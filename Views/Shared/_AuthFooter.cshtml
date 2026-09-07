@@ -1,0 +1,21 @@
+@{
+    // Slim legal-links row for the standalone auth pages (Login, Register,
+    // ForgotPassword, etc. — see _AuthLayout.cshtml). The main site's
+    // _Footer.cshtml is a full 4-column footer, which is too heavy for a
+    // centered login/register card; this mirrors the lighter single-row
+    // pattern common on SaaS auth screens (e.g. a plain link row + a
+    // copyright line under the card) using only pages that actually exist
+    // in this app — no invented legal pages.
+    var year = DateTime.UtcNow.Year;
+}
+<footer class="w-full py-8 px-4">
+    <div class="mx-auto flex max-w-md flex-col items-center gap-3 text-center">
+        <nav aria-label="Legal" class="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs">
+            <a asp-controller="Site" asp-action="PrivacyPolicy" class="text-[var(--vw-text-muted)] hover:text-[var(--vw-text)] hover:underline">Privacy Policy</a>
+            <a asp-controller="Site" asp-action="TermsOfService" class="text-[var(--vw-text-muted)] hover:text-[var(--vw-text)] hover:underline">Terms of Service</a>
+            <a asp-controller="Site" asp-action="CookiePolicy" class="text-[var(--vw-text-muted)] hover:text-[var(--vw-text)] hover:underline">Cookie Policy</a>
+            <a asp-controller="Site" asp-action="AccessibilityStatement" class="text-[var(--vw-text-muted)] hover:text-[var(--vw-text)] hover:underline">Accessibility</a>
+        </nav>
+        <p class="text-xs text-[var(--vw-text-muted)]">&copy; @year Vistawaystech LLP. All rights reserved.</p>
+    </div>
+</footer>

@@ -1,0 +1,410 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+        @layer components {
+            .ui-btn {
+                @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold leading-tight transition-colors duration-150 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none disabled:active:translate-y-0 focus-visible:outline-none;
+            }
+            /* Colors below use the shared --vw-* tokens (not Tailwind's dark: variant,
+               since the theme toggle sets data-theme="dark" on <html> rather than a
+               "dark" class) so every button automatically re-themes for dark mode
+               exactly like the rest of the app, with no separate dark: rules needed. */
+            .ui-btn-primary { @apply ui-btn text-white bg-[var(--vw-accent)] hover:bg-[var(--vw-accent-hover)] focus-visible:ring-[3px] focus-visible:ring-[var(--vw-accent-bg)]; }
+            .ui-btn-secondary { @apply ui-btn border border-[var(--vw-border)] bg-[var(--vw-surface-muted)] text-[var(--vw-text)] hover:bg-[var(--vw-border)] hover:border-[var(--vw-border-strong)] focus-visible:ring-[3px] focus-visible:ring-[var(--vw-accent-bg)]; }
+            .ui-btn-outline { @apply ui-btn border-[1.5px] border-[var(--vw-border-strong)] bg-transparent text-[var(--vw-text)] hover:bg-[var(--vw-surface-muted)] focus-visible:ring-[3px] focus-visible:ring-[var(--vw-accent-bg)]; }
+            .ui-btn-danger { @apply ui-btn text-white bg-[var(--vw-danger)] hover:bg-[var(--vw-danger-hover)] focus-visible:ring-[3px] focus-visible:ring-[var(--vw-danger-bg)]; }
+            .ui-btn-success { @apply ui-btn text-white bg-[var(--vw-success)] hover:brightness-90 focus-visible:ring-[3px] focus-visible:ring-[var(--vw-success-bg)]; }
+            .ui-btn-warning { @apply ui-btn text-white bg-[var(--vw-warning)] hover:brightness-90 focus-visible:ring-[3px] focus-visible:ring-[var(--vw-warning-bg)]; }
+            .ui-btn-ghost { @apply ui-btn bg-transparent text-[var(--vw-text-secondary)] hover:bg-[var(--vw-surface-muted)] hover:text-[var(--vw-text)] focus-visible:ring-[3px] focus-visible:ring-[var(--vw-accent-bg)]; }
+            .ui-btn-icon { @apply h-9 w-9 shrink-0 !p-0 rounded-full; }
+
+            /* Loading state — visibility:hidden (not display:none) on the
+               button's own children keeps its width/height exactly as-is
+               so nothing reflows when the spinner appears. The spinner
+               itself is a ::after on the button, so `currentColor` still
+               resolves to that button variant's own (still-visible) text
+               color — one rule works correctly across every variant
+               without needing a different spinner color per button type. */
+            .ui-btn.is-loading { pointer-events: none; position: relative; }
+            .ui-btn.is-loading > * { visibility: hidden; }
+            .ui-btn.is-loading::after {
+                content: "";
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                width: 1rem;
+                height: 1rem;
+                margin: -0.5rem 0 0 -0.5rem;
+                border: 2px solid currentColor;
+                border-right-color: transparent;
+                border-radius: 50%;
+                animation: ui-btn-spin .6s linear infinite;
+            }
+            @keyframes ui-btn-spin { to { transform: rotate(360deg); } }
+
+            
+            .ui-card {
+                @apply rounded-xl border transition-shadow duration-200;
+                border-color: var(--vw-border);
+                background-color: var(--vw-surface);
+                box-shadow: var(--vw-shadow-sm);
+            }
+            .ui-card:hover { box-shadow: var(--vw-shadow-md); }
+            .ui-card-header { @apply flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-5 sm:py-4; border-color: var(--vw-border); }
+            .ui-card-body { @apply p-4 sm:p-5; }
+
+            /* Card/section heading scale — three tiers already existed
+               informally as repeated raw utility strings across ~40 call
+               sites (documented in the Tailwind audit this session):
+               text-xl for a top-level dashboard section ("Portal
+               Modules"), text-base for a sub-section, text-sm for an
+               individual card's own header. Formalizing them here doesn't
+               change any size — every value below matches the most common
+               existing usage exactly — it just gives the hierarchy a name
+               so new sections use a consistent class instead of a new
+               one-off utility string each time. */
+            .ui-heading-lg { @apply flex items-center gap-2 text-xl font-bold; color: var(--vw-text); }
+            .ui-heading-md { @apply flex items-center gap-2 text-base font-bold; color: var(--vw-text); }
+            .ui-heading-sm { @apply flex items-center gap-2 text-sm font-bold; color: var(--vw-text); }
+
+            /* Stat-card value — the big animated counter number repeated
+               across every stats row (Admin/Recruiter/Home dashboards).
+               .ui-stat-value (text-2xl) already existed as part of the
+               .ui-stat-card component below; this adds the smaller xl
+               tier that a few dashboards use for denser stat rows,
+               without colliding with or duplicating the existing one. */
+            .ui-stat-figure { @apply text-xl font-bold; color: var(--vw-text); }
+
+            /* Section title — small uppercase eyebrow + icon used to break a long
+               form into scannable groups (Identity, Address, Education, ...).
+               One reusable class instead of repeating the same utility string
+               on every heading. */
+            .ui-section-title { @apply mb-3 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide; color: var(--vw-accent); }
+
+            .ui-badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+            .ui-badge-primary { @apply ui-badge bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]; }
+            .ui-badge-success { @apply ui-badge bg-[var(--vw-success-bg)] text-[var(--vw-success-text)]; }
+            .ui-badge-warning { @apply ui-badge bg-[var(--vw-warning-bg)] text-[var(--vw-warning-text)]; }
+            .ui-badge-danger  { @apply ui-badge bg-[var(--vw-danger-bg)] text-[var(--vw-danger-text)]; }
+            .ui-badge-neutral { @apply ui-badge bg-[var(--vw-surface-muted)] text-[var(--vw-text-secondary)]; }
+            .ui-badge-info    { @apply ui-badge bg-[var(--vw-info-bg)] text-[var(--vw-info-text)]; }
+
+            
+            .ui-alert { @apply relative flex items-start gap-3 rounded-xl border border-l-4 pl-3.5 pr-9 py-3.5 text-sm shadow-sm; }
+            .ui-alert-success { @apply ui-alert border-emerald-200 border-l-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:border-l-emerald-500 dark:bg-emerald-900/30 dark:text-emerald-200; }
+            .ui-alert-danger  { @apply ui-alert border-red-200 border-l-red-500 bg-red-50 text-red-800 dark:border-red-800 dark:border-l-red-500 dark:bg-red-900/30 dark:text-red-200; }
+            .ui-alert-info    { @apply ui-alert border-sky-200 border-l-sky-500 bg-sky-50 text-sky-800 dark:border-sky-800 dark:border-l-sky-500 dark:bg-sky-900/30 dark:text-sky-200; }
+            .ui-alert-warning { @apply ui-alert border-amber-200 border-l-amber-500 bg-amber-50 text-amber-800 dark:border-amber-800 dark:border-l-amber-500 dark:bg-amber-900/30 dark:text-amber-200; }
+
+            .ui-alert-icon { @apply flex h-8 w-8 shrink-0 items-center justify-center rounded-full; }
+            .ui-alert-success .ui-alert-icon { @apply bg-emerald-100 text-emerald-600 dark:bg-emerald-800/50 dark:text-emerald-300; }
+            .ui-alert-danger  .ui-alert-icon { @apply bg-red-100 text-red-600 dark:bg-red-800/50 dark:text-red-300; }
+            .ui-alert-info    .ui-alert-icon { @apply bg-sky-100 text-sky-600 dark:bg-sky-800/50 dark:text-sky-300; }
+            .ui-alert-warning .ui-alert-icon { @apply bg-amber-100 text-amber-600 dark:bg-amber-800/50 dark:text-amber-300; }
+
+            .ui-alert-title { @apply font-bold leading-snug; }
+            
+            .ui-alert-close { @apply absolute right-2.5 top-2.5 shrink-0 rounded-md p-1 opacity-60 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[var(--vw-accent-bg)]; }
+
+            
+            .ui-alert.is-dismissing { animation: vw-alert-out .15s ease-in forwards; }
+            @keyframes vw-alert-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-4px); } }
+            @media (prefers-reduced-motion: reduce) { .ui-alert.is-dismissing { animation: none; opacity: 0; } }
+
+            
+
+            
+            .ui-modal { @apply fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4; }
+            .ui-modal-backdrop { @apply absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] animate-fade-in; }
+            .ui-modal-panel {
+                @apply relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl sm:max-h-[80vh] animate-modal-in;
+                background-color: var(--vw-surface);
+                color: var(--vw-text);
+                box-shadow: var(--vw-shadow-lg);
+            }
+            .ui-modal-panel-sm { @apply sm:max-w-sm; }
+
+            
+            .ui-modal-grip { @apply mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-[var(--vw-border-strong)] sm:hidden; }
+
+            .ui-modal-header { @apply flex shrink-0 items-start justify-between gap-3 border-b px-5 py-4 sm:px-6; border-color: var(--vw-border); }
+            .ui-modal-title { @apply text-base font-semibold leading-tight sm:text-lg; color: var(--vw-text); }
+            .ui-modal-close { @apply ui-btn-ghost ui-btn-icon -mr-1.5 -mt-1.5 h-8 w-8 shrink-0; }
+
+            
+            .ui-modal-icon { @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full; }
+            .ui-modal-icon-danger  { @apply ui-modal-icon bg-[var(--vw-danger-bg)] text-[var(--vw-danger-text)]; }
+            .ui-modal-icon-warning { @apply ui-modal-icon bg-[var(--vw-warning-bg)] text-[var(--vw-warning-text)]; }
+            .ui-modal-icon-success { @apply ui-modal-icon bg-[var(--vw-success-bg)] text-[var(--vw-success-text)]; }
+            .ui-modal-icon-info    { @apply ui-modal-icon bg-[var(--vw-info-bg)] text-[var(--vw-info-text)]; }
+            .ui-modal-icon-default { @apply ui-modal-icon bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]; }
+
+            .ui-modal-body { @apply flex-1 overflow-y-auto px-5 py-4 text-sm sm:px-6; color: var(--vw-text-secondary); }
+
+            
+            .ui-modal-footer { @apply flex shrink-0 flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end sm:px-6; border-color: var(--vw-border); }
+            .ui-modal-footer .ui-btn { @apply w-full sm:w-auto; }
+
+            
+            .ui-loader { @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent align-[-2px]; }
+            .ui-loader-lg { @apply ui-loader h-9 w-9 border-[3px]; }
+            .ui-skeleton { @apply animate-pulse rounded-md bg-slate-200 dark:bg-slate-700; }
+
+            
+            .ui-progress { @apply h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700; }
+            .ui-progress-bar { @apply h-full rounded-full bg-[var(--vw-accent)] transition-[width] duration-500 ease-out; }
+            .ui-progress-bar-success { @apply ui-progress-bar bg-[var(--vw-success)]; }
+            .ui-progress-bar-warning { @apply ui-progress-bar bg-[var(--vw-warning)]; }
+            .ui-progress-bar-danger  { @apply ui-progress-bar bg-[var(--vw-danger)]; }
+            .ui-progress-bar-indeterminate {
+                @apply h-full w-1/3 rounded-full bg-[var(--vw-accent)];
+                animation: vw-progress-indeterminate 1.1s ease-in-out infinite;
+            }
+            @keyframes vw-progress-indeterminate {
+                0%   { margin-left: -33%; }
+                100% { margin-left: 100%; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .ui-progress-bar-indeterminate { animation-duration: 2.2s; }
+            }
+
+            
+            .ui-loading-overlay { @apply fixed inset-0 z-[200] flex flex-col items-center justify-center gap-4 bg-slate-900/70 backdrop-blur-sm text-white animate-fade-in; }
+            .ui-loading-overlay-message { @apply max-w-xs px-6 text-center text-sm font-medium; }
+
+            .ui-label { @apply mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200; }
+            .ui-field { @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors hover:border-slate-400 focus:border-[var(--vw-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--vw-accent-bg)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:hover:border-slate-500; }
+            /* <select> doesn't wrap or ellipsis its own closed-state text —
+               it just clips abruptly with no visual cue there's more. Some
+               real option values here are long (recruitment stage names
+               like "AssessmentCompleted", "InterviewInProgress" — 19
+               characters, no spaces) and these fields often sit in narrow
+               filter-row columns, so give it the same graceful truncation
+               any other constrained text gets elsewhere in the app. */
+            select.ui-field { @apply truncate; }
+            .ui-field-error { @apply mt-1 block text-xs font-medium; color: var(--vw-danger-text); }
+            .ui-required { @apply ml-0.5; color: var(--vw-danger); font-weight: 700; }
+
+            
+            .ui-checkbox {
+                @apply h-[1.05rem] w-[1.05rem] shrink-0 cursor-pointer appearance-none rounded-[0.3rem] border-2 border-slate-300 bg-white align-middle transition-colors duration-150 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--vw-accent-bg)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500;
+            }
+            .ui-checkbox:checked, .ui-checkbox:indeterminate {
+                @apply border-[var(--vw-accent)] bg-[var(--vw-accent)];
+                background-repeat: no-repeat;
+                background-position: center;
+                background-size: .68rem .68rem;
+            }
+            .ui-checkbox:checked {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E");
+            }
+            .ui-checkbox:indeterminate {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'%3E%3Cline x1='4' y1='8' x2='12' y2='8'/%3E%3C/svg%3E");
+            }
+
+            .ui-radio {
+                @apply h-[1.05rem] w-[1.05rem] shrink-0 cursor-pointer appearance-none rounded-full border-2 border-slate-300 bg-white align-middle transition-colors duration-150 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--vw-accent-bg)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500;
+            }
+            .ui-radio:checked {
+                @apply border-[var(--vw-accent)] bg-[var(--vw-accent)];
+                box-shadow: inset 0 0 0 3px #fff;
+            }
+
+            
+            .ui-switch {
+                @apply relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full border border-slate-300 bg-slate-300 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--vw-accent-bg)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-600;
+            }
+            .ui-switch:checked {
+                @apply border-[var(--vw-accent)] bg-[var(--vw-accent)];
+            }
+            .ui-switch::after {
+                content: "";
+                position: absolute;
+                top: 1px;
+                left: 1px;
+                height: 1.05rem;
+                width: 1.05rem;
+                border-radius: 9999px;
+                background: #fff;
+                box-shadow: 0 1px 2px rgba(0,0,0,.25);
+                transition: transform .2s ease;
+            }
+            .ui-switch:checked::after { transform: translateX(1.25rem); }
+
+            .ui-check-label { @apply cursor-pointer select-none text-sm text-slate-700 dark:text-slate-200; }
+            .ui-check-row { @apply flex items-start gap-2.5; }
+            .ui-check-group { @apply space-y-2; }
+
+            
+            .ui-tab { @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100; }
+            .ui-tab.is-active { @apply bg-[var(--vw-accent)] text-white hover:bg-[var(--vw-accent)] hover:text-white; }
+
+            
+            .ui-stat-card { @apply ui-card flex items-center gap-3 p-4 transition-transform duration-200 hover:-translate-y-0.5; }
+            .ui-stat-icon { @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-lg; }
+            .ui-stat-label { @apply text-xs; color: var(--vw-text-secondary); }
+            .ui-stat-value { @apply text-2xl font-bold leading-tight; color: var(--vw-text); }
+
+            
+            .ui-table { @apply w-full border-collapse text-left text-sm; }
+            /* Headers used to use position: sticky (pinned below the topbar
+               while scrolling a long list), but every .ui-table sits inside
+               <div class="overflow-x-auto"> for horizontal scroll on narrow
+               screens, and browsers always coerce overflow-y to auto
+               whenever overflow-x is non-visible — there's no way to
+               declare overflow-y: visible on that wrapper and have it
+               stick, even explicitly (tried it; the coercion happens at
+               computed-value time regardless of what's authored). That
+               turns the wrapper into the sticky containing block instead
+               of the page, so the header only intermittently catches up
+               as the real page scrolls, letting the previous row's tail
+               end render above it mid-transition. Rather than keep
+               patching around a pattern the CSS spec won't allow, headers
+               are just static now — still opaque with a bottom border,
+               they just don't pin in place. */
+            .ui-table thead th {
+                background-color: var(--vw-surface);
+                color: var(--vw-text-muted);
+                box-shadow: inset 0 -1px 0 var(--vw-border);
+            }
+            .ui-table tbody tr { transition: background-color .12s ease; }
+            .ui-table tbody tr:hover { background-color: var(--vw-surface-muted); }
+            .ui-table tbody td { color: var(--vw-text); }
+        }
+    
+/* Manual replacement for the "peer" / "peer-disabled" utility pairing above:
+   @apply can't be used with the "peer" marker utility itself (it emits no
+   CSS of its own), so the disabled-sibling-label styling that used to ride
+   along on peer-disabled:* is written here as a plain adjacent-sibling rule
+   instead, targeting the same three input types and the label that follows
+   them in markup (see .ui-check-row usage across the views). */
+.ui-checkbox:disabled ~ .ui-check-label,
+.ui-radio:disabled ~ .ui-check-label,
+.ui-switch:disabled ~ .ui-check-label {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* ================================================================
+   Careers landing page (Views/Site/Index.cshtml) — components used
+   only on that page. Kept in their own block rather than mixed into
+   the general ui-* kit above, since these are specific to one page's
+   marketing content, not reusable app-wide UI primitives.
+   ================================================================ */
+@layer components {
+    /* Mono eyebrow tag — every section opens with one. Ties the page's
+       type system back to VISTAWAYS TECH being a software company: a
+       small monospace label reads like a code comment or a status
+       flag, not a generic marketing "kicker". */
+    .vw-eyebrow {
+        @apply mb-3 inline-flex items-center gap-2 text-xs font-medium tracking-wide;
+        font-family: var(--vw-font-mono);
+        color: var(--vw-accent);
+    }
+    .vw-eyebrow::before { content: "//"; opacity: .55; }
+
+    /* Hero — a quiet radial-gradient mesh in the brand colors, dark
+       enough for white text/nav to sit on top of. No stock imagery. */
+    .vw-hero {
+        position: relative;
+        overflow: hidden;
+        background-color: #0B1120;
+        background-image:
+            radial-gradient(ellipse 70% 55% at 15% -10%, rgba(37, 99, 235, .55), transparent 60%),
+            radial-gradient(ellipse 60% 50% at 100% 10%, rgba(79, 70, 229, .45), transparent 60%),
+            radial-gradient(ellipse 55% 45% at 50% 120%, rgba(6, 182, 212, .28), transparent 60%);
+    }
+    /* Faint dot grid — an engineering-notebook texture, not a generic
+       hero pattern; kept subtle (very low opacity) per "spend your
+       boldness in one place" — the pipeline section below is the one
+       place this page goes bold. */
+    .vw-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(rgba(255, 255, 255, .09) 1px, transparent 1px);
+        background-size: 28px 28px;
+        mask-image: linear-gradient(to bottom, black, transparent 85%);
+        pointer-events: none;
+    }
+
+    /* Hiring pipeline — the page's signature element. Visualizes the
+       app's own real recruitment stages (see RecruitmentStages in
+       Models.cs), not a generic "01/02/03" process graphic — this is
+       literally what the product's pipeline looks like, simplified to
+       six candidate-facing stages. Connected nodes on a rail, laid out
+       horizontally on wide screens and stacked on mobile. */
+    .vw-pipeline { @apply grid grid-cols-1 gap-0 sm:grid-cols-6; }
+    .vw-pipeline-step {
+        position: relative;
+        padding: 1.5rem 1rem 0;
+    }
+    .vw-pipeline-rail {
+        position: absolute;
+        top: 1.5rem;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(to right, var(--vw-accent), var(--vw-secondary));
+        opacity: .25;
+    }
+    .vw-pipeline-step:first-child .vw-pipeline-rail { left: 50%; }
+    .vw-pipeline-step:last-child .vw-pipeline-rail { right: 50%; }
+    .vw-pipeline-node {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        height: 2.5rem;
+        width: 2.5rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 9999px;
+        background: var(--vw-surface);
+        border: 2px solid var(--vw-accent);
+        color: var(--vw-accent);
+        font-family: var(--vw-font-mono);
+        font-size: .75rem;
+        font-weight: 700;
+        margin: 0 auto;
+    }
+    .vw-pipeline-label {
+        margin-top: .85rem;
+        text-align: center;
+        font-weight: 600;
+        color: var(--vw-text);
+        font-size: .875rem;
+    }
+    .vw-pipeline-desc {
+        margin-top: .25rem;
+        text-align: center;
+        font-size: .8rem;
+        color: var(--vw-text-muted);
+    }
+
+    /* Value / benefit / category cards share one elevation + hover
+       language so the page doesn't invent a new card style per
+       section (consistency requirement from the brief). */
+    .vw-feature-card {
+        @apply rounded-xl border bg-[var(--vw-surface)] p-6 transition-all;
+        border-color: var(--vw-border);
+        box-shadow: var(--vw-shadow-xs);
+    }
+    .vw-feature-card:hover {
+        box-shadow: var(--vw-shadow-md);
+        transform: translateY(-2px);
+        border-color: var(--vw-accent);
+    }
+
+    .vw-testimonial-card {
+        @apply rounded-xl border bg-[var(--vw-surface)] p-6;
+        border-color: var(--vw-border);
+        box-shadow: var(--vw-shadow-xs);
+    }
+    .vw-testimonial-avatar {
+        @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold;
+        background: var(--vw-accent-bg);
+        color: var(--vw-accent-text);
+    }
+}

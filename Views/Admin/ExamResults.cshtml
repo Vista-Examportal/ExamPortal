@@ -1,0 +1,136 @@
+@model List<ExamAttempt>
+@{
+    ViewData["Title"] = "Assessment Analytics"; var exam = ViewBag.Exam as Exam;
+
+    // Same color-name -> ui-badge-* mapping used across Admin/Recruiter/
+    // CandidateDetail, so rank/eligibility/violations badges in this table
+    // render through the same shared convention.
+    // Shared color->CSS-class mapping (UiBadge.CssClass) — was previously copy-pasted here.
+    Func<string, string> badgeClass = ExamPortal.Models.UiBadge.CssClass;
+}
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="bar-chart-3"></i></div>
+        <div>
+            <h1 class="vw-page-title">@exam?.Title</h1>
+            <p class="vw-page-subtitle">Assessment analytics, eligibility outcomes, and proctoring summary</p>
+        </div>
+    </div>
+    <div class="vw-page-actions">
+        @if (!User.IsInRole(PortalRoles.Admin) && User.IsInRole(PortalRoles.Recruiter))
+        {
+            <a asp-controller="Recruiter" asp-action="Index" asp-route-tab="reports" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back</a>
+        }
+        else
+        {
+            <a asp-action="Index" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back</a>
+        }
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel {
+        Icon = "inbox",
+        Title = "No attempts for this assessment yet",
+        Message = "Analytics will populate once invited candidates start completing this assessment.",
+        SecondaryText = "Back to assessments",
+        SecondaryUrl = (!User.IsInRole(PortalRoles.Admin) && User.IsInRole(PortalRoles.Recruiter))
+            ? Url.Action("Index", "Recruiter", new { tab = "reports" })
+            : Url.Action("Index")
+    })
+}
+else
+{
+    var passCount = Model.Count(a => a.Passed);
+    var avg = Model.Any() ? (int)Model.Average(a => a.TotalMarks > 0 ? (a.Score * 100.0 / a.TotalMarks) : 0) : 0;
+    var topScore = Model.Any() ? Model.Max(a => a.PercentageScore) : 0;
+    var sectionScores = Model.SelectMany(a => a.Scores)
+        .GroupBy(s => s.SectionName)
+        .Select(g => new { Section = g.Key, Average = g.Average(s => s.MaxScore > 0 ? s.AwardedScore * 100 / s.MaxScore : 0) })
+        .OrderByDescending(x => x.Average)
+        .ToList();
+    <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div class="ui-stat-card">
+            <div class="vw-stat-icon is-primary"><i data-lucide="users"></i></div>
+            <div class="vw-stat-body"><div class="vw-stat-value">@Model.Count</div><div class="vw-stat-label">Attempts</div></div>
+        </div>
+        <div class="ui-stat-card">
+            <div class="vw-stat-icon is-success"><i data-lucide="check"></i></div>
+            <div class="vw-stat-body"><div class="vw-stat-value">@passCount</div><div class="vw-stat-label">Eligible</div></div>
+        </div>
+        <div class="ui-stat-card">
+            <div class="vw-stat-icon is-danger"><i data-lucide="x"></i></div>
+            <div class="vw-stat-body"><div class="vw-stat-value">@(Model.Count - passCount)</div><div class="vw-stat-label">Not Eligible</div></div>
+        </div>
+        <div class="ui-stat-card">
+            <div class="vw-stat-icon is-primary"><i data-lucide="trending-up"></i></div>
+            <div class="vw-stat-body"><div class="vw-stat-value">@avg%</div><div class="vw-stat-label">Avg Score</div></div>
+        </div>
+    </div>
+
+    <div class="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+        <div class="ui-card vw-info-card lg:col-span-1">
+            <div class="vw-info-card-header"><i data-lucide="trophy"></i>Ranking Summary</div>
+            <div class="text-3xl font-bold text-[var(--vw-accent)]">@topScore.ToString("N2")%</div>
+            <div class="text-sm text-slate-500 dark:text-slate-400">Top percentage score</div>
+        </div>
+        <div class="ui-card vw-info-card lg:col-span-2">
+            <div class="vw-info-card-header"><i data-lucide="bar-chart-3"></i>Section Analytics</div>
+            @foreach (var sectionMetric in sectionScores)
+            {
+                <div class="mb-2">
+                    <div class="mb-1 flex items-center justify-between text-sm"><span>@sectionMetric.Section</span><strong>@sectionMetric.Average.ToString("N1")%</strong></div>
+                    <div class="ui-progress" style="height:7px;"><div class="ui-progress-bar" style="width:@(Math.Max(0, Math.Min(100, sectionMetric.Average)))%"></div></div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="ui-card">
+        <div class="overflow-x-auto">
+            @{ ViewData["TableId"] = "examResultsTable"; ViewData["ShowPageSize"] = true; ViewData["SearchPlaceholder"] = "Search candidates..."; }
+            @await Html.PartialAsync("_TableToolbar")
+            <table id="examResultsTable" class="ui-table" data-smart-table data-sortable data-page-size="10">
+                <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                    <tr><th class="px-5 py-3 font-medium" data-sort-key="rank" data-sort-type="number">Rank</th><th class="px-5 py-3 font-medium" data-sort-key="candidate">Candidate</th><th class="px-5 py-3 font-medium" data-sort-key="score" data-sort-type="number">Score</th><th class="px-5 py-3 font-medium" data-sort-key="pct" data-sort-type="number">Percentage</th><th class="px-5 py-3 font-medium" data-sort-key="eligibility">Eligibility</th><th class="px-5 py-3 font-medium" data-sort-key="violations" data-sort-type="number">Violations</th><th class="px-5 py-3 font-medium" data-sort-key="date" data-sort-type="date">Date</th><th class="px-5 py-3 font-medium">&nbsp;</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                    @foreach (var a in Model.OrderBy(x => x.Rank == 0 ? int.MaxValue : x.Rank).ThenByDescending(x => x.PercentageScore))
+                    {
+                        var pct = a.TotalMarks > 0 ? (int)Math.Round((a.Score * 100.0) / a.TotalMarks) : 0;
+                        <tr>
+                            <td class="px-5 py-3" data-sort-value="@a.Rank"><span class="@badgeClass("primary")">#@(a.Rank == 0 ? "-" : a.Rank)</span></td>
+                            <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@a.User?.FullName">@a.User?.FullName<div class="text-xs text-slate-500 dark:text-slate-400 font-normal">@a.User?.CandidateId</div></td>
+                            <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@a.Score">@a.Score / @a.TotalMarks</td>
+                            <td class="px-5 py-3" data-sort-value="@pct">
+                                <div class="flex items-center gap-2">
+                                    <div class="ui-progress flex-1" style="max-width:120px;">
+                                        <div class="ui-progress-bar-@(pct >= 60 ? "success" : pct >= 40 ? "warning" : "danger")" style="width:@pct%"></div>
+                                    </div>
+                                    <span class="text-xs font-semibold">@pct%</span>
+                                </div>
+                            </td>
+                            <td class="px-5 py-3">
+                                @if (a.Status == "PendingManualReview") {
+                                    <span class="@badgeClass("warning")">PENDING REVIEW</span>
+                                } else {
+                                    <span class="@badgeClass(a.Passed ? "success" : "danger")">@(a.Passed ? "ELIGIBLE" : "NOT ELIGIBLE")</span>
+                                }
+                            </td>
+                            <td class="px-5 py-3" data-sort-value="@a.ProctoringLogs.Count"><span class="@badgeClass(a.ProctoringLogs.Count == 0 ? "neutral" : "danger")">@a.ProctoringLogs.Count</span></td>
+                            <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(a.SubmittedAt?.ToString("o"))">@a.SubmittedAt?.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                            <td class="px-5 py-3">
+                                @if (a.Status == "PendingManualReview") {
+                                    <a asp-action="GradeAttempt" asp-route-id="@a.Id" class="ui-btn-outline !py-1 !px-2.5 text-xs"><i data-lucide="pencil-line" class="h-3.5 w-3.5"></i>Grade</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div data-table-pager="examResultsTable" class="mt-3"></div>
+        </div>
+    </div>
+}

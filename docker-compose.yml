@@ -1,0 +1,68 @@
+# Runs the app + a real SQL Server instance in containers.
+#
+# LocalDB (used by default in appsettings.json for Visual Studio) only
+# runs on Windows and can't be containerized, so this compose file
+# points the app at a SQL Server Linux container instead via the
+# ConnectionStrings__DefaultConnection env var below, which overrides
+# appsettings.json (ASP.NET Core config: double underscore = nested key).
+#
+# Usage:
+#   1. Copy .env.example to .env and set MSSQL_SA_PASSWORD (and, optionally,
+#      Google/LinkedIn client id/secret, SMTP settings — the app runs fine
+#      without those, sign-in-with-Google/LinkedIn and outbound email are
+#      just inactive until they're set).
+#   2. docker compose up --build
+#   3. App: http://localhost:8080  |  SQL Server: localhost:1433
+#
+# Schema/migrations are applied automatically on startup by
+# DatabaseInitializer.EnsureSchema (see Program.cs) — no separate
+# `dotnet ef database update` step needed.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Production"
+      ConnectionStrings__DefaultConnection: "Server=db;Database=EXAMDB;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=true"
+      # Optional — sign-in providers stay disabled until both id+secret are set.
+      Authentication__Google__ClientId: "${GOOGLE_CLIENT_ID:-}"
+      Authentication__Google__ClientSecret: "${GOOGLE_CLIENT_SECRET:-}"
+      Authentication__LinkedIn__ClientId: "${LINKEDIN_CLIENT_ID:-}"
+      Authentication__LinkedIn__ClientSecret: "${LINKEDIN_CLIENT_SECRET:-}"
+      # Optional — outbound email (verification, notifications, offer letters) stays
+      # inactive until these are set; the app runs fine without them.
+      Email__SenderEmail: "${SMTP_SENDER_EMAIL:-}"
+      Email__Password: "${SMTP_PASSWORD:-}"
+    volumes:
+      # Persists candidate uploads (resumes, documents, offer letters)
+      # across container restarts/rebuilds — see FileStorageService.
+      - app_data:/app/App_Data
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mssql_data:
+  app_data:

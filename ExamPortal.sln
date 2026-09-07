@@ -1,0 +1,31 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExamPortal", "ExamPortal.csproj", "{3480BBCB-DA95-4B74-BC61-5451319130BA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ExamPortal.Tests", "ExamPortal.Tests\ExamPortal.Tests.csproj", "{7C0CAB07-C41B-4319-AF05-45CF5E7F0B85}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3480BBCB-DA95-4B74-BC61-5451319130BA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3480BBCB-DA95-4B74-BC61-5451319130BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3480BBCB-DA95-4B74-BC61-5451319130BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3480BBCB-DA95-4B74-BC61-5451319130BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7C0CAB07-C41B-4319-AF05-45CF5E7F0B85}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7C0CAB07-C41B-4319-AF05-45CF5E7F0B85}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7C0CAB07-C41B-4319-AF05-45CF5E7F0B85}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7C0CAB07-C41B-4319-AF05-45CF5E7F0B85}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNotes = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D47C9F8E-0C03-4CF1-9D4E-8BA4C8EB359F}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /Account/
+Disallow: /Admin/
+Disallow: /Recruiter/
+Disallow: /Hr/
+Disallow: /Home/
+Disallow: /Exam/
+Disallow: /SecureFiles/
+
+Sitemap: https://vistawaystech.com/sitemap.xml

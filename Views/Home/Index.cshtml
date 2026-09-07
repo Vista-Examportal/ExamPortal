@@ -1,0 +1,529 @@
+@model CandidateDashboardViewModel
+@{ ViewData["Title"] = "My Dashboard"; }
+
+@{
+    // Shared color->CSS-class mapping (UiBadge.StageCssClass) — was previously a
+    // copy-pasted dictionary here. Colors come from RecruitmentStages.BadgeColor —
+    // the same single source of truth used on the Admin, Recruiter, and shared
+    // portal dashboard views — so a given stage always renders in the same color
+    // everywhere it appears.
+    var stage = Model.Candidate.RecruitmentStage ?? "Registered";
+    var stageColor = RecruitmentStages.BadgeColor(stage);
+    var stageBadgeClass = ExamPortal.Models.UiBadge.StageCssClass(stage);
+    var stageLabels = new Dictionary<string, string> {
+        {"Registered","Registered"}, {"EmailVerificationPending","Verify Email"},
+        {"ProfilePending","Complete Profile"}, {"ResumePending","Upload Resume & Skills"},
+        {"SkillProfilePending","Complete Skill Profile"},
+        {"ProfileUnderReview","Profile Under Review"},
+        {"InvitationSent","Assessment Invited"}, {"AssessmentStarted","Assessment In Progress"},
+        {"AssessmentCompleted","Assessment Completed"}, {"Shortlisted","Shortlisted"},
+        {"InterviewInProgress","Interview In Progress"}, {"DocumentsRequested","Documents Requested"},
+        {"DocumentsVerified","Documents Verified"}, {"OfferIssued","Offer Issued"},
+        {"OfferAccepted","Offer Accepted"}, {"Onboarding","Onboarding"}, {"Rejected","Not Selected"},
+        {"OfferDeclined","Offer Declined"}
+    };
+    var stageLabel = stageLabels.ContainsKey(stage) ? stageLabels[stage] : stage;
+
+    // Single source of truth for stage order (see RecruitmentStages.Ordered
+    // doc comment) — this used to be a separate, hand-maintained copy here
+    // that had drifted out of sync and was missing "SkillProfilePending" and
+    // "AssessmentStarted". For any candidate actually in one of those two
+    // stages (including everyone currently mid-assessment), Array.IndexOf
+    // silently returned -1, which reset the journey bar below to "Step 1 of
+    // 14, 0%" — as if they hadn't started, instead of showing real progress.
+    var steps = RecruitmentStages.Ordered;
+    var currentStep = Array.IndexOf(steps, stage);
+    // Rejected and OfferDeclined are terminal outcomes reachable from several
+    // different points in the pipeline, not fixed positions in the normal
+    // forward sequence, so they're deliberately not in RecruitmentStages.Ordered
+    // (same reasoning as above) — Array.IndexOf returns -1 for them too. Left
+    // unhandled, that hit the exact same "Step 1 of N, 0%" bug described above:
+    // a rejected/declined candidate's own dashboard would misleadingly suggest
+    // they hadn't even started, instead of reflecting that their journey concluded.
+    // Treat any such not-found stage as complete (100%, final step) rather than
+    // as step zero.
+    var isTerminalOutcome = currentStep < 0;
+    var completion = Model.Candidate.ProfileCompletion?.CompletionPercentage ?? 0;
+    var unreadNotifications = Model.Notifications.Count(n => !n.IsRead);
+    var currentStepDisplay = isTerminalOutcome ? steps.Length : currentStep + 1;
+    var journeyPct = isTerminalOutcome ? 100
+        : steps.Length > 1 ? (int)(Math.Max(currentStep, 0) * 100.0 / (steps.Length - 1)) : 0;
+    // Excludes invitations that are genuinely expired but whose Status hasn't been
+    // lazily flipped from Pending/Accepted to Expired yet (that only happens when the
+    // candidate actually opens the link — see ResolveAssessmentInvitation/ExamController.Start).
+    // Without this, a candidate could see "Start Assessment" for a dead invitation here
+    // even though actually clicking through correctly rejects it — this list should not
+    // promise something the candidate can't actually do.
+    var activeInvitations = Model.Invitations.Where(i => (i.Status == "Accepted" || i.Status == "Pending") && i.ExpiresAt >= DateTime.UtcNow).ToList();
+}
+
+<div class="mx-auto max-w-6xl space-y-6">
+
+    <!-- Header / Application Status -->
+    <div id="application-status" class="vw-page-header !mb-0 scroll-mt-20">
+        <div class="vw-page-header-main">
+            <div class="vw-page-header-icon"><i data-lucide="circle-user-round"></i></div>
+            <div class="min-w-0">
+                <h1 class="vw-page-title no-icon">Welcome, @Model.Candidate.FullName!</h1>
+                <p class="vw-page-subtitle">
+                    Candidate ID: <strong class="text-[var(--vw-accent-text)]">@Model.Candidate.CandidateId</strong>
+                </p>
+                <div class="mt-3 max-w-xs">
+                    <div class="mb-1 flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                        <span>Profile completion</span>
+                        <strong>@completion%</strong>
+                    </div>
+                    <div class="ui-progress">
+                        <div class="ui-progress-bar-success" style="width:@completion%" role="progressbar" aria-valuenow="@completion" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <span class="@stageBadgeClass shrink-0 !px-3 !py-1.5 !text-sm">@stageLabel</span>
+    </div>
+
+    <!-- Recent Activity (this candidate's own actions only — see
+         ActivityFeedService.BuildCandidateFeed) -->
+    @if (Model.ActivityFeed.Any())
+    {
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm">
+                    <i data-lucide="history" class="h-4 w-4 text-[var(--vw-accent)]"></i>Recent Activity
+                </h2>
+            </div>
+            <ul class="divide-y divide-slate-100 dark:divide-slate-700">
+                @foreach (var activity in Model.ActivityFeed)
+                {
+                    <li class="flex items-start gap-3 px-5 py-3">
+                        <span class="ui-stat-icon h-9 w-9 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@activity.Icon" class="h-4 w-4"></i></span>
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@activity.Text</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @activity.When.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <!-- Notifications -->
+    @if (Model.Notifications.Any())
+    {
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm">
+                    <i data-lucide="bell" class="h-4 w-4 text-[var(--vw-accent)]"></i>Notifications
+                    @if (unreadNotifications > 0)
+                    {
+                        <span class="ui-badge-primary">@unreadNotifications unread</span>
+                    }
+                </h2>
+                <form asp-action="MarkAllNotificationsRead" method="post">
+                    <button type="submit" class="ui-btn-outline !px-3 !py-1.5 text-xs"
+                            data-confirm-title="Mark all notifications as read?"
+                            data-confirm-message="This clears the unread badge for all notifications shown below.">
+                        <i data-lucide="check-check" class="h-3.5 w-3.5"></i>Mark all read
+                    </button>
+                </form>
+            </div>
+            <ul class="divide-y divide-slate-100 dark:divide-slate-700">
+                @foreach (var note in Model.Notifications.Take(6))
+                {
+                    var bodyText = note.Body ?? "";
+                    var preview = bodyText.Substring(0, Math.Min(bodyText.Length, 140)) + (bodyText.Length > 140 ? "..." : "");
+                    <li class="flex items-start justify-between gap-3 px-5 py-3 @(note.IsRead ? "opacity-60" : "")">
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                                @note.Subject <span class="ui-badge-neutral">@note.Channel</span>
+                            </div>
+                            <div class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">@preview</div>
+                            <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">@note.CreatedAt.ToLocalTime().ToString("dd MMM HH:mm") &middot; @note.Status</div>
+                        </div>
+                        @if (!note.IsRead)
+                        {
+                            <form asp-action="MarkNotificationRead" method="post" class="shrink-0">
+                                <input type="hidden" name="notificationId" value="@note.Id" />
+                                <button type="submit" class="ui-btn-secondary !px-3 !py-1.5 text-xs">Read</button>
+                            </form>
+                        }
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+
+    <!-- Recruitment journey -->
+    <div class="ui-card p-5">
+        <div class="mb-2 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+            <span class="flex items-center gap-1.5"><i data-lucide="route" class="h-4 w-4"></i>Recruitment journey &middot; step @currentStepDisplay of @steps.Length</span>
+            <strong class="text-slate-800 dark:text-slate-100">@journeyPct%</strong>
+        </div>
+        <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+            <div class="h-full rounded-full bg-[var(--vw-accent)]" style="width:@journeyPct%"></div>
+        </div>
+        <div class="mt-2 text-sm text-slate-500 dark:text-slate-400">Current stage: <strong class="text-slate-800 dark:text-slate-100">@stageLabel</strong></div>
+    </div>
+
+    <!-- Action prompts -->
+    @if (Model.Candidate.RecruitmentStage is "EmailVerificationPending" or "ProfilePending" or "ResumePending")
+    {
+        var action = Model.Candidate.RecruitmentStage switch
+        {
+            "EmailVerificationPending" => ("VerifyEmailOtp", "Verify Email OTP", "Check your inbox and verify your email address."),
+            "ProfilePending" => ("CompleteProfile", "Complete Candidate Profile", "Add your academic and personal details."),
+            _ => ("UploadResume", "Upload Resume & Skills", "Upload your resume and add your skills, projects, and preferences.")
+        };
+        <div class="ui-alert-info items-center justify-between">
+            <div class="ui-alert-icon"><i data-lucide="circle-arrow-right" class="h-4 w-4"></i></div>
+            <div class="flex-1">
+                <div class="ui-alert-title">@action.Item2</div>
+                <div>@action.Item3</div>
+            </div>
+            <a asp-controller="Account" asp-action="@action.Item1" class="ui-btn-primary shrink-0 !px-4 !py-2">Continue</a>
+        </div>
+    }
+
+    @if (activeInvitations.Any())
+    {
+        <div class="ui-alert-info">
+            <div class="ui-alert-icon"><i data-lucide="mail-open" class="h-4 w-4"></i></div>
+            <div class="w-full">
+                <div class="ui-alert-title">You have an active assessment invitation!</div>
+                @foreach (var inv in activeInvitations)
+                {
+                    <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                        <strong>@inv.Exam?.Title</strong> <span>— expires @inv.ExpiresAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                        <a asp-controller="Exam" asp-action="Details" asp-route-id="@inv.ExamId" class="ui-btn-primary !px-3 !py-1.5 text-xs">Start Assessment</a>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <!-- Offer Status — always present so it's a real sidebar destination, not
+         just an alert that disappears entirely before an offer exists. -->
+    <div id="offer-status" class="scroll-mt-20">
+        @if (Model.Offer != null && Model.Offer.Status == "Issued")
+        {
+            <div class="ui-alert-success" data-dismissible>
+                <div class="ui-alert-icon"><i data-lucide="file-check-2" class="h-4 w-4"></i></div>
+                <div>
+                    <div class="ui-alert-title">🎉 Offer Letter Received!</div>
+                    <div class="mt-1">You have received an offer for <strong>@Model.Offer.Designation</strong> — ₹@Model.Offer.CtcLpa.ToString("N2") LPA. Joining: @Model.Offer.JoiningDate.ToString("dd MMM yyyy")</div>
+                    <div class="mt-1 text-emerald-700/80 dark:text-emerald-300/80">Check your email from VISTAWAYS TECH for the acceptance link.</div>
+                </div>
+            </div>
+        }
+        else if (Model.Offer != null && Model.Offer.Status == "Accepted")
+        {
+            <div class="ui-alert-success" data-dismissible>
+                <div class="ui-alert-icon"><i data-lucide="handshake" class="h-4 w-4"></i></div>
+                <div>
+                    <div class="ui-alert-title">🎊 Welcome to VISTAWAYS TECH!</div>
+                    <div class="mt-1">You've accepted the offer for <strong>@Model.Offer.Designation</strong>. Your joining date is <strong>@Model.Offer.JoiningDate.ToString("dd MMM yyyy")</strong>. Our HR team will reach out with onboarding details.</div>
+                </div>
+            </div>
+        }
+        else if (Model.Offer != null)
+        {
+            <div class="ui-alert-info">
+                <div class="ui-alert-icon"><i data-lucide="file-check" class="h-4 w-4"></i></div>
+                <div><strong>Offer Status:</strong> @Model.Offer.Status</div>
+            </div>
+        }
+        else
+        {
+            <div class="ui-card p-4 text-sm text-slate-500 dark:text-slate-400">
+                <div class="flex items-center gap-2"><i data-lucide="file-check" class="h-4 w-4"></i><span>No offer has been issued yet. This will update automatically once one is.</span></div>
+            </div>
+        }
+    </div>
+
+    <!-- Stats + chart -->
+    <div class="grid gap-4 md:grid-cols-3">
+        <div data-skeleton="home-stats" class="grid grid-cols-2 gap-3 sm:grid-cols-4 md:col-span-2 md:grid-cols-2">
+            @for (int i = 0; i < 4; i++)
+            {
+                <div class="ui-card flex items-center gap-3 p-4">
+                    <div class="ui-skeleton h-10 w-10 shrink-0 rounded-lg"></div>
+                    <div class="min-w-0 flex-1 space-y-2">
+                        <div class="ui-skeleton h-3 w-16"></div>
+                        <div class="ui-skeleton h-5 w-8"></div>
+                    </div>
+                </div>
+            }
+        </div>
+        <div data-skeleton-content="home-stats" class="hidden grid grid-cols-2 gap-3 sm:grid-cols-4 md:col-span-2 md:grid-cols-2">
+            <div class="ui-card p-4">
+                <div class="flex items-center gap-3">
+                    <div class="metric-icon text-[var(--vw-accent)]"><i data-lucide="mail" class="h-5 w-5"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400">Invitations</div><div class="ui-stat-figure"><span data-count-to="@Model.Invitations.Count">0</span></div></div>
+                </div>
+            </div>
+            <div class="ui-card p-4">
+                <div class="flex items-center gap-3">
+                    <div class="metric-icon text-emerald-600"><i data-lucide="check-check" class="h-5 w-5"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400">Assessments</div><div class="ui-stat-figure"><span data-count-to="@Model.Attempts.Count">0</span></div></div>
+                </div>
+            </div>
+            <div class="ui-card p-4">
+                <div class="flex items-center gap-3">
+                    <div class="metric-icon text-[var(--vw-accent)]"><i data-lucide="message-square" class="h-5 w-5"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400">Interviews</div><div class="ui-stat-figure"><span data-count-to="@Model.Interviews.Count">0</span></div></div>
+                </div>
+            </div>
+            <div class="ui-card p-4">
+                <div class="flex items-center gap-3">
+                    <div class="metric-icon text-amber-600"><i data-lucide="file-up" class="h-5 w-5"></i></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400">Documents</div><div class="ui-stat-figure"><span data-count-to="@Model.Documents.Count">0</span></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart with a loading skeleton shown until Chart.js renders -->
+        <div class="ui-card p-4">
+            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Activity overview</div>
+            <div id="dashboardChartSkeleton" class="space-y-2">
+                <div class="ui-skeleton mx-auto h-32 w-32 rounded-full"></div>
+                <div class="ui-skeleton mx-auto h-3 w-2/3"></div>
+            </div>
+            <canvas id="dashboardChart" class="hidden" height="160" aria-label="Chart summarizing invitations, assessments, interviews and documents" role="img"></canvas>
+        </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="ui-card">
+        <div class="ui-card-header">
+            <h2 class="ui-heading-sm">
+                <i data-lucide="zap" class="h-4 w-4 text-[var(--vw-accent)]"></i>Quick Actions
+            </h2>
+        </div>
+        <div class="ui-card-body grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <a asp-controller="Account" asp-action="UploadResume" class="ui-btn-outline w-full !justify-start"><i data-lucide="file-up" class="h-4 w-4"></i>Resume &amp; Skills</a>
+            <a asp-controller="Account" asp-action="CompleteProfile" class="ui-btn-outline w-full !justify-start"><i data-lucide="contact" class="h-4 w-4"></i>Edit Profile</a>
+            @if (activeInvitations.Any())
+            {
+                <a asp-controller="Exam" asp-action="Details" asp-route-id="@activeInvitations.First().ExamId" class="ui-btn-outline w-full !justify-start"><i data-lucide="clipboard-check" class="h-4 w-4"></i>Start Assessment</a>
+            }
+            else
+            {
+                <button type="button" class="ui-btn-outline w-full !justify-start" disabled title="No active assessment invitation right now"><i data-lucide="clipboard-check" class="h-4 w-4"></i>No Assessment Due</button>
+            }
+            <a asp-controller="Home" asp-action="Results" class="ui-btn-outline w-full !justify-start"><i data-lucide="history" class="h-4 w-4"></i>My Assessments</a>
+        </div>
+    </div>
+
+    <!-- Document upload -->
+    @if (Model.Candidate.RecruitmentStage == "DocumentsRequested")
+    {
+        <div>
+            <h2 class="ui-heading-sm mb-3">
+                <i data-lucide="file-up" class="h-4 w-4 text-[var(--vw-accent)]"></i>Upload Required Documents
+            </h2>
+            <div class="ui-card p-5">
+                <p class="mb-4 text-sm text-slate-500 dark:text-slate-400">Please upload all required documents. Accepted formats: PDF, JPG, PNG (max 5 MB each).</p>
+                <div class="space-y-3">
+                    @foreach (var dt in ExamPortal.Models.DocumentTypes.AllOffered)
+                    {
+                        var existingDoc = Model.Documents.FirstOrDefault(d => d.DocumentType == dt);
+                        var docBadgeClass = existingDoc == null ? "ui-badge-neutral"
+                            : existingDoc.VerificationStatus == "Verified" ? "ui-badge-success"
+                            : existingDoc.VerificationStatus == "Rejected" ? "ui-badge-danger" : "ui-badge-warning";
+                        // Server-side rule this mirrors (see HomeController.UploadDocument):
+                        // only "not uploaded yet" or "Rejected" may show an upload control —
+                        // a Pending document is under review and a Verified one is locked, on
+                        // the server regardless of what this view renders.
+                        var canUpload = existingDoc == null || existingDoc.VerificationStatus == "Rejected";
+                        <div class="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60">
+                            <div class="w-full min-w-[140px] text-sm font-semibold text-slate-700 dark:text-slate-200 sm:w-40">
+                                @dt
+                                @if (!ExamPortal.Models.DocumentTypes.Required.Contains(dt))
+                                {
+                                    <span class="block text-xs font-normal text-slate-400 dark:text-slate-500">Optional</span>
+                                }
+                            </div>
+                            @if (existingDoc != null)
+                            {
+                                <span class="@docBadgeClass">@(existingDoc.VerificationStatus == "Pending" ? "Under Review" : existingDoc.VerificationStatus)</span>
+                                <a href="@existingDoc.FilePath" target="_blank" class="ui-btn-outline !px-3 !py-1.5 text-xs"><i data-lucide="eye" class="h-3.5 w-3.5"></i>View</a>
+                                @if (existingDoc.VerificationStatus == "Rejected")
+                                {
+                                    <small class="text-red-600 dark:text-red-400">@existingDoc.AdminNotes</small>
+                                }
+                                @if (existingDoc.VerificationStatus == "Verified")
+                                {
+                                    <small class="text-emerald-600 dark:text-emerald-400">Document verified successfully</small>
+                                }
+                            }
+                            else
+                            {
+                                <span class="ui-badge-neutral">Not Uploaded</span>
+                            }
+                            @if (canUpload)
+                            {
+                                <form asp-controller="Home" asp-action="UploadDocument" method="post" enctype="multipart/form-data" class="ml-auto flex items-center gap-2">
+                                    <input type="hidden" name="documentType" value="@dt" />
+                                    <input type="file" name="file" aria-label="@(existingDoc == null ? "Upload" : "Re-upload") @dt" class="max-w-[200px] text-xs text-slate-500 dark:text-slate-400 file:mr-2 file:rounded-md file:border-0 file:bg-slate-200 file:px-2 file:py-1.5 file:text-xs dark:file:bg-slate-700 dark:file:text-slate-100" accept=".pdf,.jpg,.jpeg,.png" />
+                                    <button type="submit" class="ui-btn-primary !px-3 !py-1.5 text-xs">@(existingDoc == null ? "Upload" : "Re-upload")</button>
+                                </form>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+    else if (Model.Candidate.RecruitmentStage == "DocumentsVerified")
+    {
+        <div class="ui-card p-5 flex items-center gap-3">
+            <i data-lucide="shield-check" class="h-5 w-5 text-emerald-500 shrink-0"></i>
+            <span class="text-sm font-medium text-slate-700 dark:text-slate-200">All required documents have been verified.</span>
+        </div>
+    }
+
+    <!-- Interview Status -->
+    <div id="interview-status" class="scroll-mt-20">
+        <h2 class="ui-heading-sm mb-3">
+            <i data-lucide="message-square" class="h-4 w-4 text-[var(--vw-accent)]"></i>Interview Status
+        </h2>
+        @if (Model.Interviews.Any())
+        {
+            <div class="ui-card overflow-x-auto">
+                <table class="ui-table min-w-[560px]">
+                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:bg-slate-800/60">
+                        <tr><th class="px-4 py-3">Round</th><th class="px-4 py-3">Scheduled</th><th class="px-4 py-3">Mode</th><th class="px-4 py-3">Status</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @foreach (var ir in Model.Interviews)
+                        {
+                            // Candidate-safe status only — Outcome, Feedback, Rating, Remarks, and
+                            // CandidateStatusAfterInterview are internal evaluation fields and are
+                            // intentionally never rendered here (see the recruitment-status-only
+                            // requirement in the candidate dashboard spec). Cancelled/Missed still
+                            // read as neutral workflow states, not evaluation outcomes.
+                            var irBadge = ir.Status == "Completed" ? "ui-badge-success" : ir.Status is "Cancelled" or "Missed" ? "ui-badge-danger" : "ui-badge-primary";
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">@ir.Round</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@ir.ScheduledAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@ir.Format</td>
+                                <td class="px-4 py-3"><span class="@irBadge">@ir.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else
+        {
+            <div class="ui-card p-4 text-sm text-slate-500 dark:text-slate-400">
+                <div class="flex items-center gap-2"><i data-lucide="message-square" class="h-4 w-4"></i><span>No interviews scheduled yet.</span></div>
+            </div>
+        }
+    </div>
+
+    <!-- My Assessments — workflow/status only. Score, TotalMarks, PercentageScore,
+         Passed/EligibilityStatus, Rank, and any other evaluation fields on ExamAttempt
+         are internal recruitment-evaluation data and are intentionally never rendered
+         on the candidate dashboard (see the candidate-dashboard evaluation-hiding spec). -->
+    @if (Model.Attempts.Any())
+    {
+        <div id="assessment-status" class="scroll-mt-20">
+            <h2 class="ui-heading-sm mb-3">
+                <i data-lucide="history" class="h-4 w-4 text-[var(--vw-accent)]"></i>My Assessments
+            </h2>
+            <div class="ui-card overflow-x-auto">
+                <table class="ui-table min-w-[480px]">
+                    <thead class="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:bg-slate-800/60">
+                        <tr><th class="px-4 py-3">Assessment</th><th class="px-4 py-3">Status</th><th class="px-4 py-3">Date</th><th class="px-4 py-3"></th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @foreach (var a in Model.Attempts)
+                        {
+                            // Candidate-safe status derived only from workflow fields (Status /
+                            // SubmittedAt) — never from Score, Passed, or PercentageScore.
+                            var statusLabel = a.SubmittedAt != null ? "Completed" : "In Progress";
+                            var statusBadge = a.SubmittedAt != null ? "ui-badge-success" : "ui-badge-primary";
+                            <tr>
+                                <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">@a.Exam?.Title</td>
+                                <td class="px-4 py-3"><span class="@statusBadge">@statusLabel</span></td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@a.StartedAt.ToLocalTime().ToString("dd MMM, HH:mm")</td>
+                                <td class="px-4 py-3">
+                                    @if (a.SubmittedAt != null)
+                                    {
+                                        <a asp-controller="Exam" asp-action="Result" asp-route-attemptId="@a.Id" class="ui-btn-outline !px-3 !py-1.5 text-xs">View Submission</a>
+                                    }
+                                    else
+                                    {
+                                        <a asp-controller="Exam" asp-action="Take" asp-route-attemptId="@a.Id" class="ui-btn-primary !px-3 !py-1.5 text-xs">Continue</a>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+
+    @if (!Model.Attempts.Any() && !activeInvitations.Any() && Model.Candidate.RecruitmentStage == "Registered")
+    {
+        <div class="ui-alert-info">
+            <div class="ui-alert-icon"><i data-lucide="info" class="h-4 w-4"></i></div>
+            <div><strong>Your registration is in progress.</strong> Your Candidate ID is active. Complete email OTP verification, profile details, resume upload, and skill profile so recruiters can review you.</div>
+        </div>
+    }
+
+    @if (!Model.Attempts.Any() && !activeInvitations.Any() && Model.Candidate.RecruitmentStage == "ProfileUnderReview")
+    {
+        <div class="ui-alert-info">
+            <div class="ui-alert-icon"><i data-lucide="info" class="h-4 w-4"></i></div>
+            <div><strong>Your profile is awaiting recruiter review.</strong> A recruiter will review your profile and send a secure assessment invitation via email. Your Candidate ID is <strong>@Model.Candidate.CandidateId</strong>.</div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Stat cards use the shared data-skeleton wiring in app.js. Once it
+        // reveals them, restart the count-up animation now that the numbers
+        // are actually visible — same pattern as the Admin dashboard.
+        document.addEventListener('vw:skeleton-revealed', function (e) {
+            if (e.detail.group === 'home-stats' && window.vwInitStatCounters) window.vwInitStatCounters();
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script>
+        (function () {
+            var ctx = document.getElementById('dashboardChart');
+            var skeleton = document.getElementById('dashboardChartSkeleton');
+            if (!ctx || !window.Chart) return;
+            // Read the real design-system colors instead of hardcoding a separate hex
+            // palette that could (and previously did) drift from --vw-accent/success/etc.
+            var css = getComputedStyle(document.documentElement);
+            var palette = [
+                css.getPropertyValue('--vw-accent').trim(),
+                css.getPropertyValue('--vw-success').trim(),
+                css.getPropertyValue('--vw-info').trim(),
+                css.getPropertyValue('--vw-warning').trim()
+            ];
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Invitations', 'Assessments', 'Interviews', 'Documents'],
+                    datasets: [{
+                        data: [@Model.Invitations.Count, @Model.Attempts.Count, @Model.Interviews.Count, @Model.Documents.Count],
+                        backgroundColor: palette,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                    cutout: '65%'
+                }
+            });
+            skeleton.classList.add('hidden');
+            ctx.classList.remove('hidden');
+        })();
+    </script>
+}

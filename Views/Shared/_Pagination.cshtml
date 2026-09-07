@@ -1,0 +1,65 @@
+@model ExamPortal.Models.PaginationInfo
+@{
+    var currentPage = Model.Page;
+    var totalPages = Model.TotalPages;
+}
+@if (totalPages > 1)
+{
+    var hasPrev = currentPage > 1;
+    var hasNext = currentPage < totalPages;
+    Func<int, string> pageUrl = p => "?" + Model.QueryStringPrefix + "page=" + p;
+
+    @* Compact page-number list: always show first, last, current +/-1,
+       collapse everything else into a single "…" so a list with, say,
+       80 pages doesn't render 80 links. *@
+    var pagesToShow = new List<int?>();
+    for (int p = 1; p <= totalPages; p++)
+    {
+        if (p == 1 || p == totalPages || Math.Abs(p - currentPage) <= 1)
+        {
+            pagesToShow.Add(p);
+        }
+        else if (pagesToShow.Count == 0 || pagesToShow[pagesToShow.Count - 1].HasValue)
+        {
+            pagesToShow.Add(null);
+        }
+    }
+
+    <nav class="vw-pagination" aria-label="Pagination">
+        <a class="vw-page-btn vw-page-prev@(hasPrev ? "" : " disabled")"
+           href="@(hasPrev ? pageUrl(currentPage - 1) : "#")"
+           aria-label="Previous page"
+           tabindex="@(hasPrev ? (int?)null : -1)"
+           aria-disabled="@(hasPrev ? null : "true")">
+            <i data-lucide="chevron-left" class="h-4 w-4" aria-hidden="true"></i><span class="vw-page-btn-label">Previous</span>
+        </a>
+
+        <div class="vw-page-numbers">
+            @foreach (var p in pagesToShow)
+            {
+                if (p == null)
+                {
+                    <span class="vw-page-ellipsis" aria-hidden="true">&hellip;</span>
+                }
+                else if (p == currentPage)
+                {
+                    <span class="vw-page-num is-active" aria-current="page">@p</span>
+                }
+                else
+                {
+                    <a class="vw-page-num" href="@pageUrl(p.Value)">@p</a>
+                }
+            }
+        </div>
+
+        <span class="vw-page-mobile-status">Page @currentPage of @totalPages</span>
+
+        <a class="vw-page-btn vw-page-next@(hasNext ? "" : " disabled")"
+           href="@(hasNext ? pageUrl(currentPage + 1) : "#")"
+           aria-label="Next page"
+           tabindex="@(hasNext ? (int?)null : -1)"
+           aria-disabled="@(hasNext ? null : "true")">
+            <span class="vw-page-btn-label">Next</span><i data-lucide="chevron-right" class="h-4 w-4" aria-hidden="true"></i>
+        </a>
+    </nav>
+}

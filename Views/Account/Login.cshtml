@@ -1,0 +1,127 @@
+@model CandidateLoginViewModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = "_AuthLayout";
+    // Centered single-column layout (brand panel removed) — this page
+    // centers its own content, unlike the other standalone auth pages, so
+    // it opts out of the shared layout's default centered-card content class.
+    // (No min-h-screen/flex-center needed here — that's now handled by
+    // _AuthLayout's <body>, and this page's own inner div below does its
+    // own min-h-screen centering.)
+    ViewData["BodyClass"] = "";
+}
+@* Toast host — same mechanism as the rest of the app (see app.js createToast /
+   data-flash-message), so any TempData flash set before a redirect into this
+   page (e.g. "Password reset — sign in with your new password") renders as
+   a consistent toast instead of Login inventing its own message style. *@
+<div id="appToastHost" class="pointer-events-none fixed inset-x-0 top-4 z-[999] flex flex-col items-center gap-2 px-4 sm:items-end sm:right-4 sm:left-auto"></div>
+@if (TempData["Success"] != null)
+{
+    <div data-flash-message="@TempData["Success"]" data-flash-variant="success" class="hidden"></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div data-flash-message="@TempData["Error"]" data-flash-variant="error" class="hidden"></div>
+}
+
+<div class="mx-auto flex min-h-screen max-w-[1280px]">
+
+    <div class="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
+    <div class="w-full max-w-md">
+        @* Logo shown at all sizes now that the desktop brand panel is gone. *@
+        <div class="mb-6 text-center">
+            <a asp-controller="Site" asp-action="Index" class="inline-block rounded-lg hover:opacity-90" aria-label="Back to home">
+                <img src="~/logo-full.png" alt="VISTAWAYS TECH — Innovation. Integration. Impact." class="mx-auto mb-3 h-16 w-auto object-contain" width="2047" height="561" />
+            </a>
+        </div>
+
+        <div class="ui-card overflow-hidden">
+            <div class="p-8 sm:p-10">
+                <div class="mb-6">
+                    <h1 class="text-xl font-bold text-slate-900 dark:text-white">Welcome back</h1>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Sign in to continue to your dashboard.</p>
+                </div>
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="ui-alert-danger mb-4 animate-[vwShake_.4s_ease-in-out]" role="alert" aria-live="assertive">
+                        <div class="ui-alert-icon"><i data-lucide="circle-alert" class="h-4 w-4"></i></div>
+                        <div>@Html.ValidationSummary(true, null, new { @class = "space-y-0.5" })</div>
+                    </div>
+                }
+
+                <form asp-action="Login" method="post" id="loginForm" class="space-y-5">
+                    <div>
+                        <label asp-for="CandidateId" for="loginId" class="ui-label">Email or Candidate ID</label>
+                        <div class="ui-input-icon-wrap">
+                            <i data-lucide="mail" class="ui-input-icon h-4 w-4" aria-hidden="true"></i>
+                            <input asp-for="CandidateId" id="loginId" class="ui-field" type="text"
+                                   autocomplete="username" autofocus
+                                   aria-required="true" aria-describedby="err-CandidateId" />
+                        </div>
+                        <span asp-validation-for="CandidateId" id="err-CandidateId" class="ui-field-error"></span>
+                    </div>
+
+                    <div>
+                        <label asp-for="Password" for="loginPw" class="ui-label">Password</label>
+                        <div class="ui-input-icon-wrap">
+                            <i data-lucide="lock" class="ui-input-icon h-4 w-4" aria-hidden="true"></i>
+                            <input asp-for="Password" class="ui-field pr-10" id="loginPw"
+                                   autocomplete="current-password"
+                                   aria-required="true" aria-describedby="err-Password" />
+                            <button type="button" id="togglePw" data-pw-toggle="loginPw" class="pw-toggle-inline" aria-label="Show password">
+                                <i data-lucide="eye" class="h-4 w-4"></i>
+                            </button>
+                        </div>
+                        <div class="mt-1.5 flex items-center justify-between">
+                            <span asp-validation-for="Password" id="err-Password" class="ui-field-error !mt-0"></span>
+                            <a asp-action="ForgotPassword" class="shrink-0 text-xs font-semibold text-[var(--vw-accent)] hover:underline">Forgot password?</a>
+                        </div>
+                    </div>
+
+                    <label class="ui-check-row"><input asp-for="RememberMe" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Remember me</span></label>
+
+                    <button type="submit" id="loginSubmit" class="ui-btn-primary w-full py-2.5 font-semibold">
+                        <i data-lucide="log-in" class="h-4 w-4"></i>Sign In
+                    </button>
+                </form>
+
+                @* Google Sign-In — candidates only. There's a single shared Login page
+                   for every role (no separate Recruiter/HR/Admin login screens to hide
+                   this from), so the "Candidates only" boundary is enforced server-side:
+                   AccountController.ExternalAuth.cs never creates or signs in a
+                   Recruiter/HR/Admin account through this button, however it's reached. *@
+                @await Html.PartialAsync("_GoogleSignInButton", "Continue with Google")
+
+                <p class="text-center mt-5 text-sm text-slate-500 dark:text-slate-400">
+                    New candidate? <a asp-action="Register" class="font-semibold text-[var(--vw-accent)] hover:underline">Register here</a>
+                </p>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<style>
+    /* Brief attention-grabbing shake on the validation summary, once, on
+       page load only (not re-triggered by client-side field errors so it
+       doesn't distract while typing) — reduced-motion users get none of it. */
+    @@keyframes vwShake { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-3px); } 40%, 60% { transform: translateX(3px); } }
+    @@media (prefers-reduced-motion: reduce) { .animate-\[vwShake_\.4s_ease-in-out\] { animation: none !important; } }
+</style>
+
+@section Scripts {
+    <script>
+        // Icons are rendered centrally by app.js's renderIcons() on DOMContentLoaded.
+        // Password show/hide is wired centrally in app.js (data-pw-toggle="loginPw" above).
+        // Prevent duplicate submissions / show a loading state, same pattern used site-wide.
+        document.getElementById("loginForm").addEventListener("submit", function (e) {
+            if (e.defaultPrevented) return;
+            var btn = document.getElementById("loginSubmit");
+            setTimeout(function () {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="ui-loader"></span>Signing in…';
+            }, 0);
+        });
+    </script>
+}

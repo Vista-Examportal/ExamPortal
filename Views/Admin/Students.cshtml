@@ -1,0 +1,181 @@
+@model List<User>
+@{
+    ViewData["Title"] = "Candidates";
+    var attemptCounts = ViewBag.AttemptCounts as Dictionary<int, int>;
+    // Same color-name -> ui-badge-* mapping used across Admin/Recruiter/Home
+    // (source of truth: RecruitmentStages.BadgeColor), so a candidate's stage
+    // renders in the same color here as everywhere else in the app.
+    // Shared color->CSS-class mapping (UiBadge.CssClass) — was previously copy-pasted here.
+    Func<string, string> badgeClass = ExamPortal.Models.UiBadge.CssClass;
+}
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="users"></i></div>
+        <div><h1 class="vw-page-title">Candidates (@Model.Count)</h1></div>
+    </div>
+    <div class="vw-page-actions">
+        <a asp-action="Pipeline" class="ui-btn-secondary"><i data-lucide="workflow" class="h-4 w-4"></i>Pipeline View</a>
+        @if (User.IsInRole(PortalRoles.Admin))
+        {
+            <a asp-action="Index" class="ui-btn-outline">Dashboard</a>
+        }
+        else if (User.IsInRole(PortalRoles.Recruiter))
+        {
+            <a asp-controller="Recruiter" asp-action="Index" class="ui-btn-outline">Dashboard</a>
+        }
+        else
+        {
+            <a asp-controller="Hr" asp-action="Index" class="ui-btn-outline">Dashboard</a>
+        }
+    </div>
+</div>
+
+<div class="space-y-4">
+    @if (!Model.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "users", Title = "No candidates yet", Message = "Candidates will appear here once they register on the portal." })
+    }
+    else
+    {
+        ViewData["TableId"] = "adminStudentsList";
+        ViewData["ShowPageSize"] = true;
+        ViewData["SearchPlaceholder"] = "Search by name, email, candidate ID, skills…";
+        ViewData["PageSizeOptions"] = "10,25,50";
+        <div class="ui-card !p-3">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div class="min-w-0 flex-1">
+                    @await Html.PartialAsync("_TableToolbar")
+                </div>
+                <label class="shrink-0 lg:pt-0">
+                    <span class="sr-only">Sort by</span>
+                    <select class="ui-field" id="adminStudentsSort" aria-label="Sort candidates by">
+                        <option value="name">Sort: Name (A–Z)</option>
+                        <option value="stage">Sort: Recruitment Stage</option>
+                        <option value="attempts">Sort: Most Attempts</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+
+        <div id="adminStudentsList" data-smart-table data-page-size="10" class="space-y-4">
+        @for (int i = 0; i < Model.Count; i++)
+        {
+            var s = Model[i];
+            var cnt = attemptCounts != null && attemptCounts.ContainsKey(s.Id) ? attemptCounts[s.Id] : 0;
+            var initial = string.IsNullOrWhiteSpace(s.FullName) ? "S" : s.FullName.Trim()[0].ToString().ToUpperInvariant();
+            var stageColor = RecruitmentStages.BadgeColor(s.RecruitmentStage);
+            <div class="ui-card p-4 transition-shadow hover:shadow-md sm:p-5" data-sort-name="@s.FullName" data-sort-stage="@(s.RecruitmentStage ?? "Registered")" data-sort-attempts="@cnt">
+            <div class="flex flex-col gap-3 lg:flex-row">
+                <div class="flex flex-grow items-start gap-3">
+                    @if (!string.IsNullOrWhiteSpace(s.ProfilePhotoPath))
+                    {
+                        <img src="@s.ProfilePhotoPath" alt="@s.FullName" loading="lazy" class="h-[54px] w-[54px] shrink-0 rounded-full object-cover" />
+                    }
+                    else
+                    {
+                        <div class="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-full bg-[var(--vw-accent-bg)] text-lg font-bold text-[var(--vw-accent)]">@initial</div>
+                    }
+                    <div>
+                        <div class="font-bold text-slate-900 dark:text-white">@s.FullName</div>
+                        <div class="text-sm text-slate-500 dark:text-slate-400">@s.Email &middot; @s.MobileNumber</div>
+                        <div class="text-sm text-slate-500 dark:text-slate-400">@(string.IsNullOrWhiteSpace(s.Address?.City) ? s.CurrentLocation : $"{s.Address.City}, {s.Address.State}")</div>
+                        <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                            <span class="vw-id-badge">@s.CandidateId</span>
+                            <span class="@badgeClass(stageColor)">@RecruitmentStages.FriendlyLabel(s.RecruitmentStage ?? "Registered")</span>
+                            <span class="ui-badge-neutral">@cnt attempt@(cnt == 1 ? "" : "s")</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-start gap-2 lg:justify-end">
+                    <a asp-action="CandidateDetail" asp-route-id="@s.Id" class="ui-btn-primary !py-1.5 text-sm"><i data-lucide="user" class="h-4 w-4"></i>Manage</a>
+                    @if (!string.IsNullOrWhiteSpace(s.ResumePath))
+                    {
+                        <a href="@s.ResumePath" target="_blank" class="ui-btn-outline !py-1.5 text-sm"><i data-lucide="file-text" class="h-4 w-4"></i>Resume</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(s.LinkedInUrl))
+                    {
+                        <a href="@s.LinkedInUrl" target="_blank" class="ui-btn-outline !py-1.5 text-sm"><i data-lucide="linkedin" class="h-4 w-4"></i>LinkedIn</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(s.GitHubUrl))
+                    {
+                        <a href="@s.GitHubUrl" target="_blank" class="ui-btn-outline !py-1.5 text-sm"><i data-lucide="github" class="h-4 w-4"></i>GitHub</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(s.PortfolioWebsite))
+                    {
+                        <a href="@s.PortfolioWebsite" target="_blank" class="ui-btn-outline !py-1.5 text-sm"><i data-lucide="globe" class="h-4 w-4"></i>Portfolio</a>
+                    }
+                </div>
+            </div>
+
+            <hr class="my-4 border-[var(--vw-border)]" />
+
+            @{
+                var eduByLevel = s.EducationRecords.ToDictionary(e => e.Level, e => e);
+                var pg = eduByLevel.GetValueOrDefault(EducationLevels.Postgraduate);
+                var ug = eduByLevel.GetValueOrDefault(EducationLevels.Undergraduate);
+                var twelfth = eduByLevel.GetValueOrDefault(EducationLevels.Intermediate);
+                var tenth = eduByLevel.GetValueOrDefault(EducationLevels.Secondary);
+            }
+            <div class="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                    <div class="text-slate-500 dark:text-slate-400">Education</div>
+                    @if (pg != null && pg.Status != EducationStatuses.NotApplicable)
+                    {
+                        <div class="font-semibold text-slate-800 dark:text-slate-100">PG: @pg.DegreeOrCourse, @pg.InstituteName</div>
+                    }
+                    <div class="font-semibold text-slate-800 dark:text-slate-100">UG: @s.Degree, @s.BranchSpecialization</div>
+                    <div class="text-slate-600 dark:text-slate-300">@s.CollegeUniversityName</div>
+                    <div class="text-slate-600 dark:text-slate-300">Graduation: @s.GraduationYear | CGPA/%: @s.CgpaOrPercentage @(ug != null ? $"({ug.Status})" : "")</div>
+                </div>
+                <div>
+                    <div class="text-slate-500 dark:text-slate-400">Scores</div>
+                    <div class="text-slate-600 dark:text-slate-300">10th: @s.TenthPercentage% @(tenth != null ? $"— {tenth.InstituteName} ({tenth.BoardOrUniversity})" : "")</div>
+                    <div class="text-slate-600 dark:text-slate-300">12th: @s.TwelfthPercentage% @(twelfth != null ? $"— {twelfth.InstituteName} ({twelfth.BoardOrUniversity})" : "")</div>
+                    <div class="text-slate-600 dark:text-slate-300">Backlogs: @(string.IsNullOrWhiteSpace(s.BacklogInformation) ? "Not specified" : s.BacklogInformation)</div>
+                </div>
+                <div>
+                    <div class="text-slate-500 dark:text-slate-400">Candidate Status</div>
+                    <div class="text-slate-600 dark:text-slate-300">@s.CurrentAcademicStatus</div>
+                    <div class="text-slate-600 dark:text-slate-300">Preferred: @s.PreferredJobLocations</div>
+                    <div class="text-slate-600 dark:text-slate-300">Gap: @(string.IsNullOrWhiteSpace(s.GapInEducation) ? "None" : s.GapInEducation)</div>
+                </div>
+                <div class="sm:col-span-2">
+                    <div class="text-slate-500 dark:text-slate-400">Skills</div>
+                    <div class="text-slate-600 dark:text-slate-300">@s.Skills</div>
+                </div>
+            </div>
+        </div>
+        }
+        </div>
+        <div data-table-pager="adminStudentsList" class="mt-1"></div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Simple client-side sort for the candidate card list — reorders the
+        // real DOM nodes (same convention as data-sortable tables elsewhere),
+        // which the smart-table MutationObserver above already re-applies the
+        // current search/page slice after.
+        (function () {
+            var sortSelect = document.getElementById('adminStudentsSort');
+            var list = document.getElementById('adminStudentsList');
+            if (!sortSelect || !list) return;
+            sortSelect.addEventListener('change', function () {
+                var key = sortSelect.value;
+                var cards = Array.prototype.slice.call(list.children).filter(function (c) { return !c.hasAttribute('data-sort-exclude'); });
+                cards.sort(function (a, b) {
+                    if (key === 'attempts') {
+                        return (parseInt(b.dataset.sortAttempts, 10) || 0) - (parseInt(a.dataset.sortAttempts, 10) || 0);
+                    }
+                    if (key === 'stage') {
+                        return (a.dataset.sortStage || '').localeCompare(b.dataset.sortStage || '');
+                    }
+                    return (a.dataset.sortName || '').localeCompare(b.dataset.sortName || '');
+                });
+                cards.forEach(function (c) { list.appendChild(c); });
+            });
+        })();
+    </script>
+}

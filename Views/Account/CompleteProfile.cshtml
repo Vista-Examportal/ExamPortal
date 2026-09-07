@@ -1,0 +1,289 @@
+@model CandidateProfileStepViewModel
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{ ViewData["Title"] = "Personal Profile"; }
+
+<div class="mx-auto max-w-4xl">
+
+    @* ── Step progress bar ─────────────────────────────────────────────────── *@
+    <div class="mb-6">
+        <div class="mb-1.5 flex items-center justify-between">
+            <span class="text-sm font-semibold text-[var(--vw-accent)]">Step 3 of 4 — Personal Profile</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">75% complete</span>
+        </div>
+        <div class="ui-progress" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" aria-label="Registration progress">
+            <div class="ui-progress-bar" style="width:75%"></div>
+        </div>
+        <div class="mt-1.5 flex justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <span>Account</span><span>Verify</span><span class="font-bold text-[var(--vw-accent)]">Profile</span><span>Resume &amp; Skills</span>
+        </div>
+    </div>
+
+    <div class="mb-6 flex items-start justify-between gap-3">
+        <div>
+            <h1 class="vw-page-title">
+                <i data-lucide="contact" class="h-5 w-5 text-[var(--vw-accent)]"></i>Personal Profile
+            </h1>
+            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Add personal details, address, languages, and education.</p>
+        </div>
+        <span class="ui-badge-primary shrink-0 !px-3 !py-1.5 !text-sm">Profile</span>
+    </div>
+
+    @* Brief skeleton while the profile form's markup (education accordion,
+       language-entry widget, etc.) settles in — same declarative pattern
+       used for the dashboard's stat cards, just shaped like a form. *@
+    <div data-skeleton="profile-form" class="ui-card space-y-6 p-5 sm:p-8">
+        @for (int section = 0; section < 3; section++)
+        {
+            <div>
+                <div class="ui-skeleton mb-3 h-3 w-32"></div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div class="space-y-2"><div class="ui-skeleton h-3 w-20"></div><div class="ui-skeleton h-9 w-full"></div></div>
+                    <div class="space-y-2"><div class="ui-skeleton h-3 w-20"></div><div class="ui-skeleton h-9 w-full"></div></div>
+                </div>
+            </div>
+        }
+        <div class="ui-skeleton h-10 w-56"></div>
+    </div>
+
+    <form asp-action="CompleteProfile" method="post" id="profileForm" data-skeleton-content="profile-form" class="hidden">
+        <div class="ui-card p-5 sm:p-8">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="ui-alert-danger mb-5" role="alert" aria-live="assertive">
+                    <div class="ui-alert-icon"><i data-lucide="circle-alert" class="h-4 w-4"></i></div>
+                    <div>@Html.ValidationSummary(false, null, new { @class = "space-y-0.5" })</div>
+                </div>
+            }
+
+            @* ── Identity ───────────────────────────────────────────────────────── *@
+            <div class="ui-section-title"><i data-lucide="user" class="h-3.5 w-3.5"></i>Identity</div>
+            <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                    <label asp-for="DateOfBirth" class="ui-label">Date of Birth<span class="ui-required" aria-hidden="true">*</span></label>
+                    <input asp-for="DateOfBirth" class="ui-field" type="date" aria-required="true" aria-describedby="err-Dob" />
+                    <span asp-validation-for="DateOfBirth" id="err-Dob" class="ui-field-error"></span>
+                </div>
+                <div>
+                    <label asp-for="Gender" class="ui-label">Gender<span class="ui-required" aria-hidden="true">*</span></label>
+                    <select asp-for="Gender" class="ui-field" aria-required="true" aria-describedby="err-Gender">
+                        <option value="">Select gender</option>
+                        @foreach (var g in RegistrationOptions.Genders)
+                        {
+                            <option>@g</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Gender" id="err-Gender" class="ui-field-error"></span>
+                </div>
+            </div>
+
+            @* ── Address ────────────────────────────────────────────────────────── *@
+            <div class="ui-section-title"><i data-lucide="map-pin" class="h-3.5 w-3.5"></i>Address</div>
+            <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="sm:col-span-2 lg:col-span-3">
+                    <label asp-for="PermanentAddress" class="ui-label">Address<span class="ui-required" aria-hidden="true">*</span></label>
+                    <textarea asp-for="PermanentAddress" class="ui-field" rows="2" aria-required="true" aria-describedby="err-Addr"></textarea>
+                    <span asp-validation-for="PermanentAddress" id="err-Addr" class="ui-field-error"></span>
+                </div>
+                <div>
+                    <label asp-for="City" for="City" class="ui-label">City<span class="ui-required" aria-hidden="true">*</span></label>
+                    <input asp-for="City" id="City" class="ui-field" aria-required="true" aria-describedby="err-City" />
+                    <span asp-validation-for="City" id="err-City" class="ui-field-error"></span>
+                </div>
+                <div>
+                    <label asp-for="State" class="ui-label">State<span class="ui-required" aria-hidden="true">*</span></label>
+                    <select asp-for="State" class="ui-field" aria-required="true" aria-describedby="err-State" data-searchable data-searchable-placeholder="Search states…">
+                        <option value="">Select state</option>
+                        @foreach (var s in RegistrationOptions.States)
+                        {
+                            <option value="@s">@s</option>
+                        }
+                    </select>
+                    <span asp-validation-for="State" id="err-State" class="ui-field-error"></span>
+                </div>
+                <div>
+                    <label asp-for="Pincode" for="Pincode" class="ui-label">Pincode<span class="ui-required" aria-hidden="true">*</span></label>
+                    <input asp-for="Pincode" id="Pincode" class="ui-field" inputmode="numeric" aria-required="true" aria-describedby="err-Pin" />
+                    <span asp-validation-for="Pincode" id="err-Pin" class="ui-field-error"></span>
+                </div>
+                <div class="sm:col-span-2 lg:col-span-1">
+                    <label asp-for="Country" class="ui-label">Country<span class="ui-required" aria-hidden="true">*</span></label>
+                    <select asp-for="Country" class="ui-field" aria-required="true" aria-describedby="err-Country" data-searchable data-searchable-placeholder="Search countries…">
+                        <option value="">Select country</option>
+                        @foreach (var c in RegistrationOptions.Countries)
+                        {
+                            <option value="@c">@c</option>
+                        }
+                    </select>
+                    <span asp-validation-for="Country" id="err-Country" class="ui-field-error"></span>
+                </div>
+            </div>
+
+            @* ── Languages Known ─────────────────────────────────────────────────── *@
+            <div class="ui-section-title"><i data-lucide="languages" class="h-3.5 w-3.5"></i>Languages Known</div>
+            <div class="mb-6">
+                <div id="langList" class="mb-3 space-y-2"></div>
+                <button type="button" class="ui-btn-outline text-sm" id="btnAddLang">
+                    <i data-lucide="plus" class="h-4 w-4"></i>Add Language
+                </button>
+                <div id="langHiddenInputs"></div>
+            </div>
+
+            @* ── Education ───────────────────────────────────────────────────────── *@
+            <div class="ui-section-title"><i data-lucide="graduation-cap" class="h-3.5 w-3.5"></i>Education</div>
+            <div class="accordion mb-6" id="eduAccordion">
+                @Html.EditorFor(m => m.Postgraduate, "EducationLevelFieldset", new
+                {
+                    LevelKey = "pg", Title = "Postgraduate", Icon = "fa-user-graduate",
+                    AllowNotApplicable = true, Expanded = false,
+                    Courses = RegistrationOptions.PostgraduateCourses, Boards = RegistrationOptions.Colleges, Streams = RegistrationOptions.Branches
+                })
+                @Html.EditorFor(m => m.Undergraduate, "EducationLevelFieldset", new
+                {
+                    LevelKey = "ug", Title = "Undergraduate", Icon = "fa-graduation-cap",
+                    AllowNotApplicable = false, Expanded = true,
+                    Courses = RegistrationOptions.UndergraduateCourses, Boards = RegistrationOptions.Colleges, Streams = RegistrationOptions.Branches
+                })
+                @Html.EditorFor(m => m.Intermediate, "EducationLevelFieldset", new
+                {
+                    LevelKey = "twelfth", Title = "Intermediate / 12th", Icon = "fa-school",
+                    AllowNotApplicable = false, Expanded = true,
+                    Courses = (string[]?)null, Boards = RegistrationOptions.IntermediateBoards, Streams = RegistrationOptions.IntermediateStreams,
+                    ShowDegree = false
+                })
+                @Html.EditorFor(m => m.Secondary, "EducationLevelFieldset", new
+                {
+                    LevelKey = "tenth", Title = "10th / Secondary", Icon = "fa-book",
+                    AllowNotApplicable = false, Expanded = true,
+                    Courses = (string[]?)null, Boards = RegistrationOptions.SecondaryBoards, Streams = (string[]?)null,
+                    DegreeRequired = false, ShowDegree = false, ShowStreamBranch = false
+                })
+            </div>
+
+            <button type="submit" id="profileSubmit" class="ui-btn-primary mt-6 px-5 py-2.5 font-semibold">
+                <i data-lucide="arrow-right" class="h-4 w-4"></i>Save &amp; Continue to Resume &amp; Skills
+            </button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const LANGUAGES = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(RegistrationOptions.Languages));
+    const PROFICIENCIES = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(RegistrationOptions.LanguageProficiencies));
+    // Seed from the server model (previously saved languages, or whatever the
+    // candidate had entered before a validation error redisplayed this page).
+    // Without this, the list always rendered empty on reload even though
+    // Model.LanguagesKnown had data — silently discarding it the moment the
+    // form re-posted with an unrelated field error, and hiding a candidate's
+    // already-saved languages when they came back to edit their profile.
+    let entries = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        Model.LanguagesKnown.Select(l => new { language = l.Language, proficiency = l.Proficiency })));
+
+    function getUsedLanguages() { return entries.map(e => e.language); }
+
+    function buildLangOptions(selected) {
+        const used = getUsedLanguages();
+        return LANGUAGES.map(l => {
+            const disabled = used.includes(l) && l !== selected ? ' disabled' : '';
+            return `<option value="${l}"${l === selected ? ' selected' : ''}${disabled}>${l}</option>`;
+        }).join('');
+    }
+
+    function buildProfOptions(selected) {
+        return PROFICIENCIES.map(p =>
+            `<option value="${p}"${p === selected ? ' selected' : ''}>${p}</option>`
+        ).join('');
+    }
+
+    // escHtml is shared via app.js as window.vwEscHtml (was previously
+    // duplicated here and in UploadResume.cshtml).
+
+    function render() {
+        const list = document.getElementById('langList');
+        if (entries.length === 0) {
+            list.innerHTML = '<p class="text-sm text-slate-500 dark:text-slate-400">No languages added yet.</p>';
+        } else {
+            list.innerHTML = entries.map((e, i) => `
+                <div class="flex flex-wrap items-center gap-2 lang-entry" data-idx="${i}">
+                    <select class="ui-field w-auto text-sm lang-select" data-idx="${i}" style="max-width:180px" aria-label="Language">
+                        <option value="">-- Language --</option>
+                        ${buildLangOptions(e.language)}
+                    </select>
+                    <select class="ui-field w-auto text-sm prof-select" data-idx="${i}" style="max-width:160px" aria-label="Proficiency">
+                        <option value="">-- Proficiency --</option>
+                        ${buildProfOptions(e.proficiency)}
+                    </select>
+                    <button type="button" class="ui-btn-outline !px-2.5 !py-1.5 text-red-600 dark:text-red-400 btn-remove" data-idx="${i}" title="Remove" aria-label="Remove language">
+                        <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+                    </button>
+                    <span class="text-sm italic text-slate-500 dark:text-slate-400 entry-preview">
+                        ${e.language && e.proficiency ? window.vwEscHtml(e.language) + ' — ' + window.vwEscHtml(e.proficiency) : ''}
+                    </span>
+                </div>`).join('');
+        }
+        syncHiddenInputs();
+        rebindEvents();
+        if (window.vwRenderIcons) window.vwRenderIcons();
+    }
+
+    function syncHiddenInputs() {
+        document.getElementById('langHiddenInputs').innerHTML = entries.map((e, i) => `
+            <input type="hidden" name="LanguagesKnown[${i}].Language" value="${window.vwEscHtml(e.language)}" />
+            <input type="hidden" name="LanguagesKnown[${i}].Proficiency" value="${window.vwEscHtml(e.proficiency)}" />
+        `).join('');
+    }
+
+    function rebindEvents() {
+        document.querySelectorAll('.lang-select').forEach(sel => {
+            sel.addEventListener('change', function () { entries[+this.dataset.idx].language = this.value; render(); });
+        });
+        document.querySelectorAll('.prof-select').forEach(sel => {
+            sel.addEventListener('change', function () {
+                const idx = +this.dataset.idx;
+                entries[idx].proficiency = this.value;
+                const e = entries[idx];
+                this.closest('.lang-entry').querySelector('.entry-preview').textContent =
+                    e.language && e.proficiency ? e.language + ' — ' + e.proficiency : '';
+                syncHiddenInputs();
+            });
+        });
+        document.querySelectorAll('.btn-remove').forEach(btn => {
+            btn.addEventListener('click', function () {
+                // No confirmation dialog here, matching the Skills tag and
+                // multi-select chip removal pattern elsewhere in the app:
+                // this only edits unsaved client-side state (nothing is sent
+                // to the server until Save & Continue), so it's a low-stakes,
+                // trivially reversible action. A blocking native confirm()
+                // popup also looked out of place next to the rest of this
+                // app's themed dialogs.
+                entries.splice(+this.dataset.idx, 1); render();
+            });
+        });
+    }
+
+    document.getElementById('btnAddLang').addEventListener('click', function () {
+        entries.push({ language: '', proficiency: '' });
+        render();
+        const sels = document.querySelectorAll('.lang-select');
+        if (sels.length) sels[sels.length - 1].focus();
+    });
+
+    render();
+
+    // Loading state on save is intentionally NOT handled here.
+    // _Layout.cshtml already attaches a single global submit handler on
+    // `document` (bubble phase) that disables the submit button and shows
+    // "Please wait…" for every form on the site, but only once the event
+    // has finished bubbling past this form's own listeners — including
+    // jQuery Unobtrusive Validation's, which is what actually calls
+    // preventDefault() when a required field (e.g. an education fieldset's
+    // Institute/Board) is missing. A form-level handler defined here would instead race that
+    // deferred jQuery Validate binding and could disable/relabel the
+    // button before validation has had a chance to block the submit,
+    // leaving it stuck on "Saving…" next to a validation error. Adding a
+    // second, form-level handler here would just reintroduce that race —
+    // the global handler is sufficient and already correct for this form.
+})();
+</script>
+}

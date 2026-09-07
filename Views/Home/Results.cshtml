@@ -1,0 +1,92 @@
+@model List<ExamAttempt>
+@{
+    ViewData["Title"] = "My Assessments";
+
+    // ── Candidate-safe view ──────────────────────────────────────────────────
+    // This page intentionally renders ONLY workflow/status information derived
+    // from ExamAttempt.Status / SubmittedAt (Not Started / In Progress / Completed).
+    // It must NEVER render Score, TotalMarks, PercentageScore, Passed,
+    // EligibilityStatus, EligibilityScore, Rank, or any other evaluation field —
+    // those remain visible only to Admin/Recruiter/HR via AdminController.
+    // Do not add those fields back to this view or to a data-* attribute (raw
+    // values in markup/attributes are just as much a leak as visible text).
+}
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="clipboard-list"></i></div>
+        <div><h1 class="vw-page-title">My Assessments</h1></div>
+    </div>
+    <div class="vw-page-actions">
+        <a asp-controller="Home" asp-action="Index" class="ui-btn-outline !rounded-full !px-3 !py-1.5 text-xs">← Dashboard</a>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel {
+        Icon = "clipboard-list",
+        Title = "No assessments yet",
+        Message = "Once an assessment is assigned to you, it will show up here.",
+        Variant = "accent",
+        ActionText = "Back to Dashboard",
+        ActionUrl = Url.Action("Index", "Home"),
+        ActionIcon = "arrow-right"
+    })
+}
+else
+{
+    var completedCount = Model.Count(a => a.SubmittedAt != null);
+    var inProgressCount = Model.Count(a => a.SubmittedAt == null);
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+        <div class="vw-stat-card">
+            <div class="vw-stat-icon is-primary"><i data-lucide="clipboard-list"></i></div>
+            <div class="vw-stat-body"><div class="vw-stat-value">@Model.Count</div><div class="vw-stat-label">Total Assessments</div></div>
+        </div>
+        <div class="vw-stat-card">
+            <div class="vw-stat-icon is-success"><i data-lucide="check"></i></div>
+            <div class="vw-stat-body"><div class="vw-stat-value">@completedCount</div><div class="vw-stat-label">Completed</div></div>
+        </div>
+        <div class="vw-stat-card">
+            <div class="vw-stat-icon is-warning"><i data-lucide="hourglass"></i></div>
+            <div class="vw-stat-body"><div class="vw-stat-value">@inProgressCount</div><div class="vw-stat-label">In Progress</div></div>
+        </div>
+    </div>
+
+    <div class="ui-card">
+        <div class="overflow-x-auto">
+            @{ ViewData["TableId"] = "myAssessmentsTable"; ViewData["ShowPageSize"] = true; ViewData["SearchPlaceholder"] = "Search assessments..."; }
+            @await Html.PartialAsync("_TableToolbar")
+            <table id="myAssessmentsTable" class="ui-table" data-smart-table data-sortable data-page-size="10">
+                <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                    <tr><th class="px-5 py-3 font-medium">#</th><th class="px-5 py-3 font-medium" data-sort-key="assessment">Assessment</th><th class="px-5 py-3 font-medium" data-sort-key="status">Status</th><th class="px-5 py-3 font-medium" data-sort-key="date" data-sort-type="date">Date</th><th class="px-5 py-3 font-medium">Action</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                    @for (int i = 0; i < Model.Count; i++)
+                    {
+                        var a = Model[i];
+                        var statusLabel = a.SubmittedAt != null ? "Completed" : "In Progress";
+                        var statusBadge = a.SubmittedAt != null ? "ui-badge-success" : "ui-badge-primary";
+                        <tr>
+                            <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@(i + 1)</td>
+                            <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@a.Exam?.Title">@a.Exam?.Title</td>
+                            <td class="px-5 py-3" data-sort-value="@statusLabel"><span class="@statusBadge">@statusLabel</span></td>
+                            <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(a.StartedAt.ToString("o"))">@a.StartedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                            <td class="px-5 py-3">
+                                @if (a.SubmittedAt != null)
+                                {
+                                    <a asp-controller="Exam" asp-action="Result" asp-route-attemptId="@a.Id" class="ui-btn-outline !px-3 !py-1.5 text-xs">View Submission</a>
+                                }
+                                else
+                                {
+                                    <a asp-controller="Exam" asp-action="Take" asp-route-attemptId="@a.Id" class="ui-btn-primary !px-3 !py-1.5 text-xs">Continue</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <div data-table-pager="myAssessmentsTable" class="mt-3"></div>
+        </div>
+    </div>
+}

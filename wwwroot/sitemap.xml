@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- NOTE: vistawaystech.com is the existing WordPress marketing site — ExamPortal is
+     presumably hosted on a different domain/subdomain (e.g. portal.vistawaystech.com),
+     not the same root. Replace the domain below with wherever ExamPortal actually runs. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://vistawaystech.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://vistawaystech.com/Site/AboutUs</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vistawaystech.com/Site/ContactUs</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://vistawaystech.com/Account/Register</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://vistawaystech.com/Account/Login</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://vistawaystech.com/Site/PrivacyPolicy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://vistawaystech.com/Site/TermsOfService</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://vistawaystech.com/Site/CookiePolicy</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+  <url><loc>https://vistawaystech.com/Site/AccessibilityStatement</loc><changefreq>yearly</changefreq><priority>0.3</priority></url>
+</urlset>

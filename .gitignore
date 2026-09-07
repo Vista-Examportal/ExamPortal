@@ -1,0 +1,19 @@
+# Build artifacts
+**/bin/
+**/obj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+
+# Local secrets — never commit real values
+.env
+appsettings.Development.json
+appsettings.*.local.json
+
+# Node (only used to build wwwroot/css from tailwind-input.css / site.css)
+node_modules/
+
+# Local file uploads (candidate resumes/documents) when running outside Docker
+App_Data/

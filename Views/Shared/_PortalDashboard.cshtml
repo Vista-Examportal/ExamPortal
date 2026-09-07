@@ -1,0 +1,370 @@
+@model PortalDashboardViewModel
+@{
+    // EnterprisePortalService.cs / PortalModels.cs (Services & Models layers —
+    // out of scope for this pass) still hand this view Font Awesome class
+    // strings like "fas fa-users" via Model.Metrics[i].Icon / Model.Modules[i].Icon.
+    // Rather than touch those layers, this local, view-only lookup maps the
+    // known Font Awesome names to their Lucide equivalents so the icons in
+    // this shared partial render with Lucide too.
+    Func<string, string> ToLucide = (fa) =>
+    {
+        var map = new Dictionary<string, string>
+        {
+            ["fa-building-columns"] = "landmark",
+            ["fa-layer-group"] = "layers",
+            ["fa-user-clock"] = "history",
+            ["fa-calendar-check"] = "calendar-check",
+            ["fa-file-signature"] = "file-check",
+            ["fa-comments"] = "message-square",
+            ["fa-handshake"] = "handshake",
+            ["fa-users"] = "users",
+            ["fa-clipboard-check"] = "clipboard-check",
+            ["fa-stream"] = "workflow",
+            ["fa-list-check"] = "list-checks",
+            ["fa-address-book"] = "book-user",
+            ["fa-plus-circle"] = "circle-plus",
+            ["fa-user-plus"] = "user-plus",
+            ["fa-search"] = "search",
+            ["fa-envelope-open-text"] = "mail-open",
+            ["fa-star"] = "star",
+            ["fa-id-card"] = "contact",
+            ["fa-chart-line"] = "trending-up",
+            ["fa-folder-open"] = "folder-open",
+            ["fa-file-shield"] = "shield-check",
+            ["fa-door-open"] = "log-in",
+            ["fa-briefcase"] = "briefcase",
+        };
+        foreach (var kv in map)
+        {
+            if (fa != null && fa.Contains(kv.Key)) return kv.Value;
+        }
+        return "circle";
+    };
+
+    // Same color-name -> ui-badge-* mapping used by Admin/Index.cshtml,
+    // Recruiter/Index.cshtml, and Admin/CandidateDetail.cshtml, so the
+    // Priority Candidates stage badge in this shared HR/Recruiter partial
+    // renders through the same convention as everywhere else.
+    // Shared color->CSS-class mapping (UiBadge.CssClass) — was previously copy-pasted here.
+    Func<string, string> badgeClass = ExamPortal.Models.UiBadge.CssClass;
+
+    // HR-scoped Recent Activity — offers generated/accepted, documents uploaded,
+    // background verification completed. Built by ActivityFeedService.BuildHrFeed
+    // (see EnterprisePortalService), replacing the old view-local merge of exam
+    // attempts + interviews + offers, which mixed in Recruiter-side events (exam
+    // attempts) that aren't HR's concern.
+    var recentActivityFeed = Model.ActivityFeed;
+
+    // Upcoming Joining Dates (HR-specific list) — filtered/sorted view-locally
+    // from Model.ActiveOffers, which already carries JoiningDate on each
+    // OfferLetter. No Service/Model change needed.
+    var upcomingJoiners = Model.ActiveOffers
+        .Where(o => o.JoiningDate.Date >= DateTime.UtcNow.Date)
+        .OrderBy(o => o.JoiningDate)
+        .Take(6)
+        .ToList();
+}
+
+<div class="enterprise-hero mb-4">
+    <div>
+        <div class="uppercase text-sm font-bold opacity-75">@Model.PortalRole Workspace</div>
+        <h1 class="font-bold mb-1 text-2xl">@Model.PortalName</h1>
+        <p class="mb-0 opacity-75">@Model.WelcomeMessage</p>
+    </div>
+    <div class="enterprise-hero-mark">
+        <i data-lucide="landmark"></i>
+    </div>
+</div>
+
+@* ================================================================
+   HR HIRING PIPELINE — the granular RecruitmentStage values rolled up
+   into the 5-stage flow HR actually works: Interview Completed →
+   Background Verification → Offer Generated → Offer Accepted →
+   Onboarding. Counts come from Model.PipelineCounts (grouped from the
+   same full candidate list EnterprisePortalService already loads for
+   this dashboard); each stage links into the same Admin Pipeline board
+   columns the Portal Modules cards below already use.
+   ================================================================ *@
+@{
+    Func<string, int> hrPcount = s => Model.PipelineCounts.TryGetValue(s, out var v) ? v : 0;
+    var hrBuckets = new (string Label, string Icon, string Fragment, string[] Stages)[] {
+        ("Interview Completed", "message-square", "pipeline-interview", new[] { RecruitmentStages.InterviewInProgress }),
+        ("Background Verification", "folder-open", "pipeline-offer", new[] { RecruitmentStages.DocumentsRequested, RecruitmentStages.DocumentsVerified }),
+        ("Offer Generated", "file-check", "pipeline-offer", new[] { RecruitmentStages.OfferIssued }),
+        ("Offer Accepted", "handshake", "pipeline-offer", new[] { RecruitmentStages.OfferAccepted }),
+        ("Onboarding", "door-open", "pipeline-onboarding", new[] { RecruitmentStages.Onboarding }),
+    };
+}
+<div class="ui-card mb-4">
+    <div class="ui-card-header">
+        <h2 class="ui-heading-sm"><i data-lucide="git-branch" class="h-4 w-4 text-[var(--vw-accent)]"></i>Hiring Pipeline</h2>
+    </div>
+    <div class="ui-card-body">
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            @foreach (var bucket in hrBuckets)
+            {
+                var bucketCount = bucket.Stages.Sum(hrPcount);
+                <a asp-controller="Admin" asp-action="Pipeline" asp-fragment="@bucket.Fragment"
+                   class="group rounded-xl border border-[var(--vw-border)] bg-[var(--vw-surface)] p-4 text-left transition hover:border-[var(--vw-accent)] hover:shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="ui-stat-icon h-9 w-9 bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]"><i data-lucide="@bucket.Icon" class="h-4 w-4"></i></span>
+                        <i data-lucide="chevron-right" class="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--vw-accent)] dark:text-slate-600"></i>
+                    </div>
+                    <div class="ui-stat-value mt-3">@bucketCount</div>
+                    <div class="text-xs font-medium text-slate-500 dark:text-slate-400">@bucket.Label</div>
+                </a>
+            }
+        </div>
+    </div>
+</div>
+
+<div data-skeleton="portal-metrics" class="grid grid-cols-2 gap-3 mb-4 sm:grid-cols-4">
+    @for (int i = 0; i < 4; i++)
+    {
+        <div class="ui-card flex items-center gap-3 p-4">
+            <div class="ui-skeleton h-11 w-11 shrink-0 rounded-lg"></div>
+            <div class="min-w-0 flex-1 space-y-2">
+                <div class="ui-skeleton h-3 w-20"></div>
+                <div class="ui-skeleton h-5 w-12"></div>
+            </div>
+        </div>
+    }
+</div>
+<div data-skeleton-content="portal-metrics" class="hidden grid grid-cols-2 gap-3 mb-4 sm:grid-cols-4">
+    @foreach (var metric in Model.Metrics)
+    {
+        <div class="ui-stat-card metric-card metric-@metric.Color">
+            <div class="vw-stat-icon is-@metric.Color"><i data-lucide="@ToLucide(metric.Icon)"></i></div>
+            <div class="vw-stat-body">
+                <div class="vw-stat-label">@metric.Label</div>
+                <div class="vw-stat-value">@metric.Value</div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="grid gap-4 lg:grid-cols-12">
+    <div class="lg:col-span-8">
+        <h2 class="ui-heading-lg mb-3"><i data-lucide="layers" class="h-[18px] w-[18px] text-[var(--vw-accent)]"></i>Portal Modules</h2>
+        <div class="grid gap-3 mb-4 sm:grid-cols-2">
+            @foreach (var module in Model.Modules)
+            {
+                <a class="block" asp-controller="@module.Controller" asp-action="@module.Action" asp-fragment="@module.Fragment">
+                    <div class="ui-card vw-summary-card module-card">
+                        <div class="vw-summary-icon module-icon is-@module.Color">
+                            <i data-lucide="@ToLucide(module.Icon)"></i>
+                        </div>
+                        <div>
+                            <h3 class="vw-summary-title mb-1 text-base">@module.Title</h3>
+                            <p class="vw-summary-desc mb-0">@module.Description</p>
+                        </div>
+                    </div>
+                </a>
+            }
+        </div>
+
+        <h2 class="ui-heading-lg mb-3"><i data-lucide="history" class="h-[18px] w-[18px] text-[var(--vw-accent)]"></i>Priority Candidates</h2>
+        <div data-skeleton="portal-table" class="ui-card">
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Candidate</th><th class="px-5 py-3 font-medium">Stage</th><th class="px-5 py-3 font-medium">Location</th><th class="px-5 py-3 font-medium">Skills</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @for (int i = 0; i < 4; i++)
+                        {
+                            <tr>
+                                <td class="px-5 py-3"><div class="ui-skeleton mb-1 h-3.5 w-32"></div><div class="ui-skeleton h-3 w-20"></div></td>
+                                <td class="px-5 py-3"><div class="ui-skeleton h-3.5 w-16"></div></td>
+                                <td class="px-5 py-3"><div class="ui-skeleton h-3.5 w-24"></div></td>
+                                <td class="px-5 py-3"><div class="ui-skeleton h-3.5 w-40"></div></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div data-skeleton-content="portal-table" class="ui-card hidden">
+            <div class="overflow-x-auto">
+                <table class="ui-table" data-sortable>
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium" data-sort-key="name">Candidate</th><th class="px-5 py-3 font-medium" data-sort-key="stage">Stage</th><th class="px-5 py-3 font-medium">Location</th><th class="px-5 py-3 font-medium">Skills</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!Model.PriorityCandidates.Any())
+                        {
+                            <tr data-sort-exclude><td colspan="4" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "star", Title = "No priority candidates yet", Message = "Candidates needing attention will surface here.", Compact = true })</td></tr>
+                        }
+                        @foreach (var candidate in Model.PriorityCandidates)
+                        {
+                            <tr>
+                                <td class="px-5 py-3" data-sort-value="@candidate.FullName">
+                                    <div class="font-semibold text-slate-800 dark:text-slate-100">@candidate.FullName</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">@candidate.CandidateId</div>
+                                </td>
+                                <td class="px-5 py-3"><span class="@badgeClass(RecruitmentStages.BadgeColor(candidate.RecruitmentStage))">@candidate.RecruitmentStage</span></td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@(string.IsNullOrWhiteSpace(candidate.Address?.City) ? candidate.CurrentLocation : $"{candidate.Address.City}, {candidate.Address.State}")</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@(candidate.Skills.Length > 80 ? candidate.Skills[..80] + "..." : candidate.Skills)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="grid gap-4 mt-1 md:grid-cols-12">
+            <div class="md:col-span-7">
+                <h2 class="ui-heading-lg mb-3"><i data-lucide="activity" class="h-[18px] w-[18px] text-[var(--vw-accent)]"></i>Recent Activity</h2>
+                <div class="ui-card">
+                    <ul class="divide-y divide-slate-100 dark:divide-slate-700 mb-0">
+                        @if (!recentActivityFeed.Any())
+                        {
+                            <li>@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "activity", Title = "No activity yet", Message = "Attempts, interviews, and offers will show up here as they happen.", Compact = true })</li>
+                        }
+                        @foreach (var activity in recentActivityFeed)
+                        {
+                            <li class="flex items-start gap-3 px-5 py-3">
+                                <span class="ui-stat-icon h-9 w-9 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@activity.Icon" class="h-4 w-4"></i></span>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@activity.Text</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @activity.When.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+            <div class="md:col-span-5">
+                <h2 class="ui-heading-lg mb-3"><i data-lucide="calendar-heart" class="h-[18px] w-[18px] text-[var(--vw-accent)]"></i>Upcoming Joining Dates</h2>
+                <div class="ui-card vw-info-card side-panel">
+                    @if (!upcomingJoiners.Any())
+                    {
+                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "calendar-heart", Title = "No upcoming joiners", Message = "Candidates with a confirmed joining date will show up here.", Compact = true })
+                    }
+                    @foreach (var offer in upcomingJoiners)
+                    {
+                        <div class="vw-info-row">
+                            <div class="vw-info-row-icon side-icon text-[var(--vw-success)]"><i data-lucide="calendar-heart"></i></div>
+                            <div>
+                                <div class="font-semibold text-sm">@offer.User?.FullName</div>
+                                <div class="text-sm text-slate-500 dark:text-slate-400">@offer.Designation &middot; joins @offer.JoiningDate.ToString("dd MMM yyyy")</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="lg:col-span-4">
+        <h2 class="ui-heading-lg mb-3"><i data-lucide="calendar-check" class="h-[18px] w-[18px] text-[var(--vw-accent)]"></i>Upcoming Interviews</h2>
+        <div data-skeleton="portal-interviews">
+            <div class="ui-card mb-4 vw-info-card side-panel">
+                @for (int i = 0; i < 3; i++)
+                {
+                    <div class="vw-info-row">
+                        <div class="ui-skeleton h-8 w-8 shrink-0 rounded-full"></div>
+                        <div class="w-full">
+                            <div class="ui-skeleton mb-2 h-3 w-2/3"></div>
+                            <div class="ui-skeleton h-2.5 w-1/2"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+        <div data-skeleton-content="portal-interviews" class="hidden">
+            <div class="ui-card mb-4 vw-info-card side-panel">
+                @if (!Model.UpcomingInterviews.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "calendar-clock", Title = "No interviews scheduled", Message = "Interviews you schedule will show up here.", Compact = true })
+                }
+                @foreach (var interview in Model.UpcomingInterviews)
+                {
+                    <div class="vw-info-row">
+                        <div class="vw-info-row-icon side-icon text-[var(--vw-accent)]"><i data-lucide="message-square"></i></div>
+                        <div>
+                            <div class="font-semibold text-sm">@interview.User?.FullName</div>
+                            <div class="text-sm text-slate-500 dark:text-slate-400">@interview.Round round - @interview.ScheduledAt?.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <h2 class="ui-heading-lg mb-3"><i data-lucide="file-check" class="h-[18px] w-[18px] text-[var(--vw-accent)]"></i>Active Offers</h2>
+        <div data-skeleton="portal-offers">
+            <div class="ui-card vw-info-card side-panel">
+                @for (int i = 0; i < 2; i++)
+                {
+                    <div class="vw-info-row">
+                        <div class="ui-skeleton h-8 w-8 shrink-0 rounded-full"></div>
+                        <div class="w-full">
+                            <div class="ui-skeleton mb-2 h-3 w-1/2"></div>
+                            <div class="ui-skeleton h-2.5 w-1/3"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+        <div data-skeleton-content="portal-offers" class="hidden">
+            <div class="ui-card vw-info-card side-panel">
+                @if (!Model.ActiveOffers.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "file-check", Title = "No active offers", Message = "Offers issued to candidates will be tracked here.", Compact = true })
+                }
+                @foreach (var offer in Model.ActiveOffers)
+                {
+                    <div class="vw-info-row">
+                        <div class="vw-info-row-icon side-icon text-[var(--vw-success)]"><i data-lucide="handshake"></i></div>
+                        <div>
+                            <div class="font-semibold text-sm">@offer.User?.FullName</div>
+                            <div class="text-sm text-slate-500 dark:text-slate-400">@offer.Designation - @offer.Status</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <h2 class="ui-heading-lg mb-3"><i data-lucide="bell" class="h-[18px] w-[18px] text-[var(--vw-accent)]"></i>Notifications</h2>
+        <div data-skeleton="portal-notifications">
+            <div class="ui-card vw-info-card side-panel">
+                @for (int i = 0; i < 2; i++)
+                {
+                    <div class="vw-info-row">
+                        <div class="ui-skeleton h-8 w-8 shrink-0 rounded-full"></div>
+                        <div class="w-full">
+                            <div class="ui-skeleton mb-2 h-3 w-1/2"></div>
+                            <div class="ui-skeleton h-2.5 w-1/3"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div data-skeleton-content="portal-notifications" class="hidden">
+            <div class="ui-card vw-info-card side-panel">
+                @if (!Model.Alerts.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "bell", Title = "You're all caught up", Message = "Pending offer approvals, missing documents, and onboarding reminders will show up here.", Compact = true, Variant = "success" })
+                }
+                @foreach (var alert in Model.Alerts)
+                {
+                    var alertColor = alert.Severity switch { "danger" => "text-[var(--vw-danger)]", "warning" => "text-[var(--vw-warning)]", "success" => "text-[var(--vw-success)]", _ => "text-slate-400" };
+                    <div class="vw-info-row">
+                        <div class="vw-info-row-icon side-icon @alertColor"><i data-lucide="@alert.Icon"></i></div>
+                        <div>
+                            <div class="font-semibold text-sm">@alert.Title</div>
+                            <div class="text-sm text-slate-500 dark:text-slate-400">@alert.Detail</div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Icons above are drawn by Lucide via data-lucide attributes; re-render on
+   partial insertion since this view can be included after DOMContentLoaded. *@
+<script>
+    if (window.lucide) { window.lucide.createIcons(); }
+</script>

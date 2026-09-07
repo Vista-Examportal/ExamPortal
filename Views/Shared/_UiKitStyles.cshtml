@@ -1,0 +1,15 @@
+@* ================================================================
+   Shared Tailwind "ui-*" component kit (buttons, cards, alerts,
+   modals, badges, forms, tables, etc.).
+
+   This used to hold a runtime <style type="text/tailwindcss"> block,
+   compiled in-browser by the Tailwind Play CDN script. That's now
+   precompiled ahead of time with the Tailwind CLI into
+   wwwroot/css/tailwind-built.css (see the build inputs in
+   tailwind.config.js / tailwind-input.css at the repo root), which
+   both _Layout.cshtml and _AuthLayout.cshtml link directly — so this
+   partial no longer needs to emit anything itself. It's kept as an
+   empty placeholder (rather than deleted) so the existing
+   <partial name="_UiKitStyles" /> includes in both of those layouts
+   keep working without an edit to remove them.
+   ================================================================ *@

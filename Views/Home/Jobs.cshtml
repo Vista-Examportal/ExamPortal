@@ -1,0 +1,67 @@
+@model List<OpenRoleViewModel>
+@{ ViewData["Title"] = "Open Roles"; }
+
+<div class="mx-auto max-w-6xl space-y-6">
+
+    <div class="vw-page-header">
+        <div class="vw-page-header-main">
+            <div class="vw-page-header-icon"><i data-lucide="briefcase"></i></div>
+            <div>
+                <h1 class="vw-page-title no-icon">Open Roles</h1>
+                <p class="vw-page-subtitle">Roles currently open at VISTAWAYS TECH. You'll be invited to the matching assessment directly by email once a recruiter reviews your profile.</p>
+            </div>
+        </div>
+    </div>
+
+    @if (!Model.Any())
+    {
+        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel
+        {
+            Icon = "briefcase",
+            Title = "No open roles right now",
+            Message = "Check back soon — new roles are opened here as soon as they're ready for applicants.",
+            Variant = "accent",
+            Compact = true
+        })
+    }
+    else
+    {
+        <div data-skeleton="jobs-grid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            @for (int i = 0; i < 3; i++)
+            {
+                <div class="ui-card p-5 space-y-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="ui-skeleton h-4 w-24"></div>
+                        <div class="ui-skeleton h-5 w-16 rounded-full"></div>
+                    </div>
+                    <div class="ui-skeleton h-3 w-32"></div>
+                    <div class="ui-skeleton h-3 w-full"></div>
+                    <div class="ui-skeleton h-3 w-2/3"></div>
+                </div>
+            }
+        </div>
+        <div data-skeleton-content="jobs-grid" class="hidden grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            @foreach (var role in Model)
+            {
+                <div class="ui-card p-5">
+                    <div class="flex items-start justify-between gap-2">
+                        <h3 class="ui-heading-sm">@role.Role</h3>
+                        <span class="ui-badge-success shrink-0">@role.OpenCount open</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(role.Experience))
+                    {
+                        <p class="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">@role.Experience</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(role.Skills))
+                    {
+                        <p class="mt-2 text-sm text-[var(--vw-text-secondary)]"><strong class="text-[var(--vw-text)]">Skills:</strong> @role.Skills</p>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(role.Locations))
+                    {
+                        <p class="mt-1 text-sm text-[var(--vw-text-secondary)]"><strong class="text-[var(--vw-text)]">Locations:</strong> @role.Locations</p>
+                    }
+                </div>
+            }
+        </div>
+    }
+</div>

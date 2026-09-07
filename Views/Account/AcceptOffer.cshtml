@@ -1,0 +1,90 @@
+@{
+    ViewData["Title"] = "Offer Letter";
+    Layout = "_AuthLayout";
+    ViewData["TitleSuffix"] = "VISTAWAYS TECH";
+    // Unlike the single-field auth pages this one is top-anchored (long,
+    // document-like content) and wider (700px, matching the old .vw-offer-card),
+    // not vertically centered.
+    ViewData["BodyClass"] = "flex-1 px-4 py-10";
+    var offer = (ExamPortal.Models.OfferLetter)ViewBag.Offer;
+    var candidate = (ExamPortal.Models.User)ViewBag.Candidate;
+
+    var rows = new List<(string Label, string Value)>
+    {
+        ("Designation", offer.Designation),
+        ("Department", offer.Department),
+        ("Location", offer.Location),
+        ("CTC", $"₹{offer.CtcLpa:N2} LPA"),
+    };
+    if (offer.BaseSalaryLpa > 0) rows.Add(("Base Salary", $"INR {offer.BaseSalaryLpa:N2} LPA"));
+    if (offer.VariablePayLpa > 0) rows.Add(("Variable Pay", $"INR {offer.VariablePayLpa:N2} LPA"));
+    if (offer.BonusLpa > 0) rows.Add(("Bonus", $"INR {offer.BonusLpa:N2} LPA"));
+    rows.Add(("Joining Date", offer.JoiningDate.ToString("dd MMM yyyy")));
+}
+<div class="w-full max-w-[700px] mx-auto">
+    <div class="ui-card overflow-hidden">
+        <div class="p-6 sm:p-8 text-center bg-[var(--vw-brand-panel-bg)] text-white">
+            <a asp-controller="Site" asp-action="Index" class="inline-block rounded-lg hover:opacity-90" aria-label="Back to home">
+                <img src="~/logo-full-light.png" alt="VISTAWAYS TECH — Innovation. Integration. Impact." class="h-16 w-auto object-contain mx-auto mb-3" width="2047" height="561" />
+            </a>
+            <h1 class="vw-page-title no-icon">Offer Letter</h1>
+            <p class="text-sm opacity-75">VISTAWAYS TECH Recruitment</p>
+        </div>
+        <div class="p-6 sm:p-8">
+            <p class="text-sm text-slate-500 dark:text-slate-400">Dear <strong class="text-slate-800 dark:text-slate-100">@candidate.FullName</strong> (ID: @candidate.CandidateId),</p>
+            <p class="mt-2 text-sm text-slate-700 dark:text-slate-300">We are pleased to extend an offer of employment at <strong>VISTAWAYS TECH</strong>. Please review the details below:</p>
+
+            <div class="rounded-lg p-4 my-5 border bg-[var(--vw-accent-bg)] border-[var(--vw-accent)]">
+                @for (var i = 0; i < rows.Count; i++)
+                {
+                    <div class="flex items-center justify-between py-3 @(i < rows.Count - 1 ? "border-b border-[var(--vw-surface-muted)]" : "pt-3")">
+                        <span class="text-sm text-slate-500 dark:text-slate-400">@rows[i].Label</span>
+                        <strong class="text-sm text-slate-900 dark:text-white">@rows[i].Value</strong>
+                    </div>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(offer.CompensationBreakup))
+            {
+                <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 mb-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">@offer.CompensationBreakup</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(offer.DigitalSignature))
+            {
+                <div class="ui-alert-info mb-4">
+                    <div class="ui-alert-icon"><i data-lucide="shield-check" class="h-4 w-4"></i></div>
+                    <div>
+                        Digitally signed by <strong>@offer.SignedBy</strong> on @((offer.SignedAt ?? offer.IssuedAt).ToString("dd MMM yyyy HH:mm")) UTC<br />
+                        Signature hash: <code class="font-mono text-xs">@offer.DigitalSignature[..Math.Min(32, offer.DigitalSignature.Length)]...</code>
+                    </div>
+                </div>
+            }
+
+            <p class="text-sm text-slate-500 dark:text-slate-400">This offer is valid until you respond. Please accept or decline below.</p>
+
+            <div class="flex flex-col sm:flex-row gap-4 mt-4">
+                <form method="post" asp-action="AcceptOffer" class="flex-1">
+                    <input type="hidden" name="token" value="@(Context.Request.Query["token"])" />
+                    <input type="hidden" name="action" value="accept" />
+                    <button type="submit" class="ui-btn-success w-full py-3"
+                            data-confirm-title="Accept this offer?"
+                            data-confirm-message="This action cannot be undone." data-confirm-ok-label="Accept Offer">
+                        <i data-lucide="circle-check" class="h-4 w-4"></i>Accept Offer
+                    </button>
+                </form>
+                <form method="post" asp-action="AcceptOffer" class="flex-1">
+                    <input type="hidden" name="token" value="@(Context.Request.Query["token"])" />
+                    <input type="hidden" name="action" value="decline" />
+                    <label for="declineReason" class="ui-label">Reason for declining <span class="font-normal text-slate-500 dark:text-slate-400">(optional)</span></label>
+                    <textarea id="declineReason" name="reason" class="ui-field mb-2" rows="2"></textarea>
+                    <button type="submit" class="ui-btn-outline w-full py-3 font-semibold border-red-300 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                            data-confirm-title="Decline this offer?"
+                            data-confirm-message="This action cannot be undone." data-confirm-ok-label="Decline Offer">
+                        <i data-lucide="circle-x" class="h-4 w-4"></i>Decline Offer
+                    </button>
+                </form>
+            </div>
+            <p class="text-center mt-5 text-sm text-slate-500 dark:text-slate-400">Issued on @offer.IssuedAt.ToString("dd MMM yyyy") · VISTAWAYS TECH HR Team</p>
+        </div>
+    </div>
+</div>
+

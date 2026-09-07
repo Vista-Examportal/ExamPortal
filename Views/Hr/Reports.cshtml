@@ -1,0 +1,49 @@
+@model PortalDashboardViewModel
+@{ ViewData["Title"] = "HR Reports"; }
+
+<div class="mx-auto max-w-6xl space-y-6">
+
+    <div class="vw-page-header">
+        <div class="vw-page-header-main">
+            <div class="vw-page-header-icon"><i data-lucide="bar-chart-3"></i></div>
+            <div>
+                <h1 class="vw-page-title no-icon">HR Reports</h1>
+                <p class="vw-page-subtitle">Hiring metrics and pending HR actions.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        @foreach (var m in Model.Metrics)
+        {
+            <div class="ui-card p-4">
+                <div class="text-xs text-slate-500 dark:text-slate-400">@m.Label</div>
+                <div class="ui-stat-figure">@m.Value</div>
+            </div>
+        }
+    </div>
+
+    <div class="ui-card">
+        <div class="ui-card-header"><h2 class="ui-heading-sm"><i data-lucide="users" class="h-4 w-4 text-[var(--vw-accent)]"></i>Priority Candidates</h2></div>
+        <div class="overflow-x-auto">
+            <table class="ui-table">
+                <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                    <tr><th class="px-5 py-3 font-medium">Candidate</th><th class="px-5 py-3 font-medium">Stage</th></tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                    @if (!Model.PriorityCandidates.Any())
+                    {
+                        <tr><td colspan="2" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "users", Title = "Nothing pending", Message = "No candidates currently need HR action.", Compact = true })</td></tr>
+                    }
+                    @foreach (var c in Model.PriorityCandidates)
+                    {
+                        <tr>
+                            <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@c.FullName</td>
+                            <td class="px-5 py-3"><span class="ui-badge-neutral">@c.RecruitmentStage</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

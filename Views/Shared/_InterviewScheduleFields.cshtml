@@ -1,0 +1,38 @@
+@model ExamPortal.Models.InterviewScheduleFieldsViewModel
+@{
+    // Shared by the "Schedule Interview" form (stage == Shortlisted) and the
+    // "Reschedule Interview" form (stage == InterviewInProgress, Missed/Cancelled
+    // rounds) on CandidateDetail.cshtml — same field names/order/values either way,
+    // so form submission behavior is unchanged from before this was extracted.
+    var m = Model ?? new ExamPortal.Models.InterviewScheduleFieldsViewModel();
+}
+<label class="ui-label text-xs">Time Zone</label>
+<select name="timeZone" class="ui-field !py-1.5 text-sm mb-2">
+    @await Html.PartialAsync("_TimeZoneOptions")
+</select>
+
+<label class="ui-label text-xs">Duration (minutes)</label>
+<input type="number" name="durationMinutes" class="ui-field !py-1.5 text-sm mb-2" value="60" min="15" max="480" required />
+
+<label class="ui-label text-xs">Format</label>
+<select name="format" class="ui-field !py-1.5 text-sm mb-2">
+    <option value="Online">Online</option>
+    <option value="In-Person">In-Person</option>
+    <option value="Hybrid">Hybrid</option>
+</select>
+
+<label class="ui-label text-xs">Meeting Link / Location</label>
+<input type="text" name="meetingLink" class="ui-field !py-1.5 text-sm mb-1" value="@m.MeetingLink" />
+<div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. https://meet.google.com/abc-defg-hij or office address</div>
+
+<label class="ui-label text-xs">Meeting ID</label>
+<input type="text" name="meetingId" class="ui-field !py-1.5 text-sm mb-1" value="@m.MeetingId" />
+<div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. abc-defg-hij</div>
+
+<label class="ui-label text-xs">Interviewer Name(s)</label>
+<input type="text" name="interviewerNames" class="ui-field !py-1.5 text-sm mb-1" value="@m.InterviewerNames" />
+<div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. Priya Sharma, Ravi Kumar</div>
+
+<label class="ui-label text-xs">Panel Members</label>
+<input type="text" name="panelMembers" class="ui-field !py-1.5 text-sm mb-1" value="@m.PanelMembers" />
+<div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. Tech Lead, HR Manager, Hiring Manager</div>

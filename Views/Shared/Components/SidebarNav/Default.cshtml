@@ -1,0 +1,57 @@
+@model SidebarNavViewModel
+@{
+    // An item is "active" when its controller+action match the current
+    // request, AND — for items scoped to a specific in-page tab — the
+    // ?tab= query value also matches. Items with no Tab set (real routes
+    // like Candidates -> Students, or Create Assessment) ignore ?tab=
+    // entirely, same as before. The "dashboard" tab is treated as the
+    // default: if a page hasn't been given an explicit ?tab= yet, its
+    // Dashboard item still highlights correctly.
+    //
+    // Fragment-only items (Tab unset, Fragment set — e.g. the candidate
+    // dashboard's Applications/Interviews/Offers links, or HR's Pipeline
+    // column links) are deliberately excluded from this server-side match:
+    // a URL fragment isn't sent to the server, so there's no way to tell
+    // which one (if any) the person actually followed. Leaving them out
+    // means the page's real controller+action match (usually "Dashboard")
+    // stays the single active item by default, instead of every fragment
+    // link on that page lighting up at once. syncSidebarFragmentActive()
+    // in app.js promotes the right one to active client-side once
+    // location.hash is available.
+    Func<SidebarNavItem, bool> isActive = item =>
+    {
+        bool controllerActionMatches = item.MatchControllerOnly
+            ? string.Equals(Model.CurrentController, item.Controller, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(Model.CurrentController, item.Controller, StringComparison.OrdinalIgnoreCase)
+              && string.Equals(Model.CurrentAction, item.Action, StringComparison.OrdinalIgnoreCase);
+
+        if (!controllerActionMatches) return false;
+        if (!string.IsNullOrEmpty(item.Fragment)) return false;
+        if (string.IsNullOrEmpty(item.Tab)) return true;
+
+        var effectiveCurrentTab = string.IsNullOrEmpty(Model.CurrentTab) ? "dashboard" : Model.CurrentTab;
+        return string.Equals(effectiveCurrentTab, item.Tab, StringComparison.OrdinalIgnoreCase);
+    };
+}
+@foreach (var navSection in Model.Sections)
+{
+    if (!string.IsNullOrWhiteSpace(navSection.Title))
+    {
+        <div class="app-sidebar-section-title px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-slate-400 first:pt-0">@navSection.Title</div>
+    }
+    foreach (var item in navSection.Items)
+    {
+        bool active = isActive(item);
+        var routeValues = string.IsNullOrEmpty(item.Tab)
+            ? null
+            : new Dictionary<string, string> { ["tab"] = item.Tab };
+
+        <a asp-controller="@item.Controller" asp-action="@item.Action" asp-all-route-data="@routeValues"
+           asp-fragment="@item.Fragment" data-tooltip="@item.Label"
+           data-nav-fragment="@item.Fragment"
+           class="app-sidebar-link flex items-center gap-3 px-3 py-2.5 text-sm @(active ? "is-active" : "")"
+           aria-current="@(active ? "page" : null)">
+            <i data-lucide="@item.Icon" class="h-5 w-5 shrink-0"></i><span class="app-sidebar-label">@item.Label</span>
+        </a>
+    }
+}

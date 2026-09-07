@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/App_Data/
+**/.vs/
+**/.vscode/
+**/.git/
+**/.gitignore
+**/*.user
+**/secrets.json
+**/appsettings.Development.json
+ExamPortal.Tests/
+Dockerfile
+.dockerignore
+docker-compose*.yml
+README*.md

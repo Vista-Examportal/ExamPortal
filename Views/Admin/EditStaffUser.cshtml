@@ -1,0 +1,64 @@
+@model EditStaffUserViewModel
+@{ ViewData["Title"] = "Edit Staff User"; }
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="user-cog"></i></div>
+        <div>
+            <h1 class="vw-page-title">Edit Staff User</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400">@Model.FullName &middot; <span class="ui-badge-neutral">@Model.Role</span></p>
+        </div>
+    </div>
+    <div class="vw-page-actions">
+        <a asp-action="Index" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back</a>
+    </div>
+</div>
+
+<div class="mx-auto max-w-xl">
+    <div class="ui-card">
+        <div class="ui-card-body">
+            <form asp-action="EditStaffUser" method="post" class="space-y-3">
+                <input type="hidden" asp-for="Id" />
+                <input type="hidden" asp-for="Role" />
+
+                <p class="mb-1 text-sm text-slate-500 dark:text-slate-400">
+                    Role and password aren't changed here — role stays on the Roles &amp; Access
+                    tab, and password resets go through Forgot Password like any other account.
+                </p>
+
+                <div>
+                    <label asp-for="FullName" class="ui-label">Full name<span class="ui-required" aria-hidden="true">*</span></label>
+                    <input asp-for="FullName" class="ui-field" aria-required="true" aria-describedby="err-FullName" />
+                    <span asp-validation-for="FullName" id="err-FullName" class="ui-field-error"></span>
+                </div>
+
+                <div>
+                    <label asp-for="Email" class="ui-label">Email<span class="ui-required" aria-hidden="true">*</span></label>
+                    <input asp-for="Email" type="email" class="ui-field" aria-required="true" aria-describedby="err-Email hint-Email" />
+                    <div id="hint-Email" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        Also this person's sign-in username — changing it changes what they log in with.
+                    </div>
+                    <span asp-validation-for="Email" id="err-Email" class="ui-field-error"></span>
+                </div>
+
+                <div>
+                    <label asp-for="Phone" class="ui-label">Phone</label>
+                    <input asp-for="Phone" class="ui-field" />
+                    <span asp-validation-for="Phone" class="ui-field-error"></span>
+                </div>
+
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="ui-alert-danger" role="alert" aria-live="assertive">
+                        <div class="ui-alert-icon"><i data-lucide="circle-alert" class="h-4 w-4"></i></div>
+                        <div>@Html.ValidationSummary(false, null, new { @class = "space-y-0.5" })</div>
+                    </div>
+                }
+
+                <button type="submit" class="ui-btn-primary mt-2 w-full py-2.5 font-semibold">
+                    <i data-lucide="save" class="h-4 w-4"></i>Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+</div>

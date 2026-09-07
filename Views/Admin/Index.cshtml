@@ -1,0 +1,968 @@
+@using ExamPortal.Models
+@using System.Text.RegularExpressions
+@using System.Globalization
+@model AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Admin Dashboard";
+    var staffUsers = (IEnumerable<User>)(ViewBag.StaffUsers ?? new List<User>());
+    var recruiters = (IEnumerable<User>)(ViewBag.Recruiters ?? new List<User>());
+    var hrStaff = staffUsers.Where(u => u.Role == PortalRoles.Hr).ToList();
+    var candidates = (IEnumerable<User>)(ViewBag.Candidates ?? new List<User>());
+    var interviews = (IEnumerable<InterviewRecord>)(ViewBag.Interviews ?? new List<InterviewRecord>());
+    var offers = (IEnumerable<OfferLetter>)(ViewBag.Offers ?? new List<OfferLetter>());
+    var auditLogs = (IEnumerable<AuditLog>)(ViewBag.AuditLogs ?? new List<AuditLog>());
+    var settings = (IEnumerable<SystemSetting>)(ViewBag.SystemSettings ?? new List<SystemSetting>());
+    var notifications = (IEnumerable<NotificationMessage>)(ViewBag.Notifications ?? new List<NotificationMessage>());
+    var reports = (IEnumerable<AssessmentReport>)(ViewBag.Reports ?? new List<AssessmentReport>());
+    var proctoringLogs = (IEnumerable<ProctoringLog>)(ViewBag.ProctoringLogs ?? new List<ProctoringLog>());
+    var pipelineCounts = ViewBag.PipelineCounts as IDictionary<string, int> ?? new Dictionary<string, int>();
+    var roles = new[] { PortalRoles.Admin, PortalRoles.Recruiter, PortalRoles.Hr, PortalRoles.Candidate };
+    var isAdmin = User.IsInRole(PortalRoles.Admin);
+
+    var activeInvitations = (int)(ViewBag.ActiveInvitations ?? 0);
+    var averageScore = (decimal)(ViewBag.AverageScore ?? 0m);
+    var shortlistedCount = (int)(ViewBag.ShortlistedCount ?? 0);
+    var averageScoreStr = averageScore.ToString("0.0", CultureInfo.InvariantCulture);
+    var pendingOffersCount = (int)(ViewBag.PendingOffersCount ?? 0);
+    var monthlyHiredCount = (int)(ViewBag.MonthlyHiredCount ?? 0);
+    var totalAuditLogsCount = (int)(ViewBag.TotalAuditLogsCount ?? 0);
+    var activeJobsCount = Model.Exams.Where(e => e.IsActive && !e.IsTemplate)
+        .Select(e => string.IsNullOrWhiteSpace(e.Subject) ? "Unspecified" : e.Subject)
+        .Distinct().Count();
+
+    // ── Candidate summary data (view-only aggregation of data the page
+    // already receives via Model/ViewBag — no controller/service change) ──
+    Func<string, int> stageCount = s => pipelineCounts.TryGetValue(s, out var v) ? v : 0;
+    var onboardingCount = stageCount("Onboarding");
+    var upcomingExams = Model.Exams
+        .Where(e => e.StartDateTime.HasValue && e.StartDateTime.Value > DateTime.UtcNow)
+        .OrderBy(e => e.StartDateTime)
+        .Take(5)
+        .ToList();
+
+    // Shared with Admin/Pipeline.cshtml via RecruitmentStages.FriendlyLabel (was previously
+    // a copy-pasted local regex here).
+    Func<string, string> friendlyLabel = RecruitmentStages.FriendlyLabel;
+
+    Func<string, string> auditIcon = action =>
+    {
+        var a = (action ?? "").ToLowerInvariant();
+        if (a.Contains("create") || a.Contains("add") || a.Contains("issue")) return "circle-plus";
+        if (a.Contains("delete") || a.Contains("remove") || a.Contains("revoke")) return "trash-2";
+        if (a.Contains("update") || a.Contains("edit") || a.Contains("change")) return "pencil";
+        if (a.Contains("login") || a.Contains("auth")) return "log-in";
+        return "activity";
+    };
+
+    // Shared color->CSS-class mapping (UiBadge.StageCssClass) — was previously copy-pasted here.
+    Func<string, string> stageBadgeClass = ExamPortal.Models.UiBadge.StageCssClass;
+
+    // Dashboard pipeline widget shows a curated subset of stages — the
+    // intake/paperwork sub-steps (email verification, profile/resume/skill
+    // completion, document requests) are real and still fully tracked
+    // everywhere else (Pipeline board, Candidates tab; RecruitmentStages
+    // itself is unchanged), just collapsed out of this one summary view so
+    // it reads as 8 funnel stages instead of 16. Offer is shown as a single
+    // combined stage (Issued + Accepted) to match; nothing here changes how
+    // candidates are actually staged.
+    var dashboardPipelineStages = new (string Label, int Count)[]
+    {
+        ("Registered", stageCount(RecruitmentStages.Registered)),
+        ("Invitation Sent", stageCount(RecruitmentStages.InvitationSent)),
+        ("Assessment Started", stageCount(RecruitmentStages.AssessmentStarted)),
+        ("Assessment Completed", stageCount(RecruitmentStages.AssessmentCompleted)),
+        ("Shortlisted", stageCount(RecruitmentStages.Shortlisted)),
+        ("Interview", stageCount(RecruitmentStages.InterviewInProgress)),
+        ("Offer", stageCount(RecruitmentStages.OfferIssued) + stageCount(RecruitmentStages.OfferAccepted)),
+        ("Onboarding", stageCount(RecruitmentStages.Onboarding)),
+    };
+    var dashboardPipelineMax = dashboardPipelineStages.Select(s => s.Count).DefaultIfEmpty(0).Max();
+    var dashboardPipelineTotal = dashboardPipelineStages.Sum(s => s.Count);
+    // Admin-only Recent Activity (platform administration events only — staff/role/
+    // system-setting changes). Built by ActivityFeedService.BuildAdminFeed, which
+    // filters AuditLogs down to an admin-action allowlist so candidate/exam entries
+    // written by AuditService elsewhere (e.g. "Start Assessment") never show up here.
+    var recentActivity = Model.ActivityFeed;
+    var adminAlerts = Model.Alerts;
+}
+
+<div class="mx-auto max-w-7xl space-y-6">
+
+    @* ===================== Header ===================== *@
+    <div class="vw-page-header !mb-0">
+        <div class="vw-page-header-main">
+            <div class="vw-page-header-icon"><i data-lucide="shield-check"></i></div>
+            <div>
+                <h1 class="vw-page-title no-icon">Admin Dashboard</h1>
+                <p class="vw-page-subtitle">Enterprise recruitment operations, access control, audit, and analytics.</p>
+            </div>
+        </div>
+        <div class="vw-page-actions">
+            <a asp-action="Pipeline" class="ui-btn-secondary"><i data-lucide="git-branch" class="h-4 w-4"></i>Pipeline</a>
+            <a asp-action="Students" class="ui-btn-outline"><i data-lucide="users" class="h-4 w-4"></i>Candidates</a>
+            <a asp-action="CreateExam" class="ui-btn-primary"><i data-lucide="circle-plus" class="h-4 w-4"></i>New Assessment</a>
+        </div>
+    </div>
+
+    @* ===================== Stat cards (with a brief skeleton loading state) ===================== *@
+    <div data-skeleton="admin-stats" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        @for (int i = 0; i < 4; i++)
+        {
+            <div class="ui-card flex items-center gap-3 p-4">
+                <div class="ui-skeleton h-11 w-11 shrink-0 rounded-lg"></div>
+                <div class="min-w-0 flex-1 space-y-2">
+                    <div class="ui-skeleton h-3 w-20"></div>
+                    <div class="ui-skeleton h-5 w-12"></div>
+                </div>
+            </div>
+        }
+    </div>
+    <div data-skeleton-content="admin-stats" class="hidden grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="ui-stat-card">
+            <span class="ui-stat-icon bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]"><i data-lucide="users" class="h-5 w-5"></i></span>
+            <div class="min-w-0">
+                <div class="text-xs text-slate-500 dark:text-slate-400">Total Candidates</div>
+                <div class="ui-stat-value"><span data-count-to="@Model.TotalUsers">0</span></div>
+            </div>
+        </div>
+        <div class="ui-stat-card">
+            <span class="ui-stat-icon bg-[var(--vw-info-bg)] text-[var(--vw-info-text)]"><i data-lucide="briefcase" class="h-5 w-5"></i></span>
+            <div class="min-w-0">
+                <div class="text-xs text-slate-500 dark:text-slate-400">Active Invitations</div>
+                <div class="ui-stat-value"><span data-count-to="@activeInvitations">0</span></div>
+            </div>
+        </div>
+        <div class="ui-stat-card">
+            <span class="ui-stat-icon bg-[var(--vw-warning-bg)] text-[var(--vw-warning-text)]"><i data-lucide="clipboard-check" class="h-5 w-5"></i></span>
+            <div class="min-w-0">
+                <div class="text-xs text-slate-500 dark:text-slate-400">Assessments</div>
+                <div class="ui-stat-value"><span data-count-to="@Model.TotalExams">0</span></div>
+            </div>
+        </div>
+        <div class="ui-stat-card">
+            <span class="ui-stat-icon bg-[var(--vw-success-bg)] text-[var(--vw-success-text)]"><i data-lucide="trending-up" class="h-5 w-5"></i></span>
+            <div class="min-w-0">
+                <div class="text-xs text-slate-500 dark:text-slate-400">Average Assessment Score</div>
+                <div class="ui-stat-value"><span data-count-to="@averageScoreStr" data-count-decimals="1" data-count-suffix="%">0%</span></div>
+            </div>
+        </div>
+    </div>
+
+    @* ===================== Tabs ===================== *@
+    <div data-tabs="admin-dash" class="ui-tabbar flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 dark:border-slate-700 dark:bg-slate-800" role="tablist">
+        <button type="button" class="ui-tab is-active" data-tabs-trigger="dashboard" role="tab" aria-selected="true">Dashboard</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="access" role="tab">Users</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="recruiters" role="tab">Recruiters</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="hrstaff" role="tab">HR Staff</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="candidates" role="tab">Candidates</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="jobs" role="tab">Jobs</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="assessments" role="tab">Assessments</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="interviews" role="tab">Interviews</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="offers" role="tab">Offers</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="analytics" role="tab">Reports</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="auditlogs" role="tab">Audit Logs</button>
+        <button type="button" class="ui-tab" data-tabs-trigger="operations" role="tab">Settings</button>
+    </div>
+
+    @* ===================== Dashboard tab ===================== *@
+    <section data-tabs-panel="dashboard" data-tabs-group="admin-dash" class="space-y-8">
+
+        @* ===================== Priority KPIs ===================== *@
+        @* The brief's actual admin priorities, ahead of the pipeline detail —
+           each tile is a live count and jumps straight to the tab that owns it. *@
+        <div>
+            <h2 class="ui-heading-sm mb-3">
+                <i data-lucide="gauge" class="h-4 w-4 text-[var(--vw-accent)]"></i>Overview
+            </h2>
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                @{
+                    var kpiTiles = new (string Label, string Value, string Icon, string Tab)[] {
+                        ("Total Candidates", Model.TotalUsers.ToString("N0"), "users", "candidates"),
+                        ("Active Jobs", activeJobsCount.ToString("N0"), "briefcase", "jobs"),
+                        ("Recruiters", recruiters.Count().ToString("N0"), "user-cog", "recruiters"),
+                        ("HR Users", hrStaff.Count.ToString("N0"), "users-round", "hrstaff"),
+                        ("Monthly Hiring", monthlyHiredCount.ToString("N0"), "trending-up", "analytics"),
+                        ("Pending Offers", pendingOffersCount.ToString("N0"), "file-check", "offers"),
+                        ("Reports", reports.Count().ToString("N0"), "bar-chart-3", "analytics"),
+                        ("Audit Logs", totalAuditLogsCount.ToString("N0"), "shield", "auditlogs"),
+                    };
+                }
+                @foreach (var kpi in kpiTiles)
+                {
+                    <button type="button" onclick="window.vwActivateTab('admin-dash','@kpi.Tab')" class="ui-card group flex flex-col items-start gap-2 p-4 text-left transition hover:-translate-y-0.5 hover:border-[var(--vw-accent)]">
+                        <span class="ui-stat-icon h-9 w-9 bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]"><i data-lucide="@kpi.Icon" class="h-4 w-4"></i></span>
+                        <div class="ui-stat-value">@kpi.Value</div>
+                        <div class="text-xs font-medium text-slate-500 dark:text-slate-400">@kpi.Label</div>
+                    </button>
+                }
+                @* System Health — no infrastructure monitoring exists in this app to
+                   report on, so this is an honest "is the app responding" indicator
+                   (you're looking at a rendered admin page, so: yes) rather than a
+                   fabricated uptime/latency figure. *@
+                <div class="ui-card flex flex-col items-start gap-2 p-4">
+                    <span class="ui-stat-icon h-9 w-9 bg-[var(--vw-success-bg)] text-[var(--vw-success-text)]"><i data-lucide="heart-pulse" class="h-4 w-4"></i></span>
+                    <div class="ui-stat-value"><span class="ui-badge-success !text-xs">Operational</span></div>
+                    <div class="text-xs font-medium text-slate-500 dark:text-slate-400">System Health</div>
+                </div>
+            </div>
+        </div>
+
+        @* ===================== Recruitment Pipeline (summary) ===================== *@
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm">
+                    <i data-lucide="git-branch" class="h-4 w-4 text-[var(--vw-accent)]"></i>Recruitment Pipeline
+                </h2>
+                <span class="ui-badge-neutral">@dashboardPipelineTotal candidates</span>
+            </div>
+            <div class="ui-card-body">
+                <div class="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+                    @foreach (var stage in dashboardPipelineStages)
+                    {
+                        var pct = dashboardPipelineMax > 0 ? (int)Math.Round(stage.Count * 100.0 / dashboardPipelineMax) : 0;
+                        <div>
+                            <div class="mb-1 flex items-center justify-between text-xs">
+                                <span class="font-medium text-slate-600 dark:text-slate-300">@stage.Label</span>
+                                <span class="font-semibold text-slate-800 dark:text-slate-100">@stage.Count</span>
+                            </div>
+                            <div class="ui-progress">
+                                <div class="ui-progress-bar" style="width:@(pct)%" role="progressbar" aria-valuenow="@stage.Count" aria-valuemin="0" aria-valuemax="@dashboardPipelineMax" aria-label="@stage.Label"></div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ===================== Quick Actions ===================== *@
+        @* Surfaces Admin's own domain first (staff/roles, system config, analytics) —
+           Candidates/Assessments/Pipeline are still one click away via the tab bar above
+           and the sections below; this just stops them from being the first three things
+           an Admin sees, since day-to-day candidate screening is Recruiter's job. *@
+        <div>
+            <h2 class="ui-heading-sm mb-3">
+                <i data-lucide="zap" class="h-4 w-4 text-[var(--vw-accent)]"></i>Quick Actions
+            </h2>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <button type="button" onclick="window.vwActivateTab('admin-dash','access')" class="ui-card group flex items-center gap-3 p-4 text-start hover:-translate-y-0.5 hover:border-[var(--vw-accent)]">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)] transition-colors group-hover:bg-[var(--vw-accent)] group-hover:text-white">
+                        <i data-lucide="shield-check" class="h-5 w-5"></i>
+                    </span>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-semibold text-slate-900 dark:text-white">Manage Staff &amp; Roles</span>
+                        <span class="block text-xs text-slate-500 dark:text-slate-400">Add staff, assign roles</span>
+                    </span>
+                </button>
+                <button type="button" onclick="window.vwActivateTab('admin-dash','operations')" class="ui-card group flex items-center gap-3 p-4 text-start hover:-translate-y-0.5 hover:border-[var(--vw-accent)]">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--vw-info-bg)] text-[var(--vw-info-text)] transition-colors group-hover:bg-[var(--vw-accent)] group-hover:text-white">
+                        <i data-lucide="settings" class="h-5 w-5"></i>
+                    </span>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-semibold text-slate-900 dark:text-white">System Settings</span>
+                        <span class="block text-xs text-slate-500 dark:text-slate-400">Configuration &amp; notifications</span>
+                    </span>
+                </button>
+                <button type="button" onclick="window.vwActivateTab('admin-dash','analytics')" class="ui-card group flex items-center gap-3 p-4 text-start hover:-translate-y-0.5 hover:border-[var(--vw-accent)]">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--vw-success-bg)] text-[var(--vw-success-text)] transition-colors group-hover:bg-[var(--vw-accent)] group-hover:text-white">
+                        <i data-lucide="bar-chart-3" class="h-5 w-5"></i>
+                    </span>
+                    <span class="min-w-0">
+                        <span class="block text-sm font-semibold text-slate-900 dark:text-white">View Analytics</span>
+                        <span class="block text-xs text-slate-500 dark:text-slate-400">Hiring funnel &amp; reports</span>
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        @* ===================== Candidate Summary ===================== *@
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm">
+                    <i data-lucide="graduation-cap" class="h-4 w-4 text-[var(--vw-accent)]"></i>Candidate Summary
+                </h2>
+                <a asp-action="Students" class="ui-btn-ghost !px-3 !py-1.5 text-xs">View candidates →</a>
+            </div>
+            <div class="ui-card-body">
+                <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Needs Review</div>
+                        <div class="ui-stat-figure">@stageCount(RecruitmentStages.ProfileUnderReview)</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Shortlisted</div>
+                        <div class="ui-stat-figure">@shortlistedCount</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Onboarding</div>
+                        <div class="ui-stat-figure">@onboardingCount</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Rejected</div>
+                        <div class="ui-stat-figure">@stageCount(RecruitmentStages.Rejected)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ===================== Upcoming Assessments ===================== *@
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm">
+                    <i data-lucide="calendar-clock" class="h-4 w-4 text-[var(--vw-accent)]"></i>Upcoming Assessments
+                </h2>
+                <button type="button" class="ui-btn-ghost !px-3 !py-1.5 text-xs" onclick="window.vwActivateTab('admin-dash','assessments')">View all</button>
+            </div>
+            <ul class="divide-y divide-slate-100 dark:divide-slate-700">
+                @if (!upcomingExams.Any())
+                {
+                    <li>@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "calendar-clock", Title = "No upcoming assessments", Message = "Assessments scheduled to open in the future will show up here.", Compact = true })</li>
+                }
+                @foreach (var exam in upcomingExams)
+                {
+                    <li class="flex items-start gap-3 px-5 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                        <span class="ui-stat-icon h-9 w-9 bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]"><i data-lucide="clipboard-list" class="h-4 w-4"></i></span>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@exam.Title</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">Opens @exam.StartDateTime?.ToLocalTime().ToString("dd MMM, HH:mm") &middot; @exam.Questions.Count questions</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+
+        @* ===================== Recent Activity (latest 5, timeline) ===================== *@
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm">
+                    <i data-lucide="history" class="h-4 w-4 text-[var(--vw-accent)]"></i>Recent Activity
+                </h2>
+                <button type="button" class="ui-btn-ghost !px-3 !py-1.5 text-xs" onclick="window.vwActivateTab('admin-dash','operations')">View all</button>
+            </div>
+            <div class="ui-card-body">
+                <ol data-skeleton="admin-activity" class="space-y-5">
+                    @for (int i = 0; i < 5; i++)
+                    {
+                        <li class="flex items-start gap-3">
+                            <div class="ui-skeleton h-8 w-8 shrink-0 rounded-full"></div>
+                            <div class="min-w-0 flex-1 space-y-2 pt-0.5">
+                                <div class="ui-skeleton h-3.5 w-3/4"></div>
+                                <div class="ui-skeleton h-3 w-1/3"></div>
+                            </div>
+                        </li>
+                    }
+                </ol>
+                @if (!recentActivity.Any())
+                {
+                    <div data-skeleton-content="admin-activity" class="hidden">
+                        @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "activity", Title = "No activity yet", Message = "Actions taken across the portal will show up here as they happen.", Compact = true })
+                    </div>
+                }
+                else
+                {
+                    <ol data-skeleton-content="admin-activity" class="hidden relative space-y-5 before:absolute before:bottom-1 before:left-4 before:top-1 before:w-px before:bg-slate-200 before:content-[''] dark:before:bg-slate-700">
+                        @foreach (var item in recentActivity)
+                        {
+                            <li class="relative flex items-start gap-3">
+                                <span class="ui-stat-icon relative z-10 h-8 w-8 shrink-0 bg-slate-100 text-slate-500 ring-4 ring-[var(--vw-surface)] dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@item.Icon" class="h-3.5 w-3.5"></i></span>
+                                <div class="min-w-0 flex-1 rounded-lg px-1 py-0.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                                    <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@item.Text</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">@item.Sub &middot; @item.When.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                                </div>
+                            </li>
+                        }
+                    </ol>
+                }
+            </div>
+        </div>
+
+        @* ===================== Notifications (Security & Platform Alerts) =====================
+           Admin-only, actionable signals — failed logins / security events / platform
+           health — built by ActivityFeedService.BuildAdminAlerts. Distinct from the
+           "Notifications and Proctoring" panel on the Operations tab, which is the
+           outbound-email dispatch queue (a different, operational concern). *@
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm">
+                    <i data-lucide="bell" class="h-4 w-4 text-[var(--vw-accent)]"></i>Notifications
+                </h2>
+            </div>
+            <div class="ui-card-body">
+                @if (!adminAlerts.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "bell", Title = "No alerts", Message = "Security and platform signals will show up here.", Compact = true, Variant = "success" })
+                }
+                else
+                {
+                    <ul class="space-y-3">
+                        @foreach (var alert in adminAlerts)
+                        {
+                            var alertColor = alert.Severity switch { "danger" => "text-[var(--vw-danger)]", "warning" => "text-[var(--vw-warning)]", "success" => "text-[var(--vw-success)]", _ => "text-slate-400" };
+                            <li class="flex items-start gap-3">
+                                <span class="ui-stat-icon h-9 w-9 shrink-0 bg-slate-100 @alertColor dark:bg-slate-700"><i data-lucide="@alert.Icon" class="h-4 w-4"></i></span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@alert.Title</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">@alert.Detail</div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+    </section>
+
+    @* ===================== Recruiters tab ===================== *@
+    <section data-tabs-panel="recruiters" data-tabs-group="admin-dash" class="hidden">
+        <div class="ui-card">
+            <div class="overflow-x-auto">
+                <table data-skeleton="admin-recruiters-table" class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Recruiter</th><th class="px-5 py-3 font-medium">Email</th><th class="px-5 py-3 font-medium">Phone</th><th class="px-5 py-3 font-medium">Created</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @for (int i = 0; i < 5; i++)
+                        {
+                            <tr>
+                                <td class="px-5 py-3"><div class="ui-skeleton h-3.5 w-28"></div></td>
+                                <td class="px-5 py-3"><div class="ui-skeleton h-3.5 w-36"></div></td>
+                                <td class="px-5 py-3"><div class="ui-skeleton h-3.5 w-24"></div></td>
+                                <td class="px-5 py-3"><div class="ui-skeleton h-3.5 w-20"></div></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <table data-skeleton-content="admin-recruiters-table" class="ui-table hidden" data-sortable>
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium" data-sort-key="name">Recruiter</th><th class="px-5 py-3 font-medium" data-sort-key="email">Email</th><th class="px-5 py-3 font-medium" data-sort-key="phone">Phone</th><th class="px-5 py-3 font-medium" data-sort-key="created" data-sort-type="date">Created</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!recruiters.Any())
+                        {
+                            <tr data-sort-exclude><td colspan="4" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "users", Title = "No recruiters yet", Message = "Add a recruiter or HR account from Settings → Create Staff User.", Compact = true })</td></tr>
+                        }
+                        @foreach (var recruiter in recruiters)
+                        {
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@recruiter.FullName</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@recruiter.Email</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@recruiter.MobileNumber</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(recruiter.CreatedAt.ToString("o"))">@recruiter.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ===================== HR Staff tab ===================== *@
+    <section data-tabs-panel="hrstaff" data-tabs-group="admin-dash" class="hidden">
+        <div class="ui-card">
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">HR Staff</th><th class="px-5 py-3 font-medium">Email</th><th class="px-5 py-3 font-medium">Phone</th><th class="px-5 py-3 font-medium">Created</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!hrStaff.Any())
+                        {
+                            <tr><td colspan="4" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "users", Title = "No HR staff yet", Message = "Add an HR account from Settings → Create Staff User.", Compact = true })</td></tr>
+                        }
+                        @foreach (var hr in hrStaff)
+                        {
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@hr.FullName</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@hr.Email</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@hr.MobileNumber</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@hr.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ===================== Candidates tab =====================
+       This used to duplicate Views/Admin/Students.cshtml — the same full,
+       sortable candidate table implemented twice with two independent
+       markups, both linking to CandidateDetail. Students.cshtml is the
+       single source of truth now (it's a real route, so it's linkable,
+       bookmarkable, and already has its own sort/paging); this tab shows a
+       short, non-sortable recent-candidates preview and links out to the
+       full directory instead of re-implementing it. *@
+    <section data-tabs-panel="candidates" data-tabs-group="admin-dash" class="hidden">
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm"><i data-lucide="users" class="h-4 w-4 text-[var(--vw-accent)]"></i>Recently Registered</h2>
+                <a asp-action="Students" class="ui-btn-outline !px-3 !py-1.5 text-xs">Open full candidate directory →</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Candidate</th><th class="px-5 py-3 font-medium">ID</th><th class="px-5 py-3 font-medium">Stage</th><th class="px-5 py-3 font-medium">Profile</th><th class="px-5 py-3 font-medium">Action</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!candidates.Any())
+                        {
+                            <tr><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "user-plus", Title = "No candidates yet", Message = "Candidates will appear here once they register on the portal.", Compact = true })</td></tr>
+                        }
+                        @foreach (var candidate in candidates.Take(5))
+                        {
+                            <tr>
+                                <td class="px-5 py-3">
+                                    @await Html.PartialAsync("_CandidateIdentityCell", new CandidateIdentityCellViewModel { Candidate = candidate })
+                                </td>
+                                <td class="px-5 py-3"><span class="ui-badge-neutral vw-mono">@candidate.CandidateId</span></td>
+                                <td class="px-5 py-3"><span class="@stageBadgeClass(candidate.RecruitmentStage)">@friendlyLabel(candidate.RecruitmentStage)</span></td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@(candidate.ProfileCompletion?.CompletionPercentage ?? 0)%</td>
+                                <td class="px-5 py-3"><a asp-action="CandidateDetail" asp-route-id="@candidate.Id" class="ui-btn-outline !px-3 !py-1.5 text-xs">Review</a></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            @if (candidates.Count() > 5)
+            {
+                <div class="ui-card-body !pt-0">
+                    <a asp-action="Students" class="text-sm font-medium text-[var(--vw-accent-text)] hover:underline">View all @candidates.Count() candidates →</a>
+                </div>
+            }
+        </div>
+    </section>
+
+    @* ===================== Jobs tab ===================== *@
+    @* There's no separate Job/requisition entity in this app — recruiting here
+       is assessment-centric. Rather than re-listing the same Model.Exams rows
+       shown in the Assessments tab with different column labels (which was
+       pure duplication of the same data), this rolls exams up by Subject —
+       the closest proxy to "role" on the Exam model — into one row per role,
+       aggregating the skills/locations/experience already on each exam and
+       showing how many assessments and how many are currently open for that
+       role. All computed view-locally from Model.Exams; no new data needed. *@
+    <section data-tabs-panel="jobs" data-tabs-group="admin-dash" class="hidden">
+        @{
+            var roleGroups = Model.Exams
+                .GroupBy(e => string.IsNullOrWhiteSpace(e.Subject) ? "Unspecified" : e.Subject)
+                .Select(g => new
+                {
+                    Role = g.Key,
+                    TotalAssessments = g.Count(),
+                    OpenAssessments = g.Count(e => e.IsActive),
+                    Skills = string.Join(", ", g.Select(e => e.RequiredSkills).Where(s => !string.IsNullOrWhiteSpace(s)).SelectMany(s => s.Split(',')).Select(s => s.Trim()).Where(s => s.Length > 0).Distinct()),
+                    Locations = string.Join(", ", g.Select(e => e.EligibleLocations).Where(s => !string.IsNullOrWhiteSpace(s)).SelectMany(s => s.Split(',')).Select(s => s.Trim()).Where(s => s.Length > 0).Distinct()),
+                    Experience = string.Join(", ", g.Select(e => e.ExperienceLevel).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct())
+                })
+                .OrderByDescending(r => r.OpenAssessments)
+                .ToList();
+        }
+        <div class="ui-card">
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Role</th><th class="px-5 py-3 font-medium">Skills</th><th class="px-5 py-3 font-medium">Locations</th><th class="px-5 py-3 font-medium">Experience</th><th class="px-5 py-3 font-medium">Open / Total Assessments</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!roleGroups.Any())
+                        {
+                            <tr><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "briefcase", Title = "No roles configured yet", Message = "Create an assessment to open a role for candidates.", Variant = "accent", ActionText = "Create Assessment", ActionUrl = Url.Action("CreateExam"), ActionIcon = "plus", Compact = true })</td></tr>
+                        }
+                        @foreach (var role in roleGroups)
+                        {
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@role.Role</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" style="max-width:240px;">@role.Skills</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@role.Locations</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@role.Experience</td>
+                                <td class="px-5 py-3">
+                                    <span class="@(role.OpenAssessments > 0 ? "ui-badge-success" : "ui-badge-neutral")">@role.OpenAssessments / @role.TotalAssessments</span>
+                                    <button type="button" class="ui-btn-ghost ml-2 !px-0 !py-0 text-xs" onclick="window.vwActivateTab('admin-dash','assessments')">View assessments →</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ===================== Assessments tab ===================== *@
+    <section data-tabs-panel="assessments" data-tabs-group="admin-dash" class="hidden">
+        <div class="ui-card">
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Assessment</th><th class="px-5 py-3 font-medium">Questions</th><th class="px-5 py-3 font-medium">Passing</th><th class="px-5 py-3 font-medium">Schedule</th><th class="px-5 py-3 font-medium">Actions</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!Model.Exams.Any())
+                        {
+                            <tr><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "clipboard-list", Title = "No assessments yet", Message = "Build your first assessment to start inviting candidates.", Variant = "accent", ActionText = "Create Assessment", ActionUrl = Url.Action("CreateExam"), ActionIcon = "plus", Compact = true })</td></tr>
+                        }
+                        @foreach (var exam in Model.Exams)
+                        {
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@exam.Title</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@exam.Questions.Count</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@exam.PassingMarks / @exam.TotalMarks</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@exam.StartDateTime?.ToLocalTime().ToString("dd MMM") - @exam.EndDateTime?.ToLocalTime().ToString("dd MMM")</td>
+                                <td class="px-5 py-3">
+                                    <div class="flex flex-wrap gap-2">
+                                        <a asp-action="ExamResults" asp-route-id="@exam.Id" class="ui-btn-outline !px-3 !py-1.5 text-xs">Results</a>
+                                        <a asp-action="EditSchedule" asp-route-id="@exam.Id" class="ui-btn-outline !px-3 !py-1.5 text-xs">Edit Schedule</a>
+                                        <form asp-action="ToggleExam" asp-route-id="@exam.Id" method="post">
+                                            <button class="ui-btn-outline !px-3 !py-1.5 text-xs" type="submit"
+                                                    data-confirm-title="@(exam.IsActive ? "Disable" : "Enable") this assessment?"
+                                                    data-confirm-message="@exam.Title will be @(exam.IsActive ? "hidden from" : "made available to") eligible candidates.">
+                                                @(exam.IsActive ? "Disable" : "Enable")
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ===================== Interviews tab ===================== *@
+    <section data-tabs-panel="interviews" data-tabs-group="admin-dash" class="hidden">
+        <div class="ui-card">
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Candidate</th><th class="px-5 py-3 font-medium">Round</th><th class="px-5 py-3 font-medium">Schedule</th><th class="px-5 py-3 font-medium">Mode</th><th class="px-5 py-3 font-medium">Status</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!interviews.Any())
+                        {
+                            <tr><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "calendar-clock", Title = "No interviews scheduled yet", Message = "Interviews scheduled from a candidate's profile will show up here.", Compact = true })</td></tr>
+                        }
+                        @foreach (var interview in interviews)
+                        {
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@interview.User?.FullName</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@interview.Round</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@interview.ScheduledAt?.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@interview.Format</td>
+                                <td class="px-5 py-3"><span class="ui-badge-primary">@interview.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ===================== Offers tab ===================== *@
+    <section data-tabs-panel="offers" data-tabs-group="admin-dash" class="hidden">
+        <div class="ui-card">
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Candidate</th><th class="px-5 py-3 font-medium">Designation</th><th class="px-5 py-3 font-medium">Location</th><th class="px-5 py-3 font-medium">CTC</th><th class="px-5 py-3 font-medium">Status</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!offers.Any())
+                        {
+                            <tr><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "file-check", Title = "No offers issued yet", Message = "Offers issued once candidates clear documentation review will appear here.", Compact = true })</td></tr>
+                        }
+                        @foreach (var offer in offers)
+                        {
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@offer.User?.FullName</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@offer.Designation</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@offer.Location</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@offer.CtcLpa.ToString("0.##") LPA</td>
+                                <td class="px-5 py-3"><span class="ui-badge-success">@offer.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ===================== Roles / Access tab ===================== *@
+    <section data-tabs-panel="access" data-tabs-group="admin-dash" class="hidden grid gap-6 md:grid-cols-12">
+        <div class="ui-card md:col-span-7">
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">User</th><th class="px-5 py-3 font-medium">Current Role</th><th class="px-5 py-3 font-medium">Change Role</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @foreach (var user in staffUsers.Concat(candidates.Take(15)))
+                        {
+                            <tr>
+                                <td class="px-5 py-3">
+                                    <div class="font-semibold text-slate-800 dark:text-slate-100">@user.FullName</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">@user.Email</div>
+                                </td>
+                                <td class="px-5 py-3"><span class="ui-badge-neutral">@user.Role</span></td>
+                                <td class="px-5 py-3">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <form asp-action="UpdateUserRole" method="post" class="flex gap-2">
+                                            <input type="hidden" name="userId" value="@user.Id" />
+                                            <select name="role" class="ui-field !py-1.5 text-xs" disabled="@(!isAdmin)">
+                                                @foreach (var role in roles)
+                                                {
+                                                    <option value="@role" selected="@(user.Role == role)">@role</option>
+                                                }
+                                            </select>
+                                            <button class="ui-btn-outline shrink-0 !px-3 !py-1.5 text-xs" type="submit" disabled="@(!isAdmin)">Save</button>
+                                        </form>
+                                        @if (user.Role != PortalRoles.Candidate)
+                                        {
+                                            <a asp-action="EditStaffUser" asp-route-id="@user.Id" class="ui-btn-outline shrink-0 !px-3 !py-1.5 text-xs">Edit</a>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="ui-card md:col-span-5">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Permissions Matrix</h2></div>
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-2.5 font-medium">Permission</th><th class="px-5 py-2.5 font-medium">Admin</th><th class="px-5 py-2.5 font-medium">Recruiter</th><th class="px-5 py-2.5 font-medium">HR</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-slate-600 dark:divide-slate-700 dark:text-slate-300">
+                        <tr><td class="px-5 py-2.5">System settings</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">No</td><td class="px-5 py-2.5">No</td></tr>
+                        <tr><td class="px-5 py-2.5">Role management</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">No</td><td class="px-5 py-2.5">No</td></tr>
+                        <tr><td class="px-5 py-2.5">Candidate review</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">Yes</td></tr>
+                        <tr><td class="px-5 py-2.5">Assessment management</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">No</td></tr>
+                        <tr><td class="px-5 py-2.5">Offers and onboarding</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">No</td><td class="px-5 py-2.5">Yes</td></tr>
+                        <tr><td class="px-5 py-2.5">Audit logs</td><td class="px-5 py-2.5">Yes</td><td class="px-5 py-2.5">No</td><td class="px-5 py-2.5">No</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    @* ===================== Audit Logs tab =====================
+       Full list — the Settings tab below keeps its existing 10-item
+       preview widget as-is (nothing removed), this is the complete,
+       dedicated view the sidebar links to. *@
+    <section data-tabs-panel="auditlogs" data-tabs-group="admin-dash" class="hidden">
+        <div class="ui-card">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Audit Logs</h2></div>
+            <ul class="max-h-[32rem] divide-y divide-slate-100 overflow-y-auto dark:divide-slate-700">
+                @if (!auditLogs.Any())
+                {
+                    <li>@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "shield", Title = "No audit activity yet", Message = "A trail of admin actions will build up here over time.", Compact = true })</li>
+                }
+                @foreach (var log in auditLogs)
+                {
+                    <li class="flex items-start gap-3 px-5 py-3">
+                        <span class="ui-stat-icon h-8 w-8 shrink-0 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@auditIcon(log.Action)" class="h-3.5 w-3.5"></i></span>
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@log.Action <span class="font-normal text-slate-500 dark:text-slate-400">on @log.EntityName</span></div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">@log.Actor &middot; @log.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</div>
+                        </div>
+                    </li>
+                }
+            </ul>
+        </div>
+    </section>
+
+    @* ===================== Operations tab ===================== *@
+    <section data-tabs-panel="operations" data-tabs-group="admin-dash" class="hidden grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="ui-card">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Email Templates</h2></div>
+            <ul class="divide-y divide-slate-100 text-sm text-slate-600 dark:divide-slate-700 dark:text-slate-300">
+                <li class="px-5 py-2.5">Candidate Registration OTP</li>
+                <li class="px-5 py-2.5">Assessment Invitation</li>
+                <li class="px-5 py-2.5">Interview Schedule</li>
+                <li class="px-5 py-2.5">Document Request</li>
+                <li class="px-5 py-2.5">Offer Letter</li>
+            </ul>
+        </div>
+        <div class="ui-card">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">System Settings</h2></div>
+            <div class="ui-card-body space-y-4">
+                @if (!settings.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "settings", Title = "No settings configured", Message = "System-wide settings will be listed here once added.", Compact = true })
+                }
+                @foreach (var setting in settings)
+                {
+                    <form asp-action="UpdateSystemSetting" method="post" class="space-y-1.5 border-b border-slate-100 pb-3 last:border-0 last:pb-0 dark:border-slate-700">
+                        <input type="hidden" name="id" value="@setting.Id" />
+                        <label class="ui-label !mb-0.5">@setting.Key</label>
+                        <div class="flex gap-2">
+                            <input name="value" value="@setting.Value" class="ui-field !py-1.5 text-sm" />
+                            <button class="ui-btn-outline shrink-0 !px-3 !py-1.5 text-xs" type="submit" disabled="@(!isAdmin)">Update</button>
+                        </div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">@setting.Description</div>
+                    </form>
+                }
+            </div>
+        </div>
+        <div class="ui-card">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Audit Logs</h2></div>
+            <ul class="max-h-96 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-700">
+                @if (!auditLogs.Any())
+                {
+                    <li>@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "shield", Title = "No audit activity yet", Message = "A trail of admin actions will build up here over time.", Compact = true })</li>
+                }
+                @foreach (var log in auditLogs.Take(10))
+                {
+                    <li class="px-5 py-2.5">
+                        <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@log.Action <span class="font-normal text-slate-500 dark:text-slate-400">on @log.EntityName</span></div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">@log.Actor &middot; @log.CreatedAt.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                    </li>
+                }
+            </ul>
+        </div>
+        <div class="ui-card">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Create Staff User</h2></div>
+            <form asp-action="CreateStaffUser" method="post" class="ui-card-body space-y-3">
+                <div><label class="ui-label">Full name<span class="ui-required">*</span></label><input name="fullName" class="ui-field" required /></div>
+                <div><label class="ui-label">Email<span class="ui-required">*</span></label><input name="email" type="email" class="ui-field" required /></div>
+                <div><label class="ui-label">Phone</label><input name="phone" class="ui-field" /></div>
+                <div>
+                    <label class="ui-label">Role</label>
+                    <select name="role" class="ui-field">
+                        <option value="@PortalRoles.Recruiter">Recruiter</option>
+                        <option value="@PortalRoles.Hr">HR</option>
+                        <option value="@PortalRoles.Admin">Admin</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="ui-label" for="staffTempPassword">Temporary password<span class="ui-required">*</span></label>
+                    <div class="relative">
+                        <input id="staffTempPassword" name="password" type="password" minlength="8" class="ui-field pr-10" required data-pw-strength="staffPwStrength" />
+                        <button type="button" class="pw-toggle-inline" data-pw-toggle="staffTempPassword" aria-label="Show password">
+                            <i data-lucide="eye" class="h-4 w-4"></i>
+                        </button>
+                    </div>
+                    <div id="staffPwStrength" class="pw-strength" aria-live="polite">
+                        <div class="pw-strength-track">
+                            <div class="pw-strength-seg"></div>
+                            <div class="pw-strength-seg"></div>
+                            <div class="pw-strength-seg"></div>
+                            <div class="pw-strength-seg"></div>
+                        </div>
+                        <span class="pw-strength-label"></span>
+                    </div>
+                </div>
+                <button class="ui-btn-primary w-full" type="submit" disabled="@(!isAdmin)"><i data-lucide="user-plus" class="h-4 w-4"></i>Create</button>
+            </form>
+        </div>
+    </section>
+
+    @* ===================== Analytics tab ===================== *@
+    <section data-tabs-panel="analytics" data-tabs-group="admin-dash" class="hidden grid gap-6 md:grid-cols-2">
+        <div class="ui-card">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Reports</h2></div>
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-2.5 font-medium">Assessment</th><th class="px-5 py-2.5 font-medium">Invited</th><th class="px-5 py-2.5 font-medium">Completed</th><th class="px-5 py-2.5 font-medium">Average</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!reports.Any())
+                        {
+                            <tr><td colspan="4" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "bar-chart-3", Title = "No reports generated yet", Message = "Reports appear once candidates start completing assessments.", Compact = true })</td></tr>
+                        }
+                        @foreach (var report in reports)
+                        {
+                            <tr>
+                                <td class="px-5 py-2.5 text-slate-700 dark:text-slate-200">@report.Exam?.Title</td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">@report.InvitedCandidates</td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">@report.CompletedAttempts</td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">@report.AverageScore.ToString("0.##")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="ui-card">
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Notifications and Proctoring</h2></div>
+            <div class="ui-card-body space-y-4">
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/40">
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Notification History</div>
+                        <div class="text-xl font-bold text-slate-800 dark:text-slate-100">@notifications.Count()</div>
+                    </div>
+                    <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/40">
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Recent Suspicious Logs</div>
+                        <div class="text-xl font-bold text-slate-800 dark:text-slate-100">@proctoringLogs.Count()</div>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-700">
+                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Recent Notifications</span>
+                    <form asp-action="RetryFailedNotifications" method="post">
+                        <button class="ui-btn-outline !px-3 !py-1.5 text-xs"
+                                data-confirm-title="Retry all failed notifications?"
+                                data-confirm-message="This re-queues every notification currently marked as Failed.">Retry Failed</button>
+                    </form>
+                </div>
+                <ul class="max-h-64 divide-y divide-slate-100 overflow-y-auto text-sm dark:divide-slate-700">
+                    @foreach (var note in notifications.Take(8))
+                    {
+                        <li class="flex items-start justify-between gap-3 py-2.5">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2 font-medium text-slate-800 dark:text-slate-100">
+                                    @note.Subject <span class="ui-badge-neutral">@note.Channel</span>
+                                </div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">@note.User?.FullName &middot; retries @note.RetryCount/@note.MaxRetries</div>
+                                @if (!string.IsNullOrWhiteSpace(note.ErrorMessage))
+                                {
+                                    <div class="text-xs text-red-500 dark:text-red-400">@note.ErrorMessage</div>
+                                }
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <span class="@(note.Status == "Sent" ? "ui-badge-success" : note.Status == "Failed" ? "ui-badge-danger" : "ui-badge-warning")">@note.Status</span>
+                                @if (note.Status == "Failed")
+                                {
+                                    <form asp-action="RetryFailedNotifications" method="post" class="mt-1">
+                                        <input type="hidden" name="notificationId" value="@note.Id" />
+                                        <button class="ui-btn-outline !px-2.5 !py-1 text-xs">Retry</button>
+                                    </form>
+                                }
+                            </div>
+                        </li>
+                    }
+                </ul>
+
+                <div class="border-t border-slate-100 pt-3 dark:border-slate-700">
+                    <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Proctoring Flags</span>
+                    <ul class="mt-2 max-h-56 divide-y divide-slate-100 overflow-y-auto text-sm dark:divide-slate-700">
+                        @if (!proctoringLogs.Any())
+                        {
+                            <li>@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "shield-check", Title = "No proctoring flags", Message = "Nothing suspicious detected during monitored attempts.", Variant = "success", Compact = true })</li>
+                        }
+                        @foreach (var log in proctoringLogs.Take(8))
+                        {
+                            <li class="flex items-center justify-between py-2">
+                                <span class="text-slate-600 dark:text-slate-300">@log.EventType &middot; @log.Attempt?.User?.FullName</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">@log.OccurredAt.ToLocalTime().ToString("HH:mm")</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <script>
+        // Stat cards use the shared data-skeleton wiring in app.js (same brief,
+        // deliberate loading state as before). Once it reveals them, restart the
+        // count-up animation now that the numbers are actually visible.
+        document.addEventListener('vw:skeleton-revealed', function (e) {
+            if (e.detail.group === 'admin-stats' && window.vwInitStatCounters) window.vwInitStatCounters();
+        });
+    </script>
+}

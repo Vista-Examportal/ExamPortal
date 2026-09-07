@@ -1,0 +1,165 @@
+@model ResumeSkillStepViewModel
+@{ ViewData["Title"] = "Resume, Skills & Preferences"; }
+
+@* ── Step progress bar ─────────────────────────────────────────────────── *@
+@* Converted from Bootstrap's .progress/.progress-bar to the shared
+   ui-progress/ui-progress-bar-success kit. The row/col grid further below
+   has since been converted to Tailwind's grid utilities as well. *@
+<div class="mb-4">
+    <div class="flex items-center justify-between mb-1">
+        <span class="text-sm font-semibold text-[var(--vw-accent)]">Step 4 of 4 — Resume, Skills &amp; Preferences</span>
+        <span class="text-sm text-slate-500 dark:text-slate-400">Final step</span>
+    </div>
+    <div class="ui-progress" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Registration progress">
+        <div class="ui-progress-bar-success" style="width:100%"></div>
+    </div>
+    <div class="flex items-center justify-between mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <span>Account</span><span>Verify</span><span>Profile</span><span class="font-bold text-[var(--vw-accent)]">Resume &amp; Skills</span>
+    </div>
+</div>
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="file-up"></i></div>
+        <div>
+            <h1 class="vw-page-title">Resume, Skills &amp; Preferences</h1>
+            <p class="vw-page-subtitle">Upload your resume, add your skills, and job preferences.</p>
+        </div>
+    </div>
+    <div class="vw-page-actions">
+        <span class="ui-badge-success rounded-full px-3 py-2">Final Step</span>
+    </div>
+</div>
+
+<form asp-action="UploadResume" method="post" enctype="multipart/form-data">
+    <div class="ui-card">
+        <div class="ui-card-body">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="ui-alert-danger mb-4" role="alert">
+                    <div class="ui-alert-icon"><i data-lucide="circle-alert" class="h-4 w-4"></i></div>
+                    <div>@Html.ValidationSummary(false, null, new { @class = "space-y-0.5" })</div>
+                </div>
+            }
+
+            @* ── Resume & Photo ─────────────────────────────────────────────────── *@
+            <div class="vw-section-title"><i data-lucide="file-up" class="h-4 w-4 me-1"></i>Resume &amp; Photo</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label asp-for="ResumeUpload" class="ui-label">
+                        Resume (PDF, max 5 MB)<span class="ui-required" aria-hidden="true">*</span>
+                    </label>
+                    <input asp-for="ResumeUpload" type="file" class="ui-field"
+                           accept="application/pdf,.pdf"
+                           aria-required="true" aria-describedby="err-Resume resume-hint" />
+                    <div id="resume-hint" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">PDF only. Recruiters will see this file.</div>
+                    <span asp-validation-for="ResumeUpload" id="err-Resume" class="ui-field-error"></span>
+                </div>
+                <div>
+                    <label asp-for="ProfilePhoto" class="ui-label">
+                        Profile Photo <span class="font-normal text-slate-500 dark:text-slate-400">— optional</span>
+                    </label>
+                    <input asp-for="ProfilePhoto" type="file" class="ui-field"
+                           accept="image/png,image/jpeg,image/webp"
+                           aria-describedby="photo-hint" />
+                    <div id="photo-hint" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">PNG, JPG, or WEBP. You can add this later.</div>
+                </div>
+            </div>
+
+            @* ── Skills ─────────────────────────────────────────────────────────── *@
+            <div class="vw-section-title"><i data-lucide="tag" class="h-4 w-4 me-1"></i>Skills</div>
+            <div class="mb-3">
+                <label class="ui-label">
+                    Skills<span class="ui-required" aria-hidden="true">*</span>
+                </label>
+                <label class="ui-label" for="skillInput" id="skillInputLabel">Add a skill</label>
+                <div class="flex flex-wrap items-center gap-1.5 rounded-[var(--vw-radius)] border border-[var(--vw-border-strong)] bg-[var(--vw-surface)] px-2.5 py-2 min-h-[2.5rem] cursor-text focus-within:border-[var(--vw-accent)] focus-within:ring-[3px] focus-within:ring-[var(--vw-accent-bg)]" id="skillTagWrap" role="group" aria-label="Skills tags">
+                    <input type="text" id="skillInput" class="flex-1 min-w-[120px] border-0 bg-transparent text-sm text-[var(--vw-text)] outline-none" aria-labelledby="skillInputLabel" />
+                </div>
+                <input type="hidden" asp-for="Skills" id="skillsHidden" />
+                <div class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Type a skill and press Enter or comma to add it. e.g. C#, SQL, React, Python, Communication</div>
+                <span asp-validation-for="Skills" class="ui-field-error"></span>
+            </div>
+
+            @* ── Job Preferences ───────────────────────────────────────────────── *@
+            <div class="vw-section-title mt-4"><i data-lucide="map-pin" class="h-4 w-4 me-1"></i>Job Preferences</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label asp-for="PreferredJobLocation" class="ui-label">Preferred Job Location(s)</label>
+                    <div class="vw-msel" data-msel data-msel-target="#PreferredJobLocation" data-msel-placeholder="Select one or more locations…" data-msel-join=", ">
+                        @foreach (var loc in RegistrationOptions.JobLocations)
+                        {
+                            <template data-msel-option value="@loc">@loc</template>
+                        }
+                    </div>
+                    <input type="hidden" asp-for="PreferredJobLocation" id="PreferredJobLocation" />
+                    <div class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Pick as many locations as you're open to — saved together in one field, same as before.</div>
+                </div>
+            </div>
+
+            <div class="vw-form-actions">
+                <button type="submit" class="ui-btn-primary px-4 font-semibold" id="uploadBtn">
+                    <i data-lucide="check" class="h-4 w-4"></i>Complete Registration
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+(function () {
+    let skills = [];
+    const wrap = document.getElementById('skillTagWrap');
+    const input = document.getElementById('skillInput');
+    const hidden = document.getElementById('skillsHidden');
+
+    const existingVal = hidden.value.trim();
+    if (existingVal) {
+        existingVal.split(',').map(s => s.trim()).filter(Boolean).forEach(addSkill);
+    }
+
+    function addSkill(val) {
+        val = val.trim();
+        const key = val.toLowerCase();
+        if (!val || skills.some(s => s.key === key)) return;
+        // Track the lowercase key (for case-insensitive de-duplication)
+        // separately from the original-case display value, so typing "SQL"
+        // or "React" doesn't get silently saved as "sql" / "react".
+        skills.push({ key: key, display: val });
+        const tag = document.createElement('span');
+        tag.className = 'js-tag inline-flex items-center gap-1 rounded bg-[var(--vw-accent-bg)] px-2 py-0.5 text-[13px] text-[var(--vw-accent-text)]';
+        tag.innerHTML = `${window.vwEscHtml(val)} <button type="button" class="js-tag-del cursor-pointer border-0 bg-transparent p-0 font-bold leading-none text-[var(--vw-accent-text)]" aria-label="Remove ${window.vwEscHtml(val)}" data-val="${window.vwEscHtml(key)}">&times;</button>`;
+        tag.querySelector('.js-tag-del').addEventListener('click', removeSkill);
+        wrap.insertBefore(tag, input);
+        syncHidden();
+    }
+
+    function removeSkill(e) {
+        const key = e.target.dataset.val;
+        skills = skills.filter(s => s.key !== key);
+        e.target.closest('.js-tag').remove();
+        syncHidden();
+    }
+
+    function syncHidden() { hidden.value = skills.map(s => s.display).join(', '); }
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            addSkill(this.value.replace(/,/g, ''));
+            this.value = '';
+        } else if (e.key === 'Backspace' && this.value === '' && skills.length) {
+            const last = wrap.querySelectorAll('.js-tag');
+            if (last.length) last[last.length - 1].querySelector('.js-tag-del').click();
+        }
+    });
+
+    input.addEventListener('blur', function () {
+        if (this.value.trim()) { addSkill(this.value); this.value = ''; }
+    });
+
+    wrap.addEventListener('click', () => input.focus());
+})();
+</script>
+}

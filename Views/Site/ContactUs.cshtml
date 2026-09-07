@@ -1,0 +1,83 @@
+@model ContactMessageViewModel
+@{
+    ViewData["Title"] = "Contact Us";
+}
+<div class="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+    <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-4xl">Contact Us</h1>
+
+    @if (TempData["ContactSuccess"] != null)
+    {
+        <div class="ui-alert-success mt-8">
+            <i data-lucide="circle-check" class="h-5 w-5 shrink-0"></i>
+            <div>@TempData["ContactSuccess"]</div>
+        </div>
+    }
+    @if (!ViewData.ModelState.IsValid && ViewData.ModelState[""] != null)
+    {
+        <div class="ui-alert-danger mt-8">
+            <i data-lucide="triangle-alert" class="h-5 w-5 shrink-0"></i>
+            <div>@Html.ValidationSummary(true, null, new { @class = "space-y-0.5" })</div>
+        </div>
+    }
+
+    <form asp-action="ContactUs" method="post" class="ui-card mt-8 space-y-4 p-6">
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <label asp-for="Name" class="ui-label">Name</label>
+                <input asp-for="Name" class="ui-field" autocomplete="name" />
+                <span asp-validation-for="Name" class="ui-field-error"></span>
+            </div>
+            <div>
+                <label asp-for="Email" class="ui-label">Email</label>
+                <input asp-for="Email" class="ui-field" autocomplete="email" />
+                <span asp-validation-for="Email" class="ui-field-error"></span>
+            </div>
+        </div>
+        <div>
+            <label asp-for="Phone" class="ui-label">Phone <span class="font-normal text-slate-400">(optional)</span></label>
+            <input asp-for="Phone" class="ui-field" autocomplete="tel" />
+            <span asp-validation-for="Phone" class="ui-field-error"></span>
+        </div>
+        <div>
+            <label asp-for="Message" class="ui-label">Message</label>
+            <textarea asp-for="Message" rows="5" class="ui-field"></textarea>
+            <span asp-validation-for="Message" class="ui-field-error"></span>
+        </div>
+
+        @* Honeypot — hidden from real visitors via CSS (not type="hidden", which some
+           bots skip), left blank by humans, filled in by simple auto-filling bots.
+           See ContactMessageViewModel.Website and SiteController.ContactUs POST. *@
+        <div style="position:absolute; left:-9999px; top:-9999px;" aria-hidden="true">
+            <label asp-for="Website">Website</label>
+            <input asp-for="Website" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <button type="submit" class="ui-btn-primary py-2.5 font-semibold">
+            <i data-lucide="send" class="h-4 w-4"></i>Send Message
+        </button>
+    </form>
+
+    <div class="mt-8 grid gap-6 sm:grid-cols-2">
+        <div class="ui-card p-5">
+            <h2 class="text-base font-bold text-slate-900 dark:text-white">Phone</h2>
+            <p class="mt-1"><a href="tel:+917995654433" class="hover:text-[var(--vw-accent)] hover:underline">+91 79956 54433</a></p>
+        </div>
+        <div class="ui-card p-5">
+            <h2 class="text-base font-bold text-slate-900 dark:text-white">Email</h2>
+            <p class="mt-1"><a href="mailto:info@vistawaystech.com" class="hover:text-[var(--vw-accent)] hover:underline">info@vistawaystech.com</a></p>
+        </div>
+        <div class="ui-card p-5 sm:col-span-2">
+            <h2 class="text-base font-bold text-slate-900 dark:text-white">Office</h2>
+            <p class="mt-1">#801 &amp; 802, Manjeera Majestic Commercials, Opp. JNTU, Hitech City Road, Hyderabad – 500085</p>
+        </div>
+        <div class="ui-card p-5 sm:col-span-2">
+            <h2 class="text-base font-bold text-slate-900 dark:text-white">Follow us</h2>
+            <div class="mt-2 flex flex-wrap gap-4 text-sm">
+                <a href="https://www.linkedin.com/company/vistawaystech" target="_blank" rel="noopener" class="hover:text-[var(--vw-accent)] hover:underline">LinkedIn</a>
+                <a href="https://www.instagram.com/vistaways.tech" target="_blank" rel="noopener" class="hover:text-[var(--vw-accent)] hover:underline">Instagram</a>
+                <a href="https://www.facebook.com/share/18iqVfAiCk/" target="_blank" rel="noopener" class="hover:text-[var(--vw-accent)] hover:underline">Facebook</a>
+                <a href="https://x.com/vistawaystech" target="_blank" rel="noopener" class="hover:text-[var(--vw-accent)] hover:underline">X (Twitter)</a>
+            </div>
+        </div>
+    </div>
+</div>

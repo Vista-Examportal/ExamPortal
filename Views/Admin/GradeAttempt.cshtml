@@ -1,0 +1,78 @@
+@model ExamAttempt
+@{
+    ViewData["Title"] = "Grade Assessment";
+    var pending = ViewBag.PendingAnswers as List<UserAnswer> ?? new List<UserAnswer>();
+    Func<string, string> badgeClass = ExamPortal.Models.UiBadge.CssClass;
+}
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="pencil-line"></i></div>
+        <div>
+            <h1 class="vw-page-title">Grade Assessment</h1>
+            <p class="vw-page-subtitle">@Model.User?.FullName (@Model.User?.CandidateId) &middot; @Model.Exam?.Title</p>
+        </div>
+    </div>
+    <div class="vw-page-actions">
+        <a asp-action="ExamResults" asp-route-id="@Model.ExamId" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back to results</a>
+    </div>
+</div>
+
+<div class="ui-card mb-4">
+    <div class="ui-card-body text-sm">
+        <p class="text-slate-600 dark:text-slate-300">
+            These question types have no automated way to check correctness (no code-execution
+            judge or essay grader), so they aren't included in the auto-graded score. Award each
+            one a score from 0 up to its maximum marks. The auto-graded (MCQ/True-False/Fill-in-
+            the-Blank) portion of this attempt has already been scored and doesn't need review.
+        </p>
+    </div>
+</div>
+
+@if (!pending.Any())
+{
+    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel {
+        Icon = "check-circle",
+        Title = "Nothing to grade",
+        Message = "This attempt has no Coding/Subjective/Short/Case-study questions awaiting manual review.",
+        SecondaryText = "Back to results",
+        SecondaryUrl = Url.Action("ExamResults", new { id = Model.ExamId })
+    })
+}
+else
+{
+    <form asp-action="GradeAttempt" asp-route-id="@Model.Id" method="post">
+        @for (var i = 0; i < pending.Count; i++)
+        {
+            var answer = pending[i];
+            var question = answer.Question!;
+            <div class="ui-card mb-3">
+                <div class="ui-card-body text-sm">
+                    <div class="mb-1 flex items-center justify-between gap-3">
+                        <span class="font-semibold text-slate-800 dark:text-slate-100">Q@(i + 1). @question.Text</span>
+                        <span class="@badgeClass("neutral") shrink-0">@question.QuestionType &middot; @question.Marks marks</span>
+                    </div>
+
+                    @if (question.QuestionType.Contains("Coding", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <label class="ui-label text-xs">Submitted code</label>
+                        <pre class="ui-field !py-2 text-xs overflow-x-auto whitespace-pre-wrap" style="max-height:260px;">@(string.IsNullOrWhiteSpace(answer.TextAnswer) ? "(no code submitted)" : answer.TextAnswer)</pre>
+                    }
+                    else
+                    {
+                        <label class="ui-label text-xs">Candidate's answer</label>
+                        <div class="ui-field !py-2 text-sm whitespace-pre-wrap" style="max-height:260px; overflow-y:auto;">@(string.IsNullOrWhiteSpace(answer.TextAnswer) ? "(no answer submitted)" : answer.TextAnswer)</div>
+                    }
+
+                    <div class="mt-2 max-w-[180px]">
+                        <label class="ui-label text-xs">Score (0 – @question.Marks)</label>
+                        <input type="number" name="scores[@answer.Id]" class="ui-field !py-1.5 text-sm"
+                               min="0" max="@question.Marks" step="0.5" value="@answer.ScoreAwarded" required />
+                    </div>
+                </div>
+            </div>
+        }
+
+        <button type="submit" class="ui-btn-primary"><i data-lucide="check" class="h-4 w-4"></i>Finalize Grading</button>
+    </form>
+}

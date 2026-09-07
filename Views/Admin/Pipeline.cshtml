@@ -1,0 +1,130 @@
+@using ExamPortal.Models
+@model AdminPipelineViewModel
+@{ ViewData["Title"] = "Recruitment Pipeline"; }
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="workflow"></i></div>
+        <div>
+            <h1 class="vw-page-title">Recruitment Pipeline</h1>
+            <p class="vw-page-subtitle">Candidate journey, grouped into 8 funnel stages</p>
+        </div>
+    </div>
+    <div class="vw-page-actions">
+        @if (User.IsInRole(PortalRoles.Admin))
+        {
+            <a asp-action="Index" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Dashboard</a>
+        }
+        else if (User.IsInRole(PortalRoles.Recruiter))
+        {
+            <a asp-controller="Recruiter" asp-action="Index" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Dashboard</a>
+        }
+        else
+        {
+            <a asp-controller="Hr" asp-action="Index" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Dashboard</a>
+        }
+    </div>
+</div>
+
+@{
+    // Board is grouped into 8 funnel-level columns instead of one column per
+    // RecruitmentStage value. This is a display-only grouping: every stage in
+    // RecruitmentStages is still the real, unchanged value stored on the
+    // candidate (see Models/PortalModels.cs) — nothing here alters how or when
+    // a candidate's stage transitions. A couple of stages don't get their own
+    // column and are folded into the nearest one so no candidate becomes
+    // invisible on the board just because their exact sub-stage isn't a whole
+    // column: ProfileUnderReview folds into "Registered" (still pre-invitation),
+    // and DocumentsRequested/DocumentsVerified fold into "Offer" (both are
+    // post-offer paperwork). Folded candidates still show their real stage as
+    // a small sub-label on the card so no information is lost, just the
+    // column count.
+    //
+    // Known gap (pre-existing, not introduced by this grouping, and not fixable
+    // from the view alone): candidates in EmailVerificationPending, ProfilePending,
+    // ResumePending, SkillProfilePending, or Rejected have no column here because
+    // AdminController.Pipeline() never queries for those stages into this
+    // view's model. They remain visible with their real stage on the Candidates
+    // (Students) page. Closing this gap needs a controller change, which is out
+    // of scope for this UI-only pass.
+    //
+    // Note: Model.AssessmentCompleted also contains AssessmentStarted candidates
+    // (the controller merges them), and Model.OfferAccepted also contains
+    // Onboarding candidates — both are split back out below using each
+    // candidate's real RecruitmentStage so nobody renders twice on the board.
+    var assessmentStarted = Model.AssessmentCompleted.Where(u => u.RecruitmentStage == RecruitmentStages.AssessmentStarted).ToList();
+    var assessmentCompleted = Model.AssessmentCompleted.Where(u => u.RecruitmentStage == RecruitmentStages.AssessmentCompleted).ToList();
+    var offerAcceptedOnly = Model.OfferAccepted.Where(u => u.RecruitmentStage == RecruitmentStages.OfferAccepted).ToList();
+    var registeredGroup = Model.Registered.Concat(Model.UnderReview).ToList();
+    var offerGroup = Model.DocumentsRequested.Concat(Model.DocumentsVerified).Concat(Model.OfferIssued).Concat(offerAcceptedOnly).ToList();
+
+    // Anchor id per column (e.g. "pipeline-interview") so other pages — HR's
+    // dashboard modules, for instance — can deep-link straight to a specific
+    // stage on this board instead of every link landing on the same unscrolled
+    // top of the page.
+    var columns = new (string Title, string Icon, string Phase, List<User> Users, bool Folded, string AnchorId)[]
+    {
+        ("Registered",          "user-plus",       "intake",     registeredGroup,        true,  "pipeline-registered"),
+        ("Invitation Sent",     "mail",             "intake",     Model.InvitationSent,   false, "pipeline-invitation-sent"),
+        ("Assessment Started",  "play-circle",      "evaluation", assessmentStarted,      false, "pipeline-assessment-started"),
+        ("Assessment Completed","clipboard-check",  "evaluation", assessmentCompleted,    false, "pipeline-assessment-completed"),
+        ("Shortlisted",         "star",             "evaluation", Model.Shortlisted,      false, "pipeline-shortlisted"),
+        ("Interview",           "message-square",   "evaluation", Model.InterviewInProgress, false, "pipeline-interview"),
+        ("Offer",               "file-check",   "closing",    offerGroup,             true,  "pipeline-offer"),
+        ("Onboarding",          "rocket",           "closing",    Model.Onboarding,       false, "pipeline-onboarding"),
+    };
+
+    // Only shown on folded columns, where a card's stage isn't already implied
+    // by the column title.
+    // Shared with Admin/Index.cshtml via RecruitmentStages.FriendlyLabel (was previously
+    // a copy-pasted local regex here).
+    Func<string, string> friendlyStage = RecruitmentStages.FriendlyLabel;
+}
+
+<div class="mb-4 flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+    <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2 w-2 rounded-full bg-[var(--vw-text-muted)]"></span>Intake</span>
+    <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2 w-2 rounded-full bg-[var(--vw-accent)]"></span>Evaluation</span>
+    <span class="inline-flex items-center gap-1.5"><span class="inline-block h-2 w-2 rounded-full bg-[var(--vw-success-text)]"></span>Closing</span>
+</div>
+
+<div class="flex items-start gap-3 overflow-x-auto pb-3">
+    @foreach (var col in columns)
+    {
+        <div id="@col.AnchorId" class="w-[220px] shrink-0 scroll-mt-24">
+            <div class="vw-pipeline-head vw-phase-@col.Phase flex items-center gap-2 rounded-t-lg p-2 text-sm font-semibold">
+                <i data-lucide="@col.Icon" class="h-4 w-4"></i>@col.Title
+                <span class="ui-badge-neutral ml-auto">@col.Users.Count</span>
+            </div>
+            <div class="flex min-h-[200px] flex-col gap-2 rounded-b-lg border border-t-0 border-[var(--vw-border)] bg-[var(--vw-surface-muted)] p-2">
+                @foreach (var u in col.Users)
+                {
+                    var showSubStage = col.Folded;
+                    <a asp-action="CandidateDetail" asp-route-id="@u.Id" class="block no-underline">
+                        <div class="ui-card cursor-pointer !shadow-none p-2 hover:!shadow-sm">
+                            <div class="text-sm font-semibold text-slate-900 dark:text-white">@u.FullName</div>
+                            <div class="text-[11px] text-slate-500 dark:text-slate-400">@u.CandidateId</div>
+                            <div class="text-[11px] text-slate-500 dark:text-slate-400">@u.Degree &middot; @u.BranchSpecialization</div>
+                            @if (showSubStage)
+                            {
+                                <div class="mt-0.5 text-[10px] font-medium text-[var(--vw-accent-text)]">@friendlyStage(u.RecruitmentStage)</div>
+                            }
+                            @{
+                                var pgRecord = u.EducationRecords.FirstOrDefault(e => e.Level == EducationLevels.Postgraduate);
+                            }
+                            @if (pgRecord != null && pgRecord.Status != EducationStatuses.NotApplicable)
+                            {
+                                <div class="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                    <i data-lucide="graduation-cap" class="h-3.5 w-3.5"></i>@pgRecord.DegreeOrCourse
+                                </div>
+                            }
+                        </div>
+                    </a>
+                }
+                @if (!col.Users.Any())
+                {
+                    @await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "inbox", Title = "Empty", Compact = true })
+                }
+            </div>
+        </div>
+    }
+</div>

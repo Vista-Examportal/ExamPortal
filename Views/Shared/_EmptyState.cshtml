@@ -1,0 +1,68 @@
+@model ExamPortal.Models.EmptyStateViewModel
+@{
+    @* Icon badge color follows the same semantic tokens used by
+       .ui-modal-icon-* / .ui-alert-* elsewhere in the app, so an empty
+       state reads as "neutral/informational" (default), "go do this"
+       (accent), "all clear" (success), or "needs attention" (warning)
+       using colors the rest of the UI already trained the eye on. *@
+    var badgeClass = Model.Variant switch
+    {
+        "accent" => "bg-[var(--vw-accent-bg)] text-[var(--vw-accent)]",
+        "success" => "bg-[var(--vw-success-bg)] text-[var(--vw-success-text)]",
+        "warning" => "bg-[var(--vw-warning-bg)] text-[var(--vw-warning-text)]",
+        _ => "bg-[var(--vw-surface-muted)] text-[var(--vw-text-muted)]",
+    };
+    bool hasPrimary = !string.IsNullOrWhiteSpace(Model.ActionText) && !string.IsNullOrWhiteSpace(Model.ActionUrl);
+    bool hasSecondary = !string.IsNullOrWhiteSpace(Model.SecondaryText) && !string.IsNullOrWhiteSpace(Model.SecondaryUrl);
+}
+@if (Model.Compact)
+{
+    <div class="flex flex-col items-center justify-center gap-1.5 py-6 px-3 text-center">
+        <div class="flex h-9 w-9 items-center justify-center rounded-full @badgeClass">
+            <i data-lucide="@Model.Icon" class="h-4 w-4"></i>
+        </div>
+        <p class="text-xs font-semibold text-[var(--vw-text)]">@Model.Title</p>
+        @if (!string.IsNullOrWhiteSpace(Model.Message))
+        {
+            <p class="text-[11px] leading-snug text-[var(--vw-text-muted)] max-w-[200px]">@Model.Message</p>
+        }
+        @if (hasPrimary)
+        {
+            <a href="@Model.ActionUrl" class="ui-btn-outline !px-2.5 !py-1 text-[11px] mt-1">
+                @if (!string.IsNullOrWhiteSpace(Model.ActionIcon)) { <i data-lucide="@Model.ActionIcon" class="h-3 w-3"></i> }
+                @Model.ActionText
+            </a>
+        }
+    </div>
+}
+else
+{
+    <div class="flex flex-col items-center justify-center gap-3 py-12 px-6 text-center">
+        <div class="flex h-16 w-16 items-center justify-center rounded-full @badgeClass">
+            <i data-lucide="@Model.Icon" class="h-7 w-7"></i>
+        </div>
+        <div class="space-y-1">
+            <p class="text-sm font-semibold text-[var(--vw-text)]">@Model.Title</p>
+            @if (!string.IsNullOrWhiteSpace(Model.Message))
+            {
+                <p class="text-sm text-[var(--vw-text-muted)] max-w-sm mx-auto">@Model.Message</p>
+            }
+        </div>
+        @if (hasPrimary || hasSecondary)
+        {
+            <div class="flex flex-wrap items-center justify-center gap-3 mt-1">
+                @if (hasPrimary)
+                {
+                    <a href="@Model.ActionUrl" class="ui-btn-primary">
+                        @if (!string.IsNullOrWhiteSpace(Model.ActionIcon)) { <i data-lucide="@Model.ActionIcon" class="h-4 w-4"></i> }
+                        @Model.ActionText
+                    </a>
+                }
+                @if (hasSecondary)
+                {
+                    <a href="@Model.SecondaryUrl" class="text-sm font-medium text-[var(--vw-text-muted)] hover:text-[var(--vw-text)] underline underline-offset-2">@Model.SecondaryText</a>
+                }
+            </div>
+        }
+    </div>
+}

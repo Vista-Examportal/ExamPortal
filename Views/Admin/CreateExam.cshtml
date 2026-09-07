@@ -1,0 +1,141 @@
+@model CreateExamViewModel
+@{ ViewData["Title"] = "Create Eligibility Assessment"; }
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="circle-plus"></i></div>
+        <div><h1 class="vw-page-title">Create Eligibility Assessment</h1></div>
+    </div>
+    <div class="vw-page-actions">
+        @if (!User.IsInRole(PortalRoles.Admin) && User.IsInRole(PortalRoles.Recruiter))
+        {
+            <a asp-controller="Recruiter" asp-action="Index" asp-route-tab="assessments" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back</a>
+        }
+        else
+        {
+            <a asp-action="Index" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Back</a>
+        }
+    </div>
+</div>
+
+<form asp-action="CreateExam" method="post">
+    <div class="grid grid-cols-12 gap-4">
+        <div class="col-span-12 lg:col-span-4">
+            <div class="ui-card mb-3">
+                <div class="ui-card-body">
+                    <h2 class="ui-heading-md mb-3"><i data-lucide="info" class="h-4 w-4 text-[var(--vw-accent)]"></i>Assessment Details</h2>
+                    <div class="mb-3"><label for="Title" class="ui-label">Assessment Name<span class="ui-required" aria-hidden="true">*</span></label><input asp-for="Title" class="ui-field" required aria-required="true" aria-describedby="err-Title" /><span asp-validation-for="Title" id="err-Title" class="ui-field-error"></span></div>
+                    <div class="mb-3"><label for="Subject" class="ui-label">Domain<span class="ui-required" aria-hidden="true">*</span></label><input asp-for="Subject" class="ui-field" required aria-required="true" aria-describedby="err-Subject" /><span asp-validation-for="Subject" id="err-Subject" class="ui-field-error"></span></div>
+                    <div class="mb-3"><label for="TemplateName" class="ui-label">Template Name</label><input asp-for="TemplateName" class="ui-field" aria-describedby="hint-TemplateName" /><div id="hint-TemplateName" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. Campus Java Developer, Backend L1</div></div>
+                    <label class="ui-check-row mb-3"><input asp-for="IsTemplate" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Save as Assessment Template</span></label>
+                    <div class="mb-3"><label for="Description" class="ui-label">Description</label><textarea asp-for="Description" class="ui-field" rows="3"></textarea></div>
+                    <div class="mb-3"><label for="Instructions" class="ui-label">Instructions</label><textarea asp-for="Instructions" class="ui-field" rows="4"></textarea></div>
+                    <div class="grid grid-cols-12 gap-2">
+                        <div class="col-span-6"><label for="DurationMinutes" class="ui-label">Duration (minutes)<span class="ui-required" aria-hidden="true">*</span></label><input asp-for="DurationMinutes" class="ui-field" type="number" min="5" max="300" required aria-required="true" aria-describedby="err-DurationMinutes" /><span asp-validation-for="DurationMinutes" id="err-DurationMinutes" class="ui-field-error"></span></div>
+                        <div class="col-span-6"><label for="PassingMarks" class="ui-label">Passing Score<span class="ui-required" aria-hidden="true">*</span></label><input asp-for="PassingMarks" class="ui-field" type="number" min="1" required aria-required="true" aria-describedby="err-PassingMarks" /><span asp-validation-for="PassingMarks" id="err-PassingMarks" class="ui-field-error"></span></div>
+                        <div class="col-span-6"><label for="StartDateTime" class="ui-label">Start</label><input asp-for="StartDateTime" class="ui-field" /></div>
+                        <div class="col-span-6"><label for="EndDateTime" class="ui-label">End</label><input asp-for="EndDateTime" class="ui-field" /></div>
+                        <div class="col-span-12"><label for="TimeZone" class="ui-label">Time Zone for Start/End</label><select asp-for="TimeZone" class="ui-field">
+                            @await Html.PartialAsync("_TimeZoneOptions")
+                        </select></div>
+                        <div class="col-span-6"><label for="Status" class="ui-label">Status</label><select asp-for="Status" class="ui-field"><option>Draft</option><option>Scheduled</option><option>Active</option><option>Closed</option></select></div>
+                        <div class="col-span-6"><label for="NegativeMarks" class="ui-label">Negative Marks</label><input asp-for="NegativeMarks" class="ui-field" type="number" step="0.25" min="0" /></div>
+                        <div class="col-span-12"><label for="RandomQuestionCount" class="ui-label">Random Question Count</label><input asp-for="RandomQuestionCount" class="ui-field" type="number" min="0" aria-describedby="hint-RandomQuestionCount" /><div id="hint-RandomQuestionCount" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Leave as 0 to use every question below.</div></div>
+                    </div>
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="ui-alert-danger mt-3" role="alert" aria-live="assertive">
+                            <div class="ui-alert-icon"><i data-lucide="circle-alert" class="h-4 w-4"></i></div>
+                            <div>@Html.ValidationSummary(false, null, new { @class = "space-y-0.5" })</div>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="ui-card">
+                <div class="ui-card-body">
+                    <h2 class="ui-heading-md mb-3"><i data-lucide="filter" class="h-4 w-4 text-[var(--vw-accent)]"></i>Eligibility Rules</h2>
+                    <div class="mb-3"><label for="RequiredEducation" class="ui-label">Required Education</label><input asp-for="RequiredEducation" class="ui-field" aria-describedby="hint-RequiredEducation" /><div id="hint-RequiredEducation" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. Computer, B.Tech</div></div>
+                    <div class="mb-3"><label for="RequiredSkills" class="ui-label">Required Skills</label><input asp-for="RequiredSkills" class="ui-field" aria-describedby="hint-RequiredSkills" /><div id="hint-RequiredSkills" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. C#, SQL, React</div></div>
+                    <div class="mb-3"><label for="EligibleLocations" class="ui-label">Eligible Locations</label><input asp-for="EligibleLocations" class="ui-field" aria-describedby="hint-EligibleLocations" /><div id="hint-EligibleLocations" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. Bengaluru, Remote</div></div>
+                    <div class="mb-3"><label for="ExperienceLevel" class="ui-label">Experience Level</label><input asp-for="ExperienceLevel" class="ui-field" aria-describedby="hint-ExperienceLevel" /><div id="hint-ExperienceLevel" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. Fresher, 2 years</div></div>
+                    <fieldset class="ui-check-group border-0 p-0 m-0">
+                        <legend class="sr-only">Assessment behavior &amp; proctoring options</legend>
+                        <label class="ui-check-row"><input asp-for="UseQuestionBank" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Use Question Bank Items</span></label>
+                        <label class="ui-check-row"><input asp-for="RandomizeQuestions" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Randomized Questions</span></label>
+                        <label class="ui-check-row"><input asp-for="RandomizeOptions" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Randomized Options</span></label>
+                        <label class="ui-check-row"><input asp-for="AllowResumeAssessment" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Resume Assessment Support</span></label>
+                        <label class="ui-check-row"><input asp-for="RequireFullScreen" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Full-Screen Enforcement</span></label>
+                        <label class="ui-check-row"><input asp-for="RequireScreenMonitoring" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Screen Monitoring</span></label>
+                        <label class="ui-check-row"><input asp-for="RequireWebcam" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Webcam Monitoring</span></label>
+                        <label class="ui-check-row"><input asp-for="RestrictCopyPaste" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Copy/Paste Restriction</span></label>
+                    </fieldset>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-span-12 lg:col-span-8">
+            <div class="ui-card">
+                <div class="ui-card-body">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h2 class="ui-heading-md"><i data-lucide="circle-help" class="h-4 w-4 text-[var(--vw-accent)]"></i>Question Bank</h2>
+                        <button type="button" class="ui-btn-outline !py-1.5 text-sm" onclick="addQuestion()"><i data-lucide="plus" class="h-4 w-4"></i>Add Question</button>
+                    </div>
+
+                    <div id="questionsContainer">
+                        @for (int i = 0; i < Model.Questions.Count; i++)
+                        {
+                            <div class="question-block ui-card mb-3 p-3 transition-shadow hover:shadow-md bg-[var(--vw-surface-muted)]" id="q_@i">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="ui-badge-primary">Q@(i+1)</span>
+                                    <button type="button" class="ui-btn-outline !h-7 !w-7 !rounded-full !p-0 justify-center text-red-600 dark:text-red-400 border-red-300 dark:border-red-800" onclick="removeQuestion(@i)" aria-label="Remove question @(i + 1)"><i data-lucide="x" class="h-3.5 w-3.5" aria-hidden="true"></i></button>
+                                </div>
+                                <div class="mb-2"><label class="ui-label text-xs">Question text</label><input name="Questions[@i].Text" class="ui-field !py-1.5 text-sm" /></div>
+                                <div class="grid grid-cols-12 gap-2 mb-2">
+                                    <div class="col-span-12 md:col-span-4"><label class="ui-label text-xs">Section</label><input name="Questions[@i].SectionName" class="ui-field !py-1.5 text-sm" value="General" /></div>
+                                    <div class="col-span-12 md:col-span-4"><label class="ui-label text-xs">Category</label><select name="Questions[@i].Category" class="ui-field !py-1.5 text-sm"><option>Technical MCQs</option><option>Aptitude Questions</option><option>Logical Reasoning</option><option>Verbal Ability</option><option>Programming Questions</option><option>Coding Challenges</option><option>Scenario-Based Questions</option><option>Domain-Specific Questions</option></select></div>
+                                    <div class="col-span-12 md:col-span-4"><label class="ui-label text-xs">Question type</label><select name="Questions[@i].QuestionType" class="ui-field !py-1.5 text-sm"><option>Single Choice MCQ</option><option>Multiple Choice MCQ</option><option>True/False</option><option>Fill in the Blank</option><option>Subjective Questions</option><option>Coding Questions</option></select></div>
+                                    <div class="col-span-12 md:col-span-6"><label class="ui-label text-xs">Difficulty</label><select name="Questions[@i].Difficulty" class="ui-field !py-1.5 text-sm"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></div>
+                                    <div class="col-span-12 md:col-span-6"><label class="ui-label text-xs">Tags</label><input name="Questions[@i].Tags" class="ui-field !py-1.5 text-sm" aria-describedby="hint-tags-@i" /><div id="hint-tags-@i" class="mt-1 text-xs text-slate-500 dark:text-slate-400">e.g. csharp, sql, reasoning</div></div>
+                                    <div class="col-span-6"><label class="sr-only">Option A</label><div class="flex items-center gap-2"><span class="ui-badge-primary h-8 w-8 shrink-0 !rounded-lg !px-0 justify-center text-xs font-bold" aria-hidden="true">A</span><input name="Questions[@i].OptionA" class="ui-field !py-1.5 text-sm" aria-label="Option A" /></div></div>
+                                    <div class="col-span-6"><label class="sr-only">Option B</label><div class="flex items-center gap-2"><span class="ui-badge-primary h-8 w-8 shrink-0 !rounded-lg !px-0 justify-center text-xs font-bold" aria-hidden="true">B</span><input name="Questions[@i].OptionB" class="ui-field !py-1.5 text-sm" aria-label="Option B" /></div></div>
+                                    <div class="col-span-6"><label class="sr-only">Option C</label><div class="flex items-center gap-2"><span class="ui-badge-primary h-8 w-8 shrink-0 !rounded-lg !px-0 justify-center text-xs font-bold" aria-hidden="true">C</span><input name="Questions[@i].OptionC" class="ui-field !py-1.5 text-sm" aria-label="Option C" /></div></div>
+                                    <div class="col-span-6"><label class="sr-only">Option D</label><div class="flex items-center gap-2"><span class="ui-badge-primary h-8 w-8 shrink-0 !rounded-lg !px-0 justify-center text-xs font-bold" aria-hidden="true">D</span><input name="Questions[@i].OptionD" class="ui-field !py-1.5 text-sm" aria-label="Option D" /></div></div>
+                                    <div class="col-span-4"><label class="ui-label text-xs">Correct Answer</label><input name="Questions[@i].CorrectAnswer" class="ui-field !py-1.5 text-sm" value="A" aria-describedby="hint-answer-@i" /><div id="hint-answer-@i" class="mt-1 text-xs text-slate-500 dark:text-slate-400">Format: A, B, True, keyword, or A,B for multiple.</div></div>
+                                    <div class="col-span-4"><label class="ui-label text-xs">Marks</label><input name="Questions[@i].Marks" type="number" min="1" value="1" class="ui-field !py-1.5 text-sm" /></div>
+                                    <div class="col-span-4"><label class="ui-label text-xs">Negative</label><input name="Questions[@i].NegativeMarks" type="number" min="0" step="0.25" value="0" class="ui-field !py-1.5 text-sm" /></div>
+                                    <div class="col-span-12"><label class="ui-check-row items-center"><input type="checkbox" name="Questions[@i].IsQuestionBankItem" value="true" checked class="ui-checkbox" /><span class="ui-check-label text-xs">Add to Question Bank</span></label></div>
+                                    <div class="col-span-12"><label class="ui-label text-xs">Starter code</label><textarea name="Questions[@i].StarterCode" class="ui-field !py-1.5 text-sm" rows="2"></textarea></div>
+                                    <div class="col-span-6"><label class="ui-label text-xs">Sample test cases</label><textarea name="Questions[@i].SampleTestCases" class="ui-field !py-1.5 text-sm" rows="2"></textarea></div>
+                                    <div class="col-span-6"><label class="ui-label text-xs">Hidden test cases</label><textarea name="Questions[@i].HiddenTestCases" class="ui-field !py-1.5 text-sm" rows="2"></textarea></div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="vw-form-actions">
+                        <button type="submit" class="ui-btn-primary w-full py-2.5 font-semibold"><i data-lucide="save" class="h-4 w-4"></i>Create Eligibility Assessment</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+let qIdx = @Model.Questions.Count;
+function addQuestion() {
+    const c = document.getElementById('questionsContainer');
+    const html = document.querySelector('.question-block').outerHTML.replaceAll('Questions[0]', `Questions[${qIdx}]`).replace('Q1', `Q${qIdx + 1}`).replace('q_0', `q_${qIdx}`);
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    c.appendChild(wrapper.firstElementChild);
+    qIdx++;
+}
+function removeQuestion(id) {
+    const el = document.getElementById('q_' + id);
+    if (el) el.remove();
+}
+</script>
+}

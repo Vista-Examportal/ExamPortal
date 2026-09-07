@@ -1,0 +1,53 @@
+@{
+    // Shared shell for every standalone auth/public page — Login, Register,
+    // ForgotPassword, ResetPassword, VerifyEmailOtp, AssessmentAuth, AcceptOffer.
+    // Extracted from 7 near-identical copies of this exact <head>/<body>
+    // boilerplate (each previously set Layout = null and repeated the same
+    // fonts/Tailwind/Lucide/site.min.css/_UiKitStyles includes independently)
+    // so the asset list has one source of truth instead of seven copies that
+    // could silently drift out of sync with each other.
+    //
+    // Pages opt into a content-wrapper class/title suffix via ViewData before
+    // Layout renders, since the pages aren't all shaped the same way (most are
+    // a single vertically-centered card; AcceptOffer is a wide, top-anchored
+    // document; Login is a full-bleed split panel that centers its own
+    // content). Sensible default matches the most common case.
+    //
+    // This class wraps just the page content (not <body> itself) — body is a
+    // column flex container so _AuthFooter always lands below the content in
+    // normal block flow, rather than as a second item in the content's own
+    // (often row-direction) flex centering, which would otherwise squeeze the
+    // footer sideways next to the card instead of underneath it.
+    var contentClass = ViewData["BodyClass"] as string
+        ?? "flex-1 flex items-center justify-center px-4 py-10";
+    var titleSuffix = ViewData["TitleSuffix"] as string ?? "VISTAWAYS TECH Recruitment";
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1B2027" />
+    <title>@ViewData["Title"] - @titleSuffix</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    @* Precompiled Tailwind build — see the matching comment in
+       Views/Shared/_Layout.cshtml for why this replaced the Play CDN. *@
+    <link href="~/css/tailwind-built.css" rel="stylesheet" asp-append-version="true" />
+    <script src="https://unpkg.com/lucide@0.383.0" defer></script>
+    <link href="~/css/site.min.css" rel="stylesheet" asp-append-version="true" />
+    <link rel="icon" type="image/png" href="~/logo.png" />
+    @* Same shared "ui-*" component kit used by Views/Shared/_Layout.cshtml. *@
+    <partial name="_UiKitStyles" />
+</head>
+<body class="min-h-screen bg-canvas font-sans text-slate-800 antialiased dark:text-slate-100 flex flex-col">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+<main id="main-content" class="@contentClass">
+@RenderBody()
+</main>
+<partial name="_AuthFooter" />
+<partial name="_CookieConsent" />
+<script src="~/js/app.min.js"></script>
+@RenderSection("Scripts", required: false)
+</body>
+</html>

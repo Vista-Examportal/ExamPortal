@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VISTAWAYS TECH — UI Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: "class",
+    theme: { extend: { fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+      keyframes: {
+        vwFadeIn: { from: { opacity: 0 }, to: { opacity: 1 } },
+        vwModalIn: { from: { opacity: 0, transform: "translateY(24px) scale(.98)" }, to: { opacity: 1, transform: "translateY(0) scale(1)" } }
+      },
+      animation: { "fade-in": "vwFadeIn .15s ease-out", "modal-in": "vwModalIn .22s cubic-bezier(.16,1,.3,1)" } } }
+  };
+</script>
+<script src="https://unpkg.com/lucide@0.383.0" defer></script>
+<link href="/css/site.min.css" rel="stylesheet" />
+<script src="/js/app.min.js" defer></script>
+<style type="text/tailwindcss">
+  @layer components {
+    .ui-btn { @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2; }
+    .ui-btn-primary { @apply ui-btn bg-[var(--vw-accent)] text-white hover:opacity-90; }
+    .ui-btn-secondary { @apply ui-btn bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600; }
+    .ui-btn-outline { @apply ui-btn border border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800; }
+    .ui-btn-danger { @apply ui-btn bg-red-600 text-white hover:bg-red-700; }
+    .ui-btn-warning { @apply ui-btn text-white bg-[var(--vw-warning)] hover:brightness-90; }
+    .ui-btn-ghost { @apply ui-btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800; }
+    .ui-btn-icon { @apply h-9 w-9 !p-0 rounded-full; }
+    .ui-card { @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800; }
+    .ui-card-header { @apply flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-700; }
+    .ui-card-body { @apply p-5; }
+    .ui-badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium; }
+    .ui-badge-primary { @apply ui-badge bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]; }
+    .ui-badge-success { @apply ui-badge bg-[var(--vw-success-bg)] text-[var(--vw-success-text)]; }
+    .ui-badge-warning { @apply ui-badge bg-[var(--vw-warning-bg)] text-[var(--vw-warning-text)]; }
+    .ui-badge-danger  { @apply ui-badge bg-[var(--vw-danger-bg)] text-[var(--vw-danger-text)]; }
+    .ui-badge-neutral { @apply ui-badge bg-[var(--vw-surface-muted)] text-[var(--vw-text-secondary)]; }
+    .ui-badge-info    { @apply ui-badge bg-[var(--vw-info-bg)] text-[var(--vw-info-text)]; }
+    .ui-alert { @apply flex items-start gap-3 rounded-xl border px-4 py-3 text-sm; }
+    .ui-alert-success { @apply ui-alert border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200; }
+    .ui-alert-danger  { @apply ui-alert border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200; }
+    .ui-alert-info    { @apply ui-alert border-sky-200 bg-sky-50 text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200; }
+    .ui-alert-warning { @apply ui-alert border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200; }
+    .ui-modal { @apply fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4; }
+    .ui-modal-backdrop { @apply absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] animate-fade-in; }
+    .ui-modal-panel { @apply relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl dark:bg-slate-800 sm:max-h-[80vh] sm:rounded-2xl animate-modal-in; }
+    .ui-modal-panel-sm { @apply sm:max-w-sm; }
+    .ui-modal-panel-lg { @apply sm:max-w-2xl; }
+    .ui-modal-grip { @apply mx-auto mt-2.5 h-1.5 w-10 shrink-0 rounded-full bg-slate-300 dark:bg-slate-600 sm:hidden; }
+    .ui-modal-header { @apply flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 dark:border-slate-700 sm:px-6; }
+    .ui-modal-title { @apply text-base font-semibold leading-tight text-slate-900 dark:text-white sm:text-lg; }
+    .ui-modal-description { @apply mt-1 text-sm text-slate-500 dark:text-slate-400; }
+    .ui-modal-close { @apply ui-btn-ghost ui-btn-icon -mr-1.5 -mt-1.5 h-8 w-8 shrink-0; }
+    .ui-modal-icon { @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full; }
+    .ui-modal-icon-danger  { @apply ui-modal-icon bg-[var(--vw-danger-bg)] text-[var(--vw-danger-text)]; }
+    .ui-modal-icon-warning { @apply ui-modal-icon bg-[var(--vw-warning-bg)] text-[var(--vw-warning-text)]; }
+    .ui-modal-icon-success { @apply ui-modal-icon bg-[var(--vw-success-bg)] text-[var(--vw-success-text)]; }
+    .ui-modal-icon-info    { @apply ui-modal-icon bg-[var(--vw-info-bg)] text-[var(--vw-info-text)]; }
+    .ui-modal-icon-default { @apply ui-modal-icon bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]; }
+    .ui-modal-body { @apply flex-1 overflow-y-auto px-5 py-4 text-sm text-slate-500 dark:text-slate-400 sm:px-6; }
+    .ui-modal-footer { @apply flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-700 sm:flex-row sm:justify-end sm:px-6; }
+    .ui-modal-footer .ui-btn { @apply w-full sm:w-auto; }
+    .ui-loader { @apply inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent align-[-2px]; }
+    .ui-skeleton { @apply animate-pulse rounded-md bg-slate-200 dark:bg-slate-700; }
+    .ui-label { @apply mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-200; }
+    .ui-field { @apply block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors hover:border-slate-400 focus:border-[var(--vw-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--vw-accent-bg)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white dark:hover:border-slate-500; }
+    .ui-field-error { @apply mt-1 block text-xs font-medium text-red-600 dark:text-red-400; }
+    .ui-checkbox { @apply peer h-[1.05rem] w-[1.05rem] shrink-0 cursor-pointer appearance-none rounded-[0.3rem] border-2 border-slate-300 bg-white align-middle transition-colors duration-150 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--vw-accent-bg)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500; }
+    .ui-checkbox:checked, .ui-checkbox:indeterminate { @apply border-[var(--vw-accent)] bg-[var(--vw-accent)]; background-repeat: no-repeat; background-position: center; background-size: .68rem .68rem; }
+    .ui-checkbox:checked { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3.5 8.5 6.5 11.5 12.5 4.5'/%3E%3C/svg%3E"); }
+    .ui-checkbox:indeterminate { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round'%3E%3Cline x1='4' y1='8' x2='12' y2='8'/%3E%3C/svg%3E"); }
+    .ui-radio { @apply peer h-[1.05rem] w-[1.05rem] shrink-0 cursor-pointer appearance-none rounded-full border-2 border-slate-300 bg-white align-middle transition-colors duration-150 hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--vw-accent-bg)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:hover:border-slate-500; }
+    .ui-radio:checked { @apply border-[var(--vw-accent)] bg-[var(--vw-accent)]; box-shadow: inset 0 0 0 3px #fff; }
+    .ui-switch { @apply peer relative h-6 w-11 shrink-0 cursor-pointer appearance-none rounded-full border border-slate-300 bg-slate-300 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--vw-accent-bg)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-600; }
+    .ui-switch:checked { @apply border-[var(--vw-accent)] bg-[var(--vw-accent)]; }
+    .ui-switch::after { content: ""; position: absolute; top: 1px; left: 1px; height: 1.05rem; width: 1.05rem; border-radius: 9999px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s ease; }
+    .ui-switch:checked::after { transform: translateX(1.25rem); }
+    .ui-check-label { @apply cursor-pointer select-none text-sm text-slate-700 peer-disabled:cursor-not-allowed peer-disabled:opacity-60 dark:text-slate-200; }
+    .ui-check-row { @apply flex items-start gap-2.5; }
+    .ui-check-group { @apply space-y-2; }
+  }
+</style>
+</head>
+<body class="bg-canvas text-slate-800 dark:text-slate-100 font-sans antialiased">
+<div id="toastHost" class="pointer-events-none fixed top-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2"></div>
+
+<header class="sticky top-0 z-20 flex items-center justify-between border-b px-6 py-4" style="background-color:var(--vw-surface);border-color:var(--vw-border);">
+  <div>
+    <h1 class="text-lg font-bold">VISTAWAYS TECH UI Kit</h1>
+    <p class="text-sm text-slate-500 dark:text-slate-400">Reusable components used across the app shell (Views/Shared/_Layout.cshtml)</p>
+  </div>
+  <button id="themeToggle" class="ui-btn-outline"><i data-lucide="moon" class="h-4 w-4"></i>Toggle theme</button>
+</header>
+
+<main class="mx-auto max-w-5xl space-y-10 px-6 py-10">
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Buttons</h2>
+    <div class="flex flex-wrap gap-3">
+      <button class="ui-btn-primary"><i data-lucide="save" class="h-4 w-4"></i>Primary</button>
+      <button class="ui-btn-secondary">Secondary</button>
+      <button class="ui-btn-outline">Outline</button>
+      <button class="ui-btn-danger"><i data-lucide="trash-2" class="h-4 w-4"></i>Danger</button>
+      <button class="ui-btn-ghost">Ghost</button>
+      <button class="ui-btn-primary" disabled>Disabled</button>
+      <button class="ui-btn-secondary ui-btn-icon"><i data-lucide="bell" class="h-4 w-4"></i></button>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Badges</h2>
+    <div class="flex flex-wrap gap-2">
+      <span class="ui-badge-primary">Primary</span>
+      <span class="ui-badge-success">Success</span>
+      <span class="ui-badge-warning">Warning</span>
+      <span class="ui-badge-danger">Danger</span>
+      <span class="ui-badge-info">Info</span>
+      <span class="ui-badge-neutral">Neutral</span>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Alerts</h2>
+    <div class="space-y-3">
+      <div class="ui-alert-success"><i data-lucide="check-circle" class="h-5 w-5 shrink-0"></i>Your changes were saved successfully.</div>
+      <div class="ui-alert-danger"><i data-lucide="alert-circle" class="h-5 w-5 shrink-0"></i>Something went wrong. Please try again.</div>
+      <div class="ui-alert-info"><i data-lucide="info" class="h-5 w-5 shrink-0"></i>This assessment closes in 2 days.</div>
+      <div class="ui-alert-warning"><i data-lucide="triangle-alert" class="h-5 w-5 shrink-0"></i>Your session will expire soon.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Cards</h2>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="ui-card">
+        <div class="ui-card-header"><span class="font-semibold">Candidates</span><span class="ui-badge-primary">Live</span></div>
+        <div class="ui-card-body text-sm text-slate-500 dark:text-slate-400">128 candidates in the pipeline this week.</div>
+      </div>
+      <div class="ui-card">
+        <div class="ui-card-header"><span class="font-semibold">Assessments</span><i data-lucide="clipboard-check" class="h-5 w-5 text-slate-400"></i></div>
+        <div class="ui-card-body text-sm text-slate-500 dark:text-slate-400">14 active assessments across all roles.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Loader &amp; skeleton</h2>
+    <div class="flex items-center gap-4">
+      <span class="ui-loader text-[var(--vw-accent)]"></span>
+      <div class="w-48 space-y-2">
+        <div class="ui-skeleton h-3 w-full"></div>
+        <div class="ui-skeleton h-3 w-3/4"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Toast</h2>
+    <button class="ui-btn-outline" id="showToast">Show toast</button>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Modal</h2>
+    <button class="ui-btn-outline" id="openModal">Open modal</button>
+    <div id="demoModal" class="ui-modal hidden">
+      <div class="ui-modal-backdrop" id="modalBackdrop"></div>
+      <div class="ui-modal-panel" role="dialog" aria-modal="true" aria-labelledby="demoModalTitle">
+        <div class="ui-modal-grip"></div>
+        <div class="ui-modal-header">
+          <div>
+            <h3 id="demoModalTitle" class="ui-modal-title">Confirm action</h3>
+            <p class="ui-modal-description">Same header / body / footer shell used everywhere else in the app.</p>
+          </div>
+          <button type="button" class="ui-modal-close" id="closeModalX" aria-label="Close"><i data-lucide="x" class="h-4 w-4"></i></button>
+        </div>
+        <div class="ui-modal-body">
+          <p>A bottom sheet below <code>sm:</code>, a centered dialog above it — same markup, no JS branching needed. The body scrolls independently if the content runs long; the header and footer stay put.</p>
+        </div>
+        <div class="ui-modal-footer">
+          <button class="ui-btn-secondary" id="closeModal">Cancel</button>
+          <button class="ui-btn-primary">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Form fields</h2>
+    <div class="grid gap-4 sm:grid-cols-2 max-w-xl">
+      <div>
+        <label class="ui-label">Email<span class="text-red-500 ml-0.5">*</span></label>
+        <input class="ui-field" placeholder="you@example.com" />
+        <span class="ui-field-error">This field is required.</span>
+      </div>
+      <div>
+        <label class="ui-label">Role</label>
+        <select class="ui-field"><option>Candidate</option><option>Recruiter</option></select>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Dropdowns &amp; selects</h2>
+    <p class="mb-4 text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+      Single-select uses a themed native <code>&lt;select&gt;</code> (custom chevron, works everywhere, zero JS).
+      Long option lists opt into a searchable combobox with <code>data-searchable</code>. Multi-value fields use the
+      chip picker (<code>data-msel</code>), which keeps posting to one plain field under the hood. All three share
+      the same disabled treatment.
+    </p>
+    <div class="grid gap-5 sm:grid-cols-2 max-w-2xl">
+      <div>
+        <label class="ui-label">Single select</label>
+        <select class="ui-field">
+          <option value="">-- Select --</option>
+          <option>Candidate</option>
+          <option>Recruiter</option>
+          <option>HR</option>
+          <option>Admin</option>
+        </select>
+      </div>
+      <div>
+        <label class="ui-label">Single select — disabled</label>
+        <select class="ui-field" disabled>
+          <option>Locked to Recruiter</option>
+        </select>
+      </div>
+      <div>
+        <label class="ui-label">Searchable dropdown</label>
+        <select class="ui-field" data-searchable data-searchable-placeholder="Search states…" id="demoSearchableSelect">
+          <option value="">-- Select --</option>
+          <option>Andhra Pradesh</option><option>Karnataka</option><option>Kerala</option>
+          <option>Maharashtra</option><option>Tamil Nadu</option><option>Telangana</option>
+          <option>Uttar Pradesh</option><option>West Bengal</option>
+        </select>
+      </div>
+      <div>
+        <label class="ui-label">Searchable dropdown — disabled</label>
+        <select class="ui-field" data-searchable disabled id="demoSearchableSelectDisabled">
+          <option>Telangana</option>
+        </select>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="ui-label">Multi-select (chips)</label>
+        <div class="vw-msel" data-msel data-msel-target="#demoMselHidden" data-msel-placeholder="Select one or more locations…" data-msel-join=", ">
+          <template data-msel-option value="Bengaluru">Bengaluru</template>
+          <template data-msel-option value="Hyderabad">Hyderabad</template>
+          <template data-msel-option value="Chennai">Chennai</template>
+          <template data-msel-option value="Remote">Remote</template>
+          <template data-msel-option value="Pune">Pune</template>
+        </div>
+        <input type="hidden" id="demoMselHidden" value="Bengaluru, Remote" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="ui-label">Multi-select (chips) — disabled</label>
+        <div class="vw-msel" data-msel data-msel-disabled data-msel-target="#demoMselHiddenDisabled" data-msel-placeholder="Select one or more locations…" data-msel-join=", ">
+          <template data-msel-option value="Bengaluru">Bengaluru</template>
+          <template data-msel-option value="Hyderabad">Hyderabad</template>
+        </div>
+        <input type="hidden" id="demoMselHiddenDisabled" value="Bengaluru, Hyderabad" />
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Checkboxes, radios &amp; switches</h2>
+    <p class="mb-4 text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+      All three are real native input elements (appearance reset with CSS, not custom div widgets), so
+      labels, keyboard use, and screen readers keep working the same as any plain checkbox or radio. Wrap
+      each in a label (or pair with for/id) so the hit target includes the text.
+    </p>
+    <div class="grid gap-6 sm:grid-cols-3 max-w-2xl">
+      <div>
+        <div class="ui-label mb-2">Checkboxes</div>
+        <div class="ui-check-group">
+          <label class="ui-check-row"><input type="checkbox" class="ui-checkbox mt-0.5" checked /><span class="ui-check-label">Randomize questions</span></label>
+          <label class="ui-check-row"><input type="checkbox" class="ui-checkbox mt-0.5" /><span class="ui-check-label">Require webcam</span></label>
+          <label class="ui-check-row"><input type="checkbox" class="ui-checkbox mt-0.5" disabled checked /><span class="ui-check-label">Locked setting</span></label>
+        </div>
+      </div>
+      <div>
+        <div class="ui-label mb-2">Radio buttons</div>
+        <fieldset class="ui-check-group">
+          <legend class="sr-only">Answer</legend>
+          <label class="ui-check-row"><input type="radio" name="demoRadio" class="ui-radio mt-0.5" checked /><span class="ui-check-label">Option A</span></label>
+          <label class="ui-check-row"><input type="radio" name="demoRadio" class="ui-radio mt-0.5" /><span class="ui-check-label">Option B</span></label>
+          <label class="ui-check-row"><input type="radio" name="demoRadio" class="ui-radio mt-0.5" disabled /><span class="ui-check-label">Disabled</span></label>
+        </fieldset>
+      </div>
+      <div>
+        <div class="ui-label mb-2">Toggle switches</div>
+        <div class="ui-check-group">
+          <label class="ui-check-row items-center"><input type="checkbox" role="switch" class="ui-switch" checked /><span class="ui-check-label">Full-screen enforcement</span></label>
+          <label class="ui-check-row items-center"><input type="checkbox" role="switch" class="ui-switch" /><span class="ui-check-label">Screen monitoring</span></label>
+          <label class="ui-check-row items-center"><input type="checkbox" role="switch" class="ui-switch" disabled /><span class="ui-check-label">Disabled</span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">Confirmation &amp; alert dialogs</h2>
+    <p class="mb-4 text-sm text-slate-500 dark:text-slate-400 max-w-2xl">
+      One shared dialog component, three semantic variants. Each button below is wired to the real
+      <code>app.js</code> helpers (not a mockup) — the icon badge and action button color switch automatically.
+    </p>
+    <div class="flex flex-wrap gap-3">
+      <button type="button" class="ui-btn-outline" data-confirm-title="Delete this candidate record?"
+              data-confirm-message="This permanently removes their profile, resume, and assessment history. This action can't be undone.">
+        <i data-lucide="trash-2" class="h-4 w-4"></i>Delete confirmation
+      </button>
+      <button type="button" class="ui-btn-outline" data-confirm-title="Cancel this interview?"
+              data-confirm-message="The candidate and panel will both be notified immediately.">
+        <i data-lucide="alert-triangle" class="h-4 w-4"></i>Warning confirmation
+      </button>
+      <button type="button" class="ui-btn-outline" data-alert-title="Offer sent!" data-alert-variant="success"
+              data-alert-message="The signed offer letter has been emailed to the candidate.">
+        <i data-lucide="check-circle-2" class="h-4 w-4"></i>Success dialog
+      </button>
+      <button type="button" class="ui-btn-outline" data-alert-title="Heads up" data-alert-variant="warning"
+              data-alert-message="This candidate's assessment invitation expires in 24 hours.">
+        <i data-lucide="alert-triangle" class="h-4 w-4"></i>Warning dialog
+      </button>
+    </div>
+  </section>
+</main>
+
+<script>
+  lucide.createIcons();
+  document.getElementById("themeToggle").addEventListener("click", function () {
+    var html = document.documentElement;
+    var next = html.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    html.setAttribute("data-theme", next);
+  });
+  document.getElementById("openModal").addEventListener("click", function () {
+    document.getElementById("demoModal").classList.remove("hidden");
+  });
+  ["closeModal", "closeModalX", "modalBackdrop"].forEach(function (id) {
+    document.getElementById(id).addEventListener("click", function () {
+      document.getElementById("demoModal").classList.add("hidden");
+    });
+  });
+  document.getElementById("showToast").addEventListener("click", function () {
+    var host = document.getElementById("toastHost");
+    var toast = document.createElement("div");
+    toast.className = "pointer-events-auto flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800 px-4 py-3 shadow-lg text-sm";
+    toast.innerHTML = '<i data-lucide="check-circle" class="h-5 w-5 shrink-0 mt-0.5"></i><span class="flex-1">Saved successfully.</span>';
+    host.appendChild(toast);
+    lucide.createIcons();
+    setTimeout(function () { toast.remove(); }, 4000);
+  });
+</script>
+</body>
+</html>

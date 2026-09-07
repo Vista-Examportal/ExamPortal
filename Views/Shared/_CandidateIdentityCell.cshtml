@@ -1,0 +1,12 @@
+@model CandidateIdentityCellViewModel
+@* Shared by Admin/Index's and Recruiter/Index's "Candidates" tab tables — previously
+   this name/ID/email cell markup was copy-pasted separately in each. *@
+<div class="font-semibold text-slate-800 dark:text-slate-100">@Model.Candidate.FullName</div>
+@if (Model.ShowCandidateIdInline)
+{
+    <div class="text-xs text-slate-500 dark:text-slate-400">@Model.Candidate.CandidateId · @Model.Candidate.Email</div>
+}
+else
+{
+    <div class="text-xs text-slate-500 dark:text-slate-400">@Model.Candidate.Email</div>
+}

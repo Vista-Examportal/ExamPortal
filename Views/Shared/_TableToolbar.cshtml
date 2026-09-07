@@ -1,0 +1,72 @@
+@{
+    var tableId = ViewData["TableId"] as string
+        ?? throw new InvalidOperationException("_TableToolbar requires ViewData[\"TableId\"] to be set before rendering.");
+    var searchPlaceholder = ViewData["SearchPlaceholder"] as string ?? "Search this table…";
+    var showPageSize = ViewData["ShowPageSize"] is bool spb ? spb : true;
+    var pageSizeOptionsRaw = ViewData["PageSizeOptions"] as string ?? "10,25,50";
+    var pageSizeOptions = pageSizeOptionsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+@*
+    Drop-in toolbar for a client-side "smart table" — search + results count
+    + optional page-size picker — that sits on top of the sorting behavior
+    already built into app.js (data-sortable). It never touches the server:
+    filtering and pagination both happen over rows the server already
+    rendered, so no controller/model changes are needed to use it.
+
+    Usage:
+        @{
+            ViewData["TableId"] = "recruiterInterviewsTable";
+            ViewData["ShowPageSize"] = true;          // optional, default true
+            ViewData["SearchPlaceholder"] = "Search interviews..."; // optional
+            ViewData["PageSizeOptions"] = "10,25,50"; // optional
+        }
+        @await Html.PartialAsync("_TableToolbar")
+
+        <table id="recruiterInterviewsTable" class="ui-table" data-smart-table data-sortable>
+            ...
+        </table>
+        <div data-table-pager="recruiterInterviewsTable" class="mt-3"></div>
+
+    Notes:
+    - TableId must match the table's id, the pager div's data-table-pager,
+      and is also what wires up data-smart-search/data-smart-pagesize below.
+    - Put data-search-text="..." on a <tr> if you need search to match text
+      that isn't in a visible cell (e.g. free-text remarks/feedback).
+    - Rows that should never be counted/searched/paginated (e.g. an
+      _EmptyState placeholder row) should carry data-sort-exclude — the
+      same attribute the existing sortable-table code already respects.
+
+    IMPORTANT — ViewData is a single dictionary shared by the whole page.
+    If you render this partial for more than one table on the same view,
+    set every key you care about (ShowPageSize, SearchPlaceholder,
+    PageSizeOptions) at *every* call site rather than relying on it staying
+    set from an earlier table — otherwise a later table can silently
+    inherit values (e.g. ShowPageSize = false) left over from an earlier one.
+*@
+<div class="vw-table-toolbar" data-smart-table-toolbar="@tableId">
+    <div class="vw-search-box vw-table-toolbar-search">
+        <i data-lucide="search" class="h-4 w-4" aria-hidden="true"></i>
+        <input type="search"
+               class="vw-search-input"
+               placeholder="@searchPlaceholder"
+               autocomplete="off"
+               data-smart-search="@tableId"
+               aria-label="Search table" />
+    </div>
+    <div class="vw-table-toolbar-meta">
+        <span class="vw-table-toolbar-count" data-smart-count="@tableId" aria-live="polite"></span>
+        @if (showPageSize)
+        {
+            <label class="vw-table-toolbar-pagesize">
+                <span class="sr-only">Rows per page</span>
+                <select class="ui-field" data-smart-pagesize="@tableId">
+                    @foreach (var opt in pageSizeOptions)
+                    {
+                        <option value="@opt">@opt / page</option>
+                    }
+                    <option value="all">Show all</option>
+                </select>
+            </label>
+        }
+    </div>
+</div>

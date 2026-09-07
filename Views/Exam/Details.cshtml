@@ -1,0 +1,167 @@
+@model Exam
+@{
+    ViewData["Title"] = Model.Title;
+    var prev = ViewBag.PreviousAttempt as ExamAttempt;
+    var startLabel = prev != null ? "Retake Assessment" : "Start Assessment";
+    var startConfirmMessage = prev != null
+        ? $"You already have a previous attempt on record. Starting a new attempt begins a fresh {Model.DurationMinutes}-minute timer and cannot be undone once submitted."
+        : $"Once started, the {Model.DurationMinutes}-minute timer begins immediately and cannot be paused.";
+}
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        <div class="vw-page-header-icon"><i data-lucide="file-text"></i></div>
+        <div>
+            <h1 class="vw-page-title">@Model.Title</h1>
+            <p class="vw-page-subtitle">@Model.Subject@(string.IsNullOrWhiteSpace(Model.TemplateName) ? "" : " · " + Model.TemplateName)</p>
+        </div>
+    </div>
+    <div class="vw-page-actions">
+        <span class="@(Model.IsActive ? "ui-badge-success" : "ui-badge-neutral")">
+            <i data-lucide="@(Model.IsActive ? "circle-check" : "circle-slash")" class="h-3 w-3"></i>@(Model.IsActive ? "Active" : "Inactive")
+        </span>
+        <a asp-controller="Home" asp-action="Index" class="ui-btn-outline">
+            <i data-lucide="arrow-left" class="h-4 w-4"></i>Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+    <div class="lg:col-span-8">
+        <div class="ui-card">
+            <div class="ui-card-body">
+                @if (!string.IsNullOrWhiteSpace(Model.Description))
+                {
+                    <p class="text-[var(--vw-text-secondary)] mb-0">@Model.Description</p>
+                }
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                    <div class="ui-stat-card">
+                        <div class="ui-stat-icon bg-[var(--vw-accent-bg)] text-[var(--vw-accent)]"><i data-lucide="clock" class="h-5 w-5"></i></div>
+                        <div class="min-w-0">
+                            <div class="ui-stat-value">@Model.DurationMinutes</div>
+                            <div class="ui-stat-label">Minutes</div>
+                        </div>
+                    </div>
+                    <div class="ui-stat-card">
+                        <div class="ui-stat-icon bg-[var(--vw-info-bg)] text-[var(--vw-info-text)]"><i data-lucide="circle-help" class="h-5 w-5"></i></div>
+                        <div class="min-w-0">
+                            <div class="ui-stat-value">@Model.Questions.Count</div>
+                            <div class="ui-stat-label">Questions</div>
+                        </div>
+                    </div>
+                    <div class="ui-stat-card">
+                        <div class="ui-stat-icon bg-[var(--vw-warning-bg)] text-[var(--vw-warning-text)]"><i data-lucide="star" class="h-5 w-5"></i></div>
+                        <div class="min-w-0">
+                            <div class="ui-stat-value">@Model.TotalMarks</div>
+                            <div class="ui-stat-label">Total Score</div>
+                        </div>
+                    </div>
+                    <div class="ui-stat-card">
+                        <div class="ui-stat-icon bg-[var(--vw-success-bg)] text-[var(--vw-success)]"><i data-lucide="circle-check" class="h-5 w-5"></i></div>
+                        <div class="min-w-0">
+                            <div class="ui-stat-value">@Model.PassingMarks</div>
+                            <div class="ui-stat-label">Passing Score</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ui-alert-warning mt-4 mb-0">
+                    <div class="ui-alert-icon"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
+                    <div>
+                        <div class="ui-alert-title">Instructions</div>
+                        @(string.IsNullOrWhiteSpace(Model.Instructions) ? $"Once started, the assessment timer will begin. You must submit within {Model.DurationMinutes} minutes." : Model.Instructions)
+                    </div>
+                </div>
+
+                <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-3 mt-4 text-sm">
+                    <div class="flex justify-between gap-3 border-b border-[var(--vw-border)] pb-2">
+                        <dt class="text-[var(--vw-text-muted)]">Schedule</dt>
+                        <dd class="text-right font-medium mb-0">@Model.StartDateTime?.ToLocalTime().ToString("dd MMM yyyy HH:mm") &ndash; @Model.EndDateTime?.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd>
+                    </div>
+                    <div class="flex justify-between gap-3 border-b border-[var(--vw-border)] pb-2">
+                        <dt class="text-[var(--vw-text-muted)]">Required Skills</dt>
+                        <dd class="text-right font-medium mb-0">@(string.IsNullOrWhiteSpace(Model.RequiredSkills) ? "Open" : Model.RequiredSkills)</dd>
+                    </div>
+                    <div class="flex justify-between gap-3 border-b border-[var(--vw-border)] pb-2">
+                        <dt class="text-[var(--vw-text-muted)]">Eligible Locations</dt>
+                        <dd class="text-right font-medium mb-0">@(string.IsNullOrWhiteSpace(Model.EligibleLocations) ? "Any" : Model.EligibleLocations)</dd>
+                    </div>
+                    <div class="flex justify-between gap-3 border-b border-[var(--vw-border)] pb-2">
+                        <dt class="text-[var(--vw-text-muted)]">Monitoring</dt>
+                        <dd class="text-right font-medium mb-0">@(Model.RequireFullScreen ? "Full-screen" : "Standard"), @(Model.RequireScreenMonitoring ? "screen checks" : "basic checks")</dd>
+                    </div>
+                    <div class="flex justify-between gap-3 border-b border-[var(--vw-border)] pb-2 sm:border-b-0">
+                        <dt class="text-[var(--vw-text-muted)]">Question Selection</dt>
+                        <dd class="text-right font-medium mb-0">@(Model.RandomQuestionCount > 0 ? $"{Model.RandomQuestionCount} random questions" : "All assigned questions")</dd>
+                    </div>
+                    <div class="flex justify-between gap-3 border-b border-[var(--vw-border)] pb-2 sm:border-b-0">
+                        <dt class="text-[var(--vw-text-muted)]">Shuffle</dt>
+                        <dd class="text-right font-medium mb-0">Questions @(Model.RandomizeQuestions ? "enabled" : "fixed"), options @(Model.RandomizeOptions ? "enabled" : "fixed")</dd>
+                    </div>
+                    <div class="flex justify-between gap-3">
+                        <dt class="text-[var(--vw-text-muted)]">Negative Marking</dt>
+                        <dd class="text-right font-medium mb-0">@(Model.NegativeMarks > 0 ? $"{Model.NegativeMarks} per wrong answer" : "Question-wise / none")</dd>
+                    </div>
+                    <div class="flex justify-between gap-3">
+                        <dt class="text-[var(--vw-text-muted)]">Progress</dt>
+                        <dd class="text-right font-medium mb-0">Auto save @(Model.AllowResumeAssessment ? "and resume later enabled" : "enabled during session")</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="lg:col-span-4">
+        @* Previous Attempt: status only — Score, TotalMarks, PercentageScore, and
+           Passed are internal evaluation fields and are intentionally never shown
+           to the candidate. The "View Submission" link goes to Exam/Result, which
+           is itself a neutral submission-confirmation view with no score. *@
+        @if (prev != null)
+        {
+            var attemptStatusLabel = prev.SubmittedAt != null ? "Completed" : "In Progress";
+            <div class="ui-card mb-3">
+                <div class="ui-card-body text-center">
+                    <h2 class="ui-section-title !mb-2 justify-center"><i data-lucide="history" class="h-3.5 w-3.5"></i>Previous Attempt</h2>
+                    <span class="@(prev.SubmittedAt != null ? "ui-badge-success" : "ui-badge-primary")">@attemptStatusLabel</span>
+                    <div class="text-sm text-[var(--vw-text-secondary)] mt-2">@prev.StartedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</div>
+                    @if (prev.SubmittedAt != null)
+                    {
+                        <a asp-controller="Exam" asp-action="Result" asp-route-attemptId="@prev.Id" class="ui-btn-outline w-full mt-3">
+                            <i data-lucide="eye" class="h-4 w-4"></i>View Submission
+                        </a>
+                    }
+                </div>
+            </div>
+        }
+
+        @* Note: the "Latest Eligibility Check" card (EligibilityResult — internal
+           screening score/status/notes) has been intentionally removed from this
+           candidate-facing view. That data remains fully available to
+           Admin/Recruiter/HR via AdminController/CandidateDetail as before. *@
+
+        <div class="ui-card">
+            <div class="ui-card-body text-center">
+                <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--vw-accent-bg)] text-[var(--vw-accent)]">
+                    <i data-lucide="circle-play" class="h-7 w-7"></i>
+                </div>
+                <h2 class="ui-heading-md mb-1">Ready to Start?</h2>
+                <p class="text-sm text-[var(--vw-text-secondary)]">Make sure you have a stable connection and @Model.DurationMinutes minutes free.</p>
+                <form asp-controller="Exam" asp-action="Start" method="post" class="mt-1">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit"
+                            class="ui-btn-primary w-full"
+                            @(!Model.IsActive ? "disabled" : "")
+                            data-confirm-title="@(prev != null ? "Retake this assessment?" : "Start this assessment?")"
+                            data-confirm-message="@startConfirmMessage"
+                            data-confirm-ok-label="@startLabel">
+                        <i data-lucide="rocket" class="h-4 w-4"></i>@startLabel
+                    </button>
+                </form>
+                <a asp-controller="Home" asp-action="Index" class="inline-flex items-center gap-1 text-sm text-[var(--vw-text-muted)] hover:text-[var(--vw-text)] mt-3">
+                    <i data-lucide="arrow-left" class="h-3.5 w-3.5"></i>Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

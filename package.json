@@ -1,0 +1,17 @@
+{
+  "name": "examportal-frontend-assets",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build tooling for minifying the site's static CSS/JS. Not part of the ASP.NET Core build — run manually (or wire into CI) after editing wwwroot/css/site.css or wwwroot/js/app.js, before deploying.",
+  "scripts": {
+    "build:css": "cleancss -o wwwroot/css/site.min.css wwwroot/css/site.css",
+    "build:tailwind": "tailwindcss -i ./tailwind-input.css -o ./wwwroot/css/tailwind-built.css --minify",
+    "build:js": "terser wwwroot/js/app.js -c -m --comments false -o wwwroot/js/app.min.js",
+    "build": "npm run build:tailwind && npm run build:css && npm run build:js"
+  },
+  "devDependencies": {
+    "clean-css-cli": "^5.6.3",
+    "tailwindcss": "^3.4.19",
+    "terser": "^5.49.0"
+  }
+}

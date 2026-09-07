@@ -1,0 +1,707 @@
+@model AdminCandidateDetailViewModel
+@{ ViewData["Title"] = "Candidate: " + Model.Candidate.FullName; }
+
+@{
+    var stage = Model.Candidate.RecruitmentStage ?? "Registered";
+    // Color comes from RecruitmentStages.BadgeColor — the same single source of
+    // truth used on Admin/Home/Recruiter dashboards — so this stage always shows
+    // in the same color here as it does everywhere else in the app.
+    var stageColor = RecruitmentStages.BadgeColor(stage);
+
+    // Mirrors AdminController's [Authorize] attributes: Offers/Onboarding are Admin+HR;
+    // Assessment management (elsewhere on this page: exam-related links) is Admin+Recruiter.
+    // Hiding the corresponding forms for a role that can't submit them avoids a silent 403.
+    var isAdmin = User.IsInRole(PortalRoles.Admin);
+    var isHr = User.IsInRole(PortalRoles.Hr);
+    var canManageOffers = isAdmin || isHr;
+
+    // Badge color name ("success"/"danger"/"warning"/"primary"/etc, as already
+    // computed by the ternaries below) -> ui-badge-* class. Same mapping used
+    // by Admin/Index.cshtml and Recruiter/Index.cshtml, so invitation/attempt/
+    // interview/document status badges on this page render through the same
+    // shared convention as everywhere else rather than inventing a second one.
+    // Shared color->CSS-class mapping (UiBadge.CssClass) — was previously copy-pasted here.
+    Func<string, string> badgeClass = ExamPortal.Models.UiBadge.CssClass;
+}
+
+@if (TempData["Success"] != null) {
+    <div class="ui-alert-success mb-4" role="status" data-dismissible>
+        <div class="ui-alert-icon"><i data-lucide="circle-check" class="h-4 w-4"></i></div>
+        <span>@TempData["Success"]</span>
+    </div>
+}
+@if (TempData["Error"] != null) {
+    <div class="ui-alert-danger mb-4" role="alert" data-dismissible>
+        <div class="ui-alert-icon"><i data-lucide="circle-alert" class="h-4 w-4"></i></div>
+        <span>@TempData["Error"]</span>
+    </div>
+}
+
+<div class="vw-page-header">
+    <div class="vw-page-header-main">
+        @if (!string.IsNullOrWhiteSpace(Model.Candidate.ProfilePhotoPath)) {
+            <img src="@Model.Candidate.ProfilePhotoPath" alt="Profile photo of @Model.Candidate.FullName" class="h-[60px] w-[60px] shrink-0 rounded-full object-cover" />
+        } else {
+            <div class="flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-full bg-[var(--vw-accent-bg)] text-xl font-bold text-[var(--vw-accent)]">@(Model.Candidate.FullName.FirstOrDefault())</div>
+        }
+        <div>
+            <h1 class="vw-page-title no-icon">@Model.Candidate.FullName</h1>
+            <p class="vw-page-subtitle mb-1">@Model.Candidate.CandidateId · @Model.Candidate.Email · @Model.Candidate.MobileNumber</p>
+            <span class="@badgeClass(stageColor)">@stage</span>
+        </div>
+    </div>
+    <div class="vw-page-actions">
+        <a asp-action="Pipeline" class="ui-btn-outline"><i data-lucide="arrow-left" class="h-4 w-4"></i>Pipeline</a>
+    </div>
+</div>
+
+<div class="grid grid-cols-12 gap-4">
+    <!-- Left: Actions -->
+    <div class="col-span-12 md:col-span-4">
+        <div class="ui-card mb-3">
+            <div class="ui-card-body">
+                <h2 class="ui-heading-md mb-3"><i data-lucide="list-checks" class="h-4 w-4 text-[var(--vw-accent)]"></i>Pipeline Actions</h2>
+
+                @if (stage == "Registered") {
+                    <form asp-action="ReviewProfile" method="post" class="mb-2">
+                        <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                        <button class="ui-btn-primary w-full !rounded-full"><i data-lucide="search" class="h-4 w-4 me-2"></i>Mark Under Review</button>
+                    </form>
+                }
+
+                @if (stage == "ProfileUnderReview") {
+                    <div class="mb-2">
+                        <label class="ui-label">Send Assessment Invitation</label>
+                        <form asp-action="SendInvitation" method="post">
+                            <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                            <select name="examId" class="ui-field !py-1.5 text-sm mb-2">
+                                @foreach (var e in Model.AvailableExams) {
+                                    <option value="@e.Id">@e.Title</option>
+                                }
+                            </select>
+                            <button class="ui-btn-primary w-full !rounded-full"><i data-lucide="mail" class="h-4 w-4 me-2"></i>Send Invitation</button>
+                        </form>
+                    </div>
+                }
+
+                @if (stage is "AssessmentCompleted" or "AssessmentStarted") {
+                    <form asp-action="Shortlist" method="post" class="mb-2">
+                        <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                        <button class="ui-btn-success w-full !rounded-full"><i data-lucide="star" class="h-4 w-4 me-2"></i>Shortlist Candidate</button>
+                    </form>
+                }
+
+                @if (stage == "Shortlisted") {
+                    @* Admin must manually send the shortlist email via Gmail *@
+                    <form asp-action="SendShortlistEmail" method="post" class="mb-2">
+                        <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                        <button class="ui-btn-outline w-full !rounded-full !text-green-600 dark:!text-green-400 !border-green-300 dark:!border-green-800">
+                            <i data-lucide="mail" class="h-4 w-4 me-2"></i>Send Shortlist Email
+                        </button>
+                    </form>
+                    <div class="mb-2">
+                        <label class="ui-label">Schedule Technical Interview</label>
+                        <form asp-action="ScheduleInterview" method="post">
+                            <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                            <input type="hidden" name="round" value="Technical" />
+
+                            <label class="ui-label text-xs">Date &amp; Time</label>
+                            <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+
+                            @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel())
+
+                            <label class="ui-label text-xs">Candidate Action Items</label>
+                            <textarea name="candidateActionItems" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. Prepare a 5-min self-intro; Review your final year project</div>
+
+                            <label class="ui-label text-xs">Additional Notes</label>
+                            <textarea name="notes" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">Internal notes / any other details for the candidate.</div>
+
+                            <button class="ui-btn-primary w-full !rounded-full"><i data-lucide="calendar" class="h-4 w-4 me-2"></i>Schedule &amp; Send Invite</button>
+                        </form>
+                    </div>
+                }
+
+                @if (stage == "InterviewInProgress") {
+                    // Computes where the candidate stands in the Technical → Managerial →
+                    // HR → [Final] → Documents sequence from their existing InterviewRecord
+                    // history — see InterviewProgressionHelper. Drives everything in this
+                    // block: the round-status summary, which "Schedule X Interview" action
+                    // (if any) is offered next, and whether "Request Documents" is shown.
+                    var progress = ExamPortal.Services.InterviewProgressionHelper.GetProgress(Model.Interviews);
+
+                    <div class="mb-3 rounded-lg border border-[var(--vw-border)] p-2 text-xs">
+                        <div class="ui-label mb-1">Interview Rounds</div>
+                        @foreach (var rs in progress.RoundStatuses) {
+                            var rsColor = rs.DisplayStatus switch {
+                                "Passed" => "success",
+                                "Failed" => "danger",
+                                "Scheduled" => "primary",
+                                "Missed" or "Cancelled" => "warning",
+                                _ => "secondary"
+                            };
+                            <div class="mb-1 flex items-center justify-between last:mb-0">
+                                <span>@rs.Round</span>
+                                <span class="@badgeClass(rsColor)">@rs.DisplayStatus</span>
+                            </div>
+                        }
+                    </div>
+
+                    @if (progress.FailedRound != null) {
+                        <div class="ui-alert-danger mb-2 text-sm">
+                            @progress.FailedRound round was not cleared. Use "Reject" below to move this candidate to the existing unsuccessful workflow, or complete a fresh round if the recruitment team decides to give another chance.
+                        </div>
+                    }
+
+                    @foreach (var ir in Model.Interviews.Where(i => i.Status == "Scheduled")) {
+                        <div class="mb-2">
+                            <label class="ui-label">Complete @ir.Round Interview</label>
+                            <form asp-action="CompleteInterview" method="post">
+                                <input type="hidden" name="interviewId" value="@ir.Id" />
+                                <select name="outcome" class="ui-field !py-1.5 text-sm mb-2">
+                                    <option>Passed</option><option>Failed</option><option>On Hold</option>
+                                </select>
+                                <select name="rating" class="ui-field !py-1.5 text-sm mb-2">
+                                    <option value="">Rating</option>
+                                    <option value="5">5 - Excellent</option>
+                                    <option value="4">4 - Strong</option>
+                                    <option value="3">3 - Good</option>
+                                    <option value="2">2 - Needs improvement</option>
+                                    <option value="1">1 - Reject</option>
+                                </select>
+                                <select name="candidateStatus" class="ui-field !py-1.5 text-sm mb-2">
+                                    <option value="">Keep current status</option>
+                                    <option value="InterviewInProgress">Interview In Progress</option>
+                                    <option value="Shortlisted">Keep Shortlisted</option>
+                                    <option value="Rejected">Reject Candidate</option>
+                                </select>
+                                <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                                    Documents are requested separately, once every required round has passed — see "Request Documents" below once available.
+                                </div>
+                                <label class="ui-label text-xs">Interview Feedback</label>
+                                <textarea name="feedback" class="ui-field !py-1.5 text-sm mb-2" rows="2"></textarea>
+                                <label class="ui-label text-xs">Recruiter Remarks</label>
+                                <textarea name="remarks" class="ui-field !py-1.5 text-sm mb-2" rows="2"></textarea>
+                                <label class="ui-label text-xs">Candidate-Visible Notes</label>
+                                <textarea name="notes" class="ui-field !py-1.5 text-sm mb-2" rows="2"></textarea>
+                                <button class="ui-btn-success w-full !rounded-full"><i data-lucide="check" class="h-4 w-4 me-2"></i>Complete</button>
+                            </form>
+                            <form asp-action="AssignInterviewPanel" method="post" class="mt-1">
+                                <input type="hidden" name="interviewId" value="@ir.Id" />
+                                <label class="ui-label text-xs">Panel Members</label>
+                                <input name="panelMembers" class="ui-field !py-1.5 text-sm mb-1" value="@ir.PanelMembers" />
+                                <label class="ui-label text-xs">Interviewer Names</label>
+                                <input name="interviewerNames" class="ui-field !py-1.5 text-sm mb-1" value="@ir.InterviewerNames" />
+                                <label class="ui-label text-xs">Panel Remarks</label>
+                                <textarea name="remarks" class="ui-field !py-1.5 text-sm mb-1" rows="1"></textarea>
+                                <button class="ui-btn-outline w-full !rounded-full"><i data-lucide="users" class="h-4 w-4 me-2"></i>Assign Panel</button>
+                            </form>
+                            <form asp-action="MarkInterviewMissed" method="post" class="mt-1">
+                                <input type="hidden" name="interviewId" value="@ir.Id" />
+                                <label class="ui-label text-xs">Notes (optional)</label>
+                                <textarea name="notes" class="ui-field !py-1.5 text-sm mb-1" rows="1"></textarea>
+                                <button class="ui-btn-warning w-full !rounded-full"
+                                        data-confirm-title="Mark this interview as Missed?"
+                                        data-confirm-message="The candidate will be notified that they missed this interview."><i data-lucide="user-x" class="h-4 w-4 me-2"></i>Mark as Missed</button>
+                            </form>
+                            <form asp-action="CancelInterview" method="post" class="mt-1">
+                                <input type="hidden" name="interviewId" value="@ir.Id" />
+                                <select name="candidateStatus" class="ui-field !py-1.5 text-sm mb-1">
+                                    <option value="">Keep current status</option>
+                                    <option value="Shortlisted">Move back to Shortlisted</option>
+                                    <option value="Rejected">Reject Candidate</option>
+                                </select>
+                                <label class="ui-label text-xs">Cancellation Reason</label>
+                                <textarea name="notes" class="ui-field !py-1.5 text-sm mb-1" rows="1"></textarea>
+                                <button class="ui-btn-outline w-full !rounded-full !text-red-600 dark:!text-red-400 !border-red-300 dark:!border-red-800"
+                                        data-confirm-title="Cancel this interview?"
+                                        data-confirm-message="The candidate will be notified that this interview was cancelled."><i data-lucide="ban" class="h-4 w-4 me-2"></i>Cancel Interview</button>
+                            </form>
+                        </div>
+                    }
+                    @foreach (var ir in Model.Interviews.Where(i => i.Status is "Missed" or "Cancelled")) {
+                        <div class="mb-2">
+                            <label class="ui-label !text-amber-600 dark:!text-amber-400">⚠ Reschedule @ir.Round Interview</label>
+                            <form asp-action="RescheduleInterview" method="post">
+                                <input type="hidden" name="interviewId" value="@ir.Id" />
+                                <label class="ui-label text-xs">New Date &amp; Time</label>
+                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+
+                                @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel { MeetingLink = ir.MeetingLink, MeetingId = ir.MeetingId, InterviewerNames = ir.InterviewerNames, PanelMembers = ir.PanelMembers })
+
+                                <label class="ui-label text-xs">Notes</label>
+                                <textarea name="notes" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
+                                <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">Any updated instructions.</div>
+                                <button class="ui-btn-primary w-full !rounded-full"><i data-lucide="calendar" class="h-4 w-4 me-2"></i>Reschedule &amp; Notify</button>
+                            </form>
+                        </div>
+                    }
+
+                    @if (progress.NextRoundToSchedule != null) {
+                        <div class="mb-2">
+                            <label class="ui-label">Next Round: Schedule @progress.NextRoundToSchedule Interview</label>
+                            <form asp-action="ScheduleInterview" method="post">
+                                <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                                <input type="hidden" name="round" value="@progress.NextRoundToSchedule" />
+
+                                <label class="ui-label text-xs">Date &amp; Time</label>
+                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+
+                                @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel())
+
+                                <label class="ui-label text-xs">Candidate Action Items</label>
+                                <textarea name="candidateActionItems" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
+
+                                <label class="ui-label text-xs">Additional Notes</label>
+                                <textarea name="notes" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
+
+                                <button class="ui-btn-primary w-full !rounded-full"><i data-lucide="calendar" class="h-4 w-4 me-2"></i>Schedule @progress.NextRoundToSchedule Interview</button>
+                            </form>
+                        </div>
+                    }
+
+                    @if (progress.CanOptionallyScheduleFinal) {
+                        <div class="mb-2">
+                            <label class="ui-label">Optional: Schedule Final Interview</label>
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">Technical, Managerial, and HR have all passed. Add a Final round only if this candidate needs one — otherwise, request documents below.</div>
+                            <form asp-action="ScheduleInterview" method="post">
+                                <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                                <input type="hidden" name="round" value="Final" />
+
+                                <label class="ui-label text-xs">Date &amp; Time</label>
+                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+
+                                @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel())
+
+                                <label class="ui-label text-xs">Additional Notes</label>
+                                <textarea name="notes" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
+
+                                <button class="ui-btn-outline w-full !rounded-full"><i data-lucide="calendar" class="h-4 w-4 me-2"></i>Schedule Final Interview</button>
+                            </form>
+                        </div>
+                    }
+
+                    @if (progress.DocumentsUnlocked) {
+                        <form asp-action="RequestDocuments" method="post" class="mb-2">
+                            <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                            <button class="ui-btn-warning w-full !rounded-full"><i data-lucide="folder" class="h-4 w-4 me-2"></i>Request Documents</button>
+                        </form>
+                    }
+                }
+
+                @if (stage == "DocumentsVerified" && !canManageOffers) {
+                    <div class="ui-alert-info mb-2 text-sm">Offers are issued by Admin/HR. This candidate is ready — an Admin or HR user can prepare the offer letter.</div>
+                }
+                @if (stage == "DocumentsVerified" && canManageOffers) {
+                    <div class="mb-2">
+                        <label class="ui-label">Issue Offer Letter</label>
+                        <form asp-action="IssueOffer" method="post">
+                            <input type="hidden" name="UserId" value="@Model.Candidate.Id" />
+                            <label for="offerDesignation" class="ui-label text-xs">Designation<span class="ui-required" aria-hidden="true">*</span></label>
+                            <input id="offerDesignation" type="text" name="Designation" class="ui-field !py-1.5 text-sm mb-1" required aria-required="true" />
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. Software Engineer</div>
+                            <label for="offerDepartment" class="ui-label text-xs">Department<span class="ui-required" aria-hidden="true">*</span></label>
+                            <input id="offerDepartment" type="text" name="Department" class="ui-field !py-1.5 text-sm mb-1" required aria-required="true" />
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. Engineering</div>
+                            <label for="offerLocation" class="ui-label text-xs">Location<span class="ui-required" aria-hidden="true">*</span></label>
+                            <input id="offerLocation" type="text" name="Location" class="ui-field !py-1.5 text-sm mb-1" required aria-required="true" />
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. Bengaluru</div>
+                            <label for="offerCtc" class="ui-label text-xs">CTC (LPA)<span class="ui-required" aria-hidden="true">*</span></label>
+                            <input id="offerCtc" type="number" step="0.01" min="0" name="CtcLpa" class="ui-field !py-1.5 text-sm mb-1" required aria-required="true" />
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. 8.5</div>
+                            <label for="offerBase" class="ui-label text-xs">Base Salary (LPA) (optional)</label>
+                            <input id="offerBase" type="number" step="0.01" min="0" name="BaseSalaryLpa" class="ui-field !py-1.5 text-sm mb-2" />
+                            <label for="offerVariable" class="ui-label text-xs">Variable Pay (LPA) (optional)</label>
+                            <input id="offerVariable" type="number" step="0.01" min="0" name="VariablePayLpa" class="ui-field !py-1.5 text-sm mb-2" />
+                            <label for="offerBonus" class="ui-label text-xs">Bonus (LPA) (optional)</label>
+                            <input id="offerBonus" type="number" step="0.01" min="0" name="BonusLpa" class="ui-field !py-1.5 text-sm mb-2" />
+                            <label for="offerBreakup" class="ui-label text-xs">Compensation Breakup (optional)</label>
+                            <textarea id="offerBreakup" name="CompensationBreakup" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. how base/variable/bonus are structured.</div>
+                            <label for="offerJoiningDate" class="ui-label text-xs">Joining Date<span class="ui-required" aria-hidden="true">*</span></label>
+                            <input id="offerJoiningDate" type="date" name="JoiningDate" class="ui-field !py-1.5 text-sm mb-2" required aria-required="true" />
+                            <label for="offerValidUntil" class="ui-label text-xs">Offer Valid Until<span class="ui-required" aria-hidden="true">*</span></label>
+                            <input id="offerValidUntil" type="date" name="OfferValidUntil" class="ui-field !py-1.5 text-sm mb-1" required aria-required="true" />
+                            <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">Last date the candidate can accept before the offer is withdrawn.</div>
+
+                            <div class="mb-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
+                                <div class="ui-label text-xs mb-1">Monthly Salary Breakup (optional — for offer letter Annexure III)</div>
+                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                    <div>
+                                        <label for="offerBasicMonthly" class="ui-label text-xs">Basic</label>
+                                        <input id="offerBasicMonthly" type="number" step="0.01" min="0" name="BasicMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerHraMonthly" class="ui-label text-xs">HRA</label>
+                                        <input id="offerHraMonthly" type="number" step="0.01" min="0" name="HraMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerSpecialAllowanceMonthly" class="ui-label text-xs">Special Allowance</label>
+                                        <input id="offerSpecialAllowanceMonthly" type="number" step="0.01" min="0" name="SpecialAllowanceMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerEmployeeEpfMonthly" class="ui-label text-xs">Employee EPF</label>
+                                        <input id="offerEmployeeEpfMonthly" type="number" step="0.01" min="0" name="EmployeeEpfMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerEmployeeEsiMonthly" class="ui-label text-xs">Employee ESI</label>
+                                        <input id="offerEmployeeEsiMonthly" type="number" step="0.01" min="0" name="EmployeeEsiMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerTrainingChargesMonthly" class="ui-label text-xs">Training/Dev. Charges</label>
+                                        <input id="offerTrainingChargesMonthly" type="number" step="0.01" min="0" name="TrainingChargesMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerProfessionalTaxMonthly" class="ui-label text-xs">Professional Tax</label>
+                                        <input id="offerProfessionalTaxMonthly" type="number" step="0.01" min="0" name="ProfessionalTaxMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerEmployerEpfMonthly" class="ui-label text-xs">Employer EPF</label>
+                                        <input id="offerEmployerEpfMonthly" type="number" step="0.01" min="0" name="EmployerEpfMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerEmployerEsiMonthly" class="ui-label text-xs">Employer ESI</label>
+                                        <input id="offerEmployerEsiMonthly" type="number" step="0.01" min="0" name="EmployerEsiMonthly" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                    <div>
+                                        <label for="offerPerformanceIncentiveAnnual" class="ui-label text-xs">Perf. Incentive (Annual)</label>
+                                        <input id="offerPerformanceIncentiveAnnual" type="number" step="0.01" min="0" name="PerformanceIncentiveAnnual" class="ui-field !py-1.5 text-sm" />
+                                    </div>
+                                </div>
+                                <div class="mt-2 text-xs text-slate-500 dark:text-slate-400">Leave blank to omit the itemized breakup table from the letter.</div>
+                            </div>
+
+                            <button class="ui-btn-success w-full !rounded-full"><i data-lucide="file-check" class="h-4 w-4 me-2"></i>Prepare Offer for HR Approval</button>
+                        </form>
+                    </div>
+                }
+
+                @if (stage == "OfferAccepted" && canManageOffers) {
+                    <form asp-action="BeginOnboarding" method="post" class="mb-2">
+                        <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                        <button class="ui-btn-success w-full !rounded-full"><i data-lucide="rocket" class="h-4 w-4 me-2"></i>Begin Onboarding</button>
+                    </form>
+                }
+                @if (stage == "OfferAccepted" && !canManageOffers) {
+                    <div class="ui-alert-info mb-2 text-sm">Onboarding is started by Admin/HR once the offer is accepted.</div>
+                }
+
+                @if (stage != "Rejected" && stage != "Onboarding") {
+                    <hr />
+                    <form asp-action="RejectCandidate" method="post">
+                        <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                        <label class="ui-label text-xs">Reason for Rejection (optional)</label>
+                        <textarea name="reason" class="ui-field !py-1.5 text-sm mb-2" rows="2"></textarea>
+                        <button class="ui-btn-outline w-full !rounded-full !text-red-600 dark:!text-red-400 !border-red-300 dark:!border-red-800"
+                                data-confirm-title="Reject this candidate?"
+                                data-confirm-message="This moves the candidate to the Rejected stage. This action can be reversed later, but the candidate may be notified."><i data-lucide="x" class="h-4 w-4 me-2"></i>Reject</button>
+                    </form>
+                }
+            </div>
+        </div>
+
+        <!-- Profile Summary -->
+        <div class="ui-card">
+            <div class="ui-card-body text-sm">
+                <h2 class="ui-heading-md mb-2"><i data-lucide="user" class="h-4 w-4 text-[var(--vw-accent)]"></i>Profile</h2>
+                @{
+                    var eduByLevel = Model.Candidate.EducationRecords.ToDictionary(e => e.Level, e => e);
+                    var eduLevelsInOrder = new[] {
+                        (EducationLevels.Postgraduate, "PG"),
+                        (EducationLevels.Undergraduate, "UG"),
+                        (EducationLevels.Intermediate, "12th"),
+                        (EducationLevels.Secondary, "10th")
+                    };
+                }
+                <div class="mb-2">
+                    <span class="text-slate-500 dark:text-slate-400">Education:</span>
+                    @foreach (var (level, label) in eduLevelsInOrder)
+                    {
+                        var rec = eduByLevel.GetValueOrDefault(level);
+                        if (rec == null || rec.Status == EducationStatuses.NotApplicable)
+                        {
+                            <div class="ms-2">@label: <span class="text-slate-500 dark:text-slate-400 italic">Not applicable</span></div>
+                        }
+                        else
+                        {
+                            <div class="ms-2">
+                                @label: @rec.DegreeOrCourse, @rec.InstituteName
+                                (@rec.BoardOrUniversity@(string.IsNullOrWhiteSpace(rec.StreamBranch) ? "" : $" · {rec.StreamBranch}"))
+                                — @rec.MarksValue @rec.MarksType, @rec.YearOfPassing
+                                <span class="ui-badge-neutral">@rec.Status</span>
+                            </div>
+                        }
+                    }
+                </div>
+                <div><span class="text-slate-500 dark:text-slate-400">Skills:</span> @Model.Candidate.Skills</div>
+                <div><span class="text-slate-500 dark:text-slate-400">Location:</span> @(string.IsNullOrWhiteSpace(Model.Candidate.Address?.City) ? Model.Candidate.CurrentLocation : $"{Model.Candidate.Address.City}, {Model.Candidate.Address.State}, {Model.Candidate.Address.Country}")</div>
+                <div class="mt-2 flex gap-2 flex-wrap">
+                    @if (!string.IsNullOrWhiteSpace(Model.Candidate.ResumePath)) {
+                        <a href="@Model.Candidate.ResumePath" target="_blank" class="ui-btn-outline !py-1.5 text-sm"><i data-lucide="file-text" class="h-4 w-4"></i>Resume</a>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Candidate.LinkedInUrl)) {
+                        <a href="@Model.Candidate.LinkedInUrl" target="_blank" class="ui-btn-outline !py-1.5 text-sm"><i data-lucide="linkedin" class="h-4 w-4"></i>LinkedIn</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Timeline -->
+    <div class="col-span-12 md:col-span-8">
+
+        <!-- Invitations -->
+        <h2 class="ui-heading-md mb-2"><i data-lucide="mail" class="h-4 w-4 text-[var(--vw-accent)]"></i>Assessment Invitations</h2>
+        <div class="ui-card mb-3">
+            <div class="ui-card-body">
+                @{ ViewData["TableId"] = "candidateInvitationsTable"; ViewData["ShowPageSize"] = false; ViewData["SearchPlaceholder"] = "Search invitations..."; }
+                @await Html.PartialAsync("_TableToolbar")
+                <div class="overflow-x-auto">
+                    <table id="candidateInvitationsTable" class="ui-table" data-smart-table data-sortable>
+                        <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700"><tr><th class="px-5 py-3 font-medium" data-sort-key="assessment">Assessment</th><th class="px-5 py-3 font-medium" data-sort-key="sent" data-sort-type="date">Sent</th><th class="px-5 py-3 font-medium" data-sort-key="expires" data-sort-type="date">Expires</th><th class="px-5 py-3 font-medium" data-sort-key="status">Status</th><th class="px-5 py-3 font-medium"></th></tr></thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!Model.Invitations.Any())
+                        {
+                            <tr data-sort-exclude><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "mail", Title = "No invitations sent yet", Message = "Assessment invitations sent to this candidate will appear here.", Compact = true })</td></tr>
+                        }
+                        @foreach (var inv in Model.Invitations) {
+                            // Same lazy-expiry gap as Recruiter/Index.cshtml's Active Links list —
+                            // Status only flips to Expired when someone actually opens this specific
+                            // link (ResolveAssessmentInvitation); compute the true state for display.
+                            var invIsLazyExpired = (inv.Status == "Pending" || inv.Status == "Accepted") && inv.ExpiresAt < DateTime.UtcNow;
+                            var invEffectiveStatus = invIsLazyExpired ? "Expired" : inv.Status;
+                            var invColor = invEffectiveStatus == "Accepted" ? "success" : invEffectiveStatus == "Pending" ? "primary" : invEffectiveStatus == "Used" ? "warning" : invEffectiveStatus == "Expired" ? "danger" : "secondary";
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@inv.Exam?.Title">@inv.Exam?.Title</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(inv.SentAt.ToString("o"))">@inv.SentAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(inv.ExpiresAt.ToString("o"))">@inv.ExpiresAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                <td class="px-5 py-3"><span class="@badgeClass(invColor)">@invEffectiveStatus</span></td>
+                                <td class="px-5 py-3">
+                                    <form asp-action="ResendInvitation" method="post" class="inline">
+                                        <input type="hidden" name="userId" value="@Model.Candidate.Id" />
+                                        <input type="hidden" name="examId" value="@inv.ExamId" />
+                                        <button class="ui-btn-outline !px-3 !py-1.5 text-xs"
+                                            data-confirm-title="Resend assessment link?"
+                                            data-confirm-message="This revokes @Model.Candidate.FullName's existing assessment link and sends a new one.">
+                                            <i data-lucide="rotate-cw" class="h-4 w-4"></i>Resend
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div data-table-pager="candidateInvitationsTable" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Attempts -->
+        <h2 class="ui-heading-md mb-2"><i data-lucide="clipboard-check" class="h-4 w-4 text-[var(--vw-accent)]"></i>Assessment Results</h2>
+        <div class="ui-card mb-3">
+            <div class="ui-card-body">
+                @{ ViewData["TableId"] = "candidateAttemptsTable"; ViewData["ShowPageSize"] = false; ViewData["SearchPlaceholder"] = "Search assessment results..."; }
+                @await Html.PartialAsync("_TableToolbar")
+                <div class="overflow-x-auto">
+                    <table id="candidateAttemptsTable" class="ui-table" data-smart-table data-sortable>
+                        <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700"><tr><th class="px-5 py-3 font-medium" data-sort-key="assessment">Assessment</th><th class="px-5 py-3 font-medium" data-sort-key="score" data-sort-type="number">Score</th><th class="px-5 py-3 font-medium" data-sort-key="result">Result</th><th class="px-5 py-3 font-medium" data-sort-key="date" data-sort-type="date">Date</th></tr></thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!Model.Attempts.Any())
+                        {
+                            <tr data-sort-exclude><td colspan="4" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "clipboard-check", Title = "No assessment attempts yet", Message = "Results will appear here once the candidate completes an assessment.", Compact = true })</td></tr>
+                        }
+                        @foreach (var a in Model.Attempts) {
+                            var pct = a.TotalMarks > 0 ? (int)((a.Score * 100.0) / a.TotalMarks) : 0;
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@a.Exam?.Title">@a.Exam?.Title</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@pct">@a.Score / @a.TotalMarks (@pct%)</td>
+                                <td class="px-5 py-3">
+                                    @if (a.Status == "PendingManualReview") {
+                                        <span class="@badgeClass("warning")">PENDING REVIEW</span>
+                                    } else {
+                                        <span class="@badgeClass(a.Passed ? "success" : "danger")">@(a.Passed ? "ELIGIBLE" : "NOT ELIGIBLE")</span>
+                                    }
+                                </td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(a.StartedAt.ToString("o"))">@a.StartedAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div data-table-pager="candidateAttemptsTable" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Interviews -->
+        <h2 class="ui-heading-md mb-2"><i data-lucide="message-square" class="h-4 w-4 text-[var(--vw-accent)]"></i>Interviews</h2>
+        <div class="ui-card mb-3">
+            <div class="ui-card-body">
+                @{ ViewData["TableId"] = "candidateInterviewsTable"; ViewData["ShowPageSize"] = false; ViewData["SearchPlaceholder"] = "Search interviews..."; }
+                @await Html.PartialAsync("_TableToolbar")
+                <div class="overflow-x-auto">
+                    <table id="candidateInterviewsTable" class="ui-table" data-smart-table data-sortable>
+                        <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700"><tr><th class="px-5 py-3 font-medium" data-sort-key="round">Round</th><th class="px-5 py-3 font-medium" data-sort-key="scheduled" data-sort-type="date">Scheduled</th><th class="px-5 py-3 font-medium">Panel</th><th class="px-5 py-3 font-medium" data-sort-key="status">Status</th><th class="px-5 py-3 font-medium" data-sort-key="rating" data-sort-type="number">Rating</th><th class="px-5 py-3 font-medium">Feedback</th><th class="px-5 py-3 font-medium">Outcome</th></tr></thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!Model.Interviews.Any())
+                        {
+                            <tr data-sort-exclude><td colspan="7" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "message-square", Title = "No interviews scheduled yet", Message = "Interviews scheduled for this candidate will appear here.", Compact = true })</td></tr>
+                        }
+                        @foreach (var ir in Model.Interviews) {
+                            var irColor = ir.Status == "Completed" ? "success" : ir.Status == "Missed" ? "warning" : ir.Status == "Cancelled" ? "danger" : "primary";
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@ir.Round">@ir.Round</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(ir.ScheduledAt?.ToString("o"))">@ir.ScheduledAt?.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@(string.IsNullOrWhiteSpace(ir.PanelMembers) ? ir.InterviewerNames : ir.PanelMembers)</td>
+                                <td class="px-5 py-3"><span class="@badgeClass(irColor)">@ir.Status</span></td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(ir.Rating ?? 0)">@(ir.Rating.HasValue ? $"{ir.Rating}/5" : "-")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">
+                                    <div>@(string.IsNullOrWhiteSpace(ir.Feedback) ? ir.Notes : ir.Feedback)</div>
+                                    @if (!string.IsNullOrWhiteSpace(ir.Remarks)) {
+                                        <div class="text-xs text-slate-500 dark:text-slate-400">Remarks: @ir.Remarks</div>
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(ir.CandidateStatusAfterInterview)) {
+                                        <div class="text-xs text-slate-500 dark:text-slate-400">Candidate Status: @ir.CandidateStatusAfterInterview</div>
+                                    }
+                                </td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@(string.IsNullOrEmpty(ir.Outcome) ? "—" : ir.Outcome)</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div data-table-pager="candidateInterviewsTable" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Documents -->
+        @{
+            var docsRelevantForStage = Model.Candidate.RecruitmentStage == "DocumentsRequested" || Model.Candidate.RecruitmentStage == "DocumentsVerified";
+            var neverUploadedRequiredTypes = docsRelevantForStage
+                ? ExamPortal.Models.DocumentTypes.Required.Where(rt => !Model.Documents.Any(d => d.DocumentType == rt)).ToList()
+                : new List<string>();
+            var stillNeededRequiredTypes = docsRelevantForStage
+                ? ExamPortal.Models.DocumentTypes.Required.Where(rt => !Model.Documents.Any(d => d.DocumentType == rt && d.VerificationStatus == "Verified")).ToList()
+                : new List<string>();
+            var verifiedRequiredCount = ExamPortal.Models.DocumentTypes.Required.Length - stillNeededRequiredTypes.Count;
+        }
+        <h2 class="ui-heading-md mb-2"><i data-lucide="folder-open" class="h-4 w-4 text-[var(--vw-accent)]"></i>Uploaded Documents</h2>
+        @if (docsRelevantForStage)
+        {
+            <p class="mb-2 text-sm text-slate-500 dark:text-slate-400">
+                <strong class="text-slate-700 dark:text-slate-200">@verifiedRequiredCount of @ExamPortal.Models.DocumentTypes.Required.Length</strong> required documents verified.
+                @if (stillNeededRequiredTypes.Any())
+                {
+                    <text>Still needed before this candidate can advance to <em>Documents Verified</em>: @string.Join(", ", stillNeededRequiredTypes).</text>
+                }
+            </p>
+        }
+        <div class="ui-card mb-3">
+            <div class="ui-card-body">
+                @{ ViewData["TableId"] = "candidateDocumentsTable"; ViewData["ShowPageSize"] = false; ViewData["SearchPlaceholder"] = "Search documents..."; }
+                @await Html.PartialAsync("_TableToolbar")
+                <div class="overflow-x-auto">
+                    <table id="candidateDocumentsTable" class="ui-table" data-smart-table data-sortable>
+                        <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700"><tr><th class="px-5 py-3 font-medium" data-sort-key="type">Type</th><th class="px-5 py-3 font-medium">File</th><th class="px-5 py-3 font-medium" data-sort-key="status">Status</th><th class="px-5 py-3 font-medium">Verification</th><th class="px-5 py-3 font-medium">Action</th></tr></thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!Model.Documents.Any() && !neverUploadedRequiredTypes.Any())
+                        {
+                            <tr data-sort-exclude><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "folder-open", Title = "No documents uploaded yet", Message = "Documents uploaded by this candidate will appear here.", Compact = true })</td></tr>
+                        }
+                        @foreach (var doc in Model.Documents) {
+                            var docColor = doc.VerificationStatus == "Verified" ? "success" : doc.VerificationStatus == "Rejected" ? "danger" : "warning";
+                            var docIsRequired = ExamPortal.Models.DocumentTypes.Required.Contains(doc.DocumentType);
+                            <tr>
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@doc.DocumentType">
+                                    @doc.DocumentType
+                                    @if (docIsRequired)
+                                    {
+                                        <span class="ui-badge-info ml-1 !text-[10px]">Required</span>
+                                    }
+                                </td>
+                                <td class="px-5 py-3"><a href="@doc.FilePath" target="_blank" class="text-[var(--vw-accent)]">@doc.OriginalFileName</a></td>
+                                <td class="px-5 py-3"><span class="@badgeClass(docColor)">@doc.VerificationStatus</span></td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@(string.IsNullOrWhiteSpace(doc.VerifiedBy) ? "" : $"By {doc.VerifiedBy}")<br />@(string.IsNullOrWhiteSpace(doc.FileHash) ? "" : doc.FileHash[..Math.Min(12, doc.FileHash.Length)])</td>
+                                <td class="px-5 py-3">
+                                    <form asp-action="VerifyDocument" method="post" class="flex gap-1 items-center">
+                                        <input type="hidden" name="documentId" value="@doc.Id" />
+                                        <label class="sr-only" for="docVerifyNotes-@doc.Id">Verification notes</label>
+                                        <textarea id="docVerifyNotes-@doc.Id" name="notes" class="ui-field !py-1.5 text-sm w-[120px]" rows="1" aria-label="Verification notes"></textarea>
+                                        <button name="status" value="Verified" class="ui-btn-primary !px-2.5 !py-1 text-xs">✓</button>
+                                        <button name="status" value="Rejected" class="ui-btn-danger !px-2.5 !py-1 text-xs">✗</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        }
+                        @foreach (var missingType in neverUploadedRequiredTypes)
+                        {
+                            <tr data-sort-exclude class="opacity-70">
+                                <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@missingType">@missingType</td>
+                                <td class="px-5 py-3 text-slate-400 dark:text-slate-500">—</td>
+                                <td class="px-5 py-3"><span class="ui-badge-neutral">Not uploaded</span></td>
+                                <td class="px-5 py-3 text-xs text-slate-400 dark:text-slate-500">Required — waiting on candidate</td>
+                                <td class="px-5 py-3"></td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+                <div data-table-pager="candidateDocumentsTable" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Offer -->
+        @if (Model.Offer != null) {
+            <h2 class="ui-heading-md mb-2"><i data-lucide="file-check" class="h-4 w-4 text-[var(--vw-accent)]"></i>Offer Letter</h2>
+            <div class="ui-card mb-3 p-3 bg-[var(--vw-success-bg)] border-[var(--vw-success-text)]">
+                <div class="grid grid-cols-12 gap-2 text-sm">
+                    <div class="col-span-6"><span class="text-slate-500 dark:text-slate-400">Designation:</span> <strong>@Model.Offer.Designation</strong></div>
+                    <div class="col-span-6"><span class="text-slate-500 dark:text-slate-400">Department:</span> @Model.Offer.Department</div>
+                    <div class="col-span-6"><span class="text-slate-500 dark:text-slate-400">CTC:</span> ₹@Model.Offer.CtcLpa.ToString("N2") LPA</div>
+                    <div class="col-span-6"><span class="text-slate-500 dark:text-slate-400">Joining:</span> @Model.Offer.JoiningDate.ToString("dd MMM yyyy")</div>
+                    <div class="col-span-6"><span class="text-slate-500 dark:text-slate-400">HR Approval:</span> @Model.Offer.HrApprovalStatus</div>
+                    <div class="col-span-6"><span class="text-slate-500 dark:text-slate-400">Signed By:</span> @(string.IsNullOrWhiteSpace(Model.Offer.SignedBy) ? "Pending" : Model.Offer.SignedBy)</div>
+                    <div class="col-span-12 mt-1"><span class="text-slate-500 dark:text-slate-400">Status:</span> <span class="@badgeClass(Model.Offer.Status == "Accepted" ? "success" : Model.Offer.Status == "Declined" ? "danger" : "primary")">@Model.Offer.Status</span></div>
+                </div>
+                <div class="mt-3">
+                    <a asp-action="DownloadOfferLetter" asp-route-userId="@Model.Candidate.Id"
+                       class="ui-btn-outline !rounded-full text-sm"
+                       target="_blank">
+                        <i data-lucide="file-text" class="h-4 w-4 me-2"></i>Download Offer Letter PDF
+                    </a>
+                    @if (Model.Offer.Status == "PendingHRApproval" && canManageOffers) {
+                        <form asp-action="ApproveOffer" method="post" class="inline">
+                            <input type="hidden" name="offerId" value="@Model.Offer.Id" />
+                            <input type="hidden" name="remarks" value="Approved from candidate detail." />
+                            <button class="ui-btn-success !rounded-full text-sm"><i data-lucide="file-check" class="h-4 w-4 me-1"></i>HR Approve & Send</button>
+                        </form>
+                        <form asp-action="RejectOffer" method="post" class="inline">
+                            <input type="hidden" name="offerId" value="@Model.Offer.Id" />
+                            <label class="sr-only" for="rejectOfferReason-@Model.Offer.Id">Reject reason</label>
+                            <input id="rejectOfferReason-@Model.Offer.Id" name="reason" class="ui-field !py-1.5 text-sm inline-block w-[180px]" aria-label="Reject reason" />
+                            <button class="ui-btn-outline !rounded-full text-sm !text-red-600 dark:!text-red-400 !border-red-300 dark:!border-red-800"><i data-lucide="x" class="h-4 w-4 me-1"></i>Reject</button>
+                        </form>
+                    }
+                    @if (Model.Offer.Status == "PendingHRApproval" && !canManageOffers) {
+                        <span class="ui-badge-neutral">Pending Admin/HR approval</span>
+                    }
+                </div>
+                @if (!string.IsNullOrWhiteSpace(Model.Offer.DigitalSignature)) {
+                    <div class="text-sm mt-2"><span class="text-slate-500 dark:text-slate-400">Digital Signature:</span> <code>@Model.Offer.DigitalSignature[..Math.Min(24, Model.Offer.DigitalSignature.Length)]...</code></div>
+                }
+                @if (Model.OfferHistory.Any()) {
+                    <div class="mt-3">
+                        <div class="font-semibold text-sm mb-2">Offer History</div>
+                        @foreach (var h in Model.OfferHistory.Take(8)) {
+                            <div class="text-sm border-t border-slate-100 dark:border-slate-700 py-1">
+                                <span class="font-semibold">@h.Action</span>
+                                <span class="text-slate-500 dark:text-slate-400">by @h.Actor on @h.CreatedAt.ToLocalTime().ToString("dd MMM HH:mm")</span>
+                                @if (!string.IsNullOrWhiteSpace(h.Remarks)) { <div class="text-slate-500 dark:text-slate-400">@h.Remarks</div> }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>

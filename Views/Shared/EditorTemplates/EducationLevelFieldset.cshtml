@@ -1,0 +1,242 @@
+@model EducationLevelEntry
+@{
+    // Supplied via Html.EditorFor(..., "EducationLevelFieldset", new { ... }) additionalViewData.
+    var levelKey = (string)ViewData["LevelKey"]!;
+    var title = (string)ViewData["Title"]!;
+    var icon = (string)ViewData["Icon"]!;
+    var allowNotApplicable = (bool)ViewData["AllowNotApplicable"]!;
+    var expanded = (bool)ViewData["Expanded"]!;
+    var courses = ViewData["Courses"] as string[];
+    var boards = ViewData["Boards"] as string[];
+    var streams = ViewData["Streams"] as string[];
+    // Label defaults to "Degree / Course" (used for Postgraduate/Undergraduate/10th),
+    // but Intermediate calls it "Group/Course" instead since 12th students pick a
+    // "group" (MPC/BiPC/CEC/etc.), not a degree.
+    var degreeLabel = (ViewData["DegreeLabel"] as string) ?? "Degree / Course";
+    // Degree/Course is required for every level except 10th/Secondary, where it isn't
+    // a meaningful field — mirrors CandidateProfileStepViewModel.Validate's requireDegreeOrCourse.
+    var degreeRequired = ViewData["DegreeRequired"] as bool? ?? true;
+    // 10th/Secondary has no meaningful "Degree/Course" or "Stream/Branch" concept at all,
+    // so those two fields are hidden entirely for that level (not just optional).
+    var showDegree = ViewData["ShowDegree"] as bool? ?? true;
+    var showStreamBranch = ViewData["ShowStreamBranch"] as bool? ?? true;
+    // Every level here is always fully completed by the time someone registers for a
+    // job — there's no "currently pursuing" state to capture, so Status is always
+    // "Completed" (or "Not Applicable" for Postgraduate when its qualification toggle
+    // is off) with no user-facing choice at all.
+
+    // ViewData.TemplateInfo.HtmlFieldPrefix is set by EditorFor to "Postgraduate" / "Undergraduate" / etc,
+    // so asp-for="DegreeOrCourse" below automatically renders name="Postgraduate.DegreeOrCourse" and so on —
+    // no manual prefixing needed.
+    var isNotApplicable = Model.Status == ExamPortal.Models.EducationStatuses.NotApplicable;
+    var collapseId = $"edu-collapse-{levelKey}";
+    var bodyExpanded = expanded || !isNotApplicable;
+
+    // Lucide icon, mapped from the Font Awesome suffixes CompleteProfile.cshtml still
+    // passes in as ViewData["Icon"] (e.g. "fa-graduation-cap") so this shared template
+    // doesn't depend on Font Awesome.
+    var lucideIcon = icon switch
+    {
+        "fa-user-graduate" => "graduation-cap",
+        "fa-graduation-cap" => "graduation-cap",
+        "fa-school" => "school",
+        "fa-book" => "book",
+        _ => "book-open"
+    };
+}
+
+@* Migrated off Bootstrap's JS collapse (data-bs-toggle/data-bs-target) onto the
+   generic vanilla accordion helper in app.js (data-accordion-toggle / vwInitAccordions),
+   which was built specifically for this file — see the comment above initAccordions()
+   in wwwroot/js/app.js. The accordion-item/-header/-button/-body class names are kept
+   (they're already themed with vw-* tokens in site.css, not raw Bootstrap defaults),
+   only the state-toggling classes/attributes changed: "is-collapsed" + aria-expanded
+   instead of Bootstrap's "collapsed"/"show". The expand/collapse chevron is now an
+   explicit Lucide icon that rotates via Tailwind's group-aria-expanded variant,
+   instead of Bootstrap's CSS-only ::after chevron. *@
+<div class="accordion-item edu-level-item" data-level-key="@levelKey" data-allow-na="@(allowNotApplicable ? "1" : "0")">
+    <h2 class="accordion-header">
+        <button class="accordion-button group flex w-full items-center gap-2 @(bodyExpanded ? "" : "is-collapsed")" type="button"
+                data-accordion-toggle="@collapseId"
+                aria-expanded="@(bodyExpanded ? "true" : "false")" aria-controls="@collapseId">
+            <i data-lucide="@lucideIcon" class="h-4 w-4 shrink-0 text-[var(--vw-accent)]"></i>
+            <span class="font-semibold">@title</span>
+            @if (allowNotApplicable)
+            {
+                <span class="ms-auto flex items-center" onclick="event.stopPropagation();">
+                    <input class="ui-switch edu-na-toggle" type="checkbox" role="switch"
+                           id="na-@levelKey" @(isNotApplicable ? "" : "checked") />
+                    <label class="ui-check-label ms-2 text-xs" for="na-@levelKey">I have this qualification</label>
+                </span>
+            }
+            <i data-lucide="chevron-down" class="h-4 w-4 shrink-0 transition-transform duration-200 group-aria-expanded:rotate-180 @(allowNotApplicable ? "" : "ms-auto")"></i>
+        </button>
+    </h2>
+    <div id="@collapseId" class="accordion-body @(bodyExpanded ? "" : "hidden")">
+        @* Status carries "Completed | Not Applicable"; the NA toggle above (Postgraduate
+           only) is the sole thing that ever drives it away from "Completed". *@
+        <input type="hidden" asp-for="Status" class="edu-status-input"
+               value="@(Model.Status == ExamPortal.Models.EducationStatuses.NotApplicable || (string.IsNullOrWhiteSpace(Model.Status) && allowNotApplicable) ? ExamPortal.Models.EducationStatuses.NotApplicable : ExamPortal.Models.EducationStatuses.Completed)" />
+
+        <div class="edu-detail-fields grid grid-cols-1 md:grid-cols-12 gap-4" style="@(isNotApplicable ? "display:none;" : "")">
+            @if (showDegree)
+            {
+                <div class="md:col-span-6">
+                    <label class="ui-label">
+                        @degreeLabel@if (degreeRequired)
+                        {
+                            <span class="ui-required" aria-hidden="true">*</span>
+                        }
+                    </label>
+                    @if (courses != null)
+                    {
+                        <select asp-for="DegreeOrCourse" class="ui-field" data-searchable data-searchable-placeholder="Search @degreeLabel.ToLower()…">
+                            <option value="">Select @degreeLabel.ToLower()</option>
+                            @foreach (var c in courses)
+                            {
+                                <option value="@c">@c</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input asp-for="DegreeOrCourse" class="ui-field" aria-describedby="hint-DegreeOrCourse" />
+                        <div id="hint-DegreeOrCourse" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. 10th / SSC</div>
+                    }
+                    <span asp-validation-for="DegreeOrCourse" class="ui-field-error"></span>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" asp-for="DegreeOrCourse" value="" />
+            }
+
+            <div class="md:col-span-6">
+                <label class="ui-label">
+                    Institute / College / School<span class="ui-required" aria-hidden="true">*</span>
+                </label>
+                <input asp-for="InstituteName" class="ui-field" />
+                <span asp-validation-for="InstituteName" class="ui-field-error"></span>
+            </div>
+
+            <div class="md:col-span-6">
+                <label class="ui-label">
+                    Board / University<span class="ui-required" aria-hidden="true">*</span>
+                </label>
+                @if (boards != null)
+                {
+                    <select asp-for="BoardOrUniversity" class="ui-field" data-searchable data-searchable-placeholder="Search board / university…">
+                        <option value="">Select board / university</option>
+                        @foreach (var b in boards)
+                        {
+                            <option value="@b">@b</option>
+                        }
+                    </select>
+                }
+                else
+                {
+                    <input asp-for="BoardOrUniversity" class="ui-field" />
+                }
+                <span asp-validation-for="BoardOrUniversity" class="ui-field-error"></span>
+            </div>
+
+            @if (showStreamBranch)
+            {
+                <div class="md:col-span-6">
+                    <label class="ui-label">Stream / Branch (optional)</label>
+                    @if (streams != null)
+                    {
+                        <select asp-for="StreamBranch" class="ui-field">
+                            <option value="">Select stream / branch</option>
+                            @foreach (var s in streams)
+                            {
+                                <option value="@s">@s</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <input asp-for="StreamBranch" class="ui-field" />
+                    }
+                    <span asp-validation-for="StreamBranch" class="ui-field-error"></span>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" asp-for="StreamBranch" value="" />
+            }
+
+            <div class="md:col-span-4">
+                <label class="ui-label">
+                    Year of Passing<span class="ui-required" aria-hidden="true">*</span>
+                </label>
+                <select asp-for="YearOfPassing" class="ui-field" data-searchable data-searchable-placeholder="Search year…">
+                    <option value="">Select year of passing</option>
+                    @foreach (var y in RegistrationOptions.GraduationYears)
+                    {
+                        <option value="@y">@y</option>
+                    }
+                </select>
+                <span asp-validation-for="YearOfPassing" class="ui-field-error"></span>
+            </div>
+
+            <div class="md:col-span-4">
+                <label class="ui-label">
+                    Marks<span class="ui-required" aria-hidden="true">*</span>
+                </label>
+                <input asp-for="MarksValue" class="ui-field" inputmode="decimal" aria-describedby="hint-MarksValue" />
+                <div id="hint-MarksValue" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. 85 or 8.5</div>
+                <span asp-validation-for="MarksValue" class="ui-field-error"></span>
+            </div>
+
+            <div class="md:col-span-4">
+                <label class="ui-label">Marks Type</label>
+                <select asp-for="MarksType" class="ui-field">
+                    <option value="Percentage">Percentage</option>
+                    <option value="CGPA">CGPA</option>
+                </select>
+            </div>
+        </div>
+
+        @if (allowNotApplicable)
+        {
+            <p class="mb-0 text-sm italic text-slate-500 dark:text-slate-400 edu-na-note" style="@(isNotApplicable ? "" : "display:none;")">
+                Not applicable — toggle "I have this qualification" above if this changes.
+            </p>
+        }
+    </div>
+</div>
+
+@* Wire up the "I have this qualification" (Not Applicable) toggle for this one
+   fieldset. Loaded once per fieldset instance; safe because each level has a
+   distinct levelKey. *@
+<script>
+(function () {
+    var item = document.querySelector('.edu-level-item[data-level-key="@levelKey"]');
+    if (!item || item.dataset.wired === "1") return;
+    item.dataset.wired = "1";
+
+    var statusHidden = item.querySelector('.edu-status-input');
+    var detailFields = item.querySelector('.edu-detail-fields');
+    var naToggle = item.querySelector('.edu-na-toggle');
+    var naNote = item.querySelector('.edu-na-note');
+
+    function applyNaUi(isNotApplicable) {
+        if (detailFields) detailFields.style.display = isNotApplicable ? "none" : "";
+        if (naNote) naNote.style.display = isNotApplicable ? "" : "none";
+        statusHidden.value = isNotApplicable
+            ? "@ExamPortal.Models.EducationStatuses.NotApplicable"
+            : "@ExamPortal.Models.EducationStatuses.Completed";
+    }
+
+    // Every level is always "Completed" unless the NA toggle (Postgraduate only)
+    // says otherwise — sync that on load too, not just on future toggle changes.
+    statusHidden.value = "@ExamPortal.Models.EducationStatuses.Completed";
+    if (naToggle) {
+        naToggle.addEventListener('change', function () {
+            applyNaUi(!naToggle.checked);
+        });
+        applyNaUi(!naToggle.checked);
+    }
+})();
+</script>

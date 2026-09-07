@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>ExamPortal</RootNamespace>
+    <UserSecretsId>1f6b8c4a-2f7d-4b1a-9c3e-6a8e2d4f7b91</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- ExamPortal.Tests lives in a subfolder of this project's directory (so the .sln
+         keeps both projects together), but the Web SDK's default item glob (**/*.cs)
+         doesn't know to skip sibling projects nested that way — without this exclude,
+         the test project's own .cs files (referencing xunit, EF Core InMemory, etc.)
+         would get swept into *this* project's compilation too and break the main build. -->
+    <Compile Remove="ExamPortal.Tests/**/*.cs" />
+    <Compile Remove="ExamPortal.Tests/**" />
+    <Content Remove="ExamPortal.Tests/**" />
+    <None Remove="ExamPortal.Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="QuestPDF" Version="2024.3.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>

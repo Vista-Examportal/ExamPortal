@@ -1,0 +1,447 @@
+@model ExamTakeViewModel
+@{ ViewData["Title"] = "Taking: " + Model.Exam.Title; }
+
+@* ================================================================
+   Sticky exam header — title, countdown timer, proctoring/connection
+   status, and live answered-count. Stacks to a single column on
+   narrow screens instead of the old fixed d-flex row (which forced
+   three items onto one line and clipped on mobile).
+   ================================================================ *@
+<div class="ui-card sticky top-0 z-30 mb-4 !rounded-none border-x-0 border-t-0 py-3 px-4">
+    <div class="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0">
+            <h1 class="text-base font-bold leading-tight mb-0 truncate">@Model.Exam.Title</h1>
+            <p class="text-xs text-[var(--vw-text-muted)] mb-0">@Model.Exam.Questions.Count questions &bull; @Model.Exam.TotalMarks score &bull; @Model.Exam.Status</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-4 sm:gap-5">
+            <div class="text-center">
+                <div class="text-2xl font-bold vw-mono leading-none text-[var(--vw-accent)]" id="timer" role="timer" aria-label="Time remaining">--:--</div>
+                <div class="text-[11px] text-[var(--vw-text-muted)] mt-0.5">Remaining</div>
+                <div id="timerAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+            </div>
+            <div class="vw-status-quiet">
+                <i data-lucide="shield" class="h-4 w-4" aria-hidden="true"></i>
+                <span id="mediaStatus" data-state="checking">Checking camera and mic</span>
+                <span aria-hidden="true">&middot;</span>
+                <span id="focusStatus" data-state="ok">Focused</span>
+                <span aria-hidden="true">&middot;</span>
+                <span id="networkStatus" data-state="ok">Online</span>
+            </div>
+            <span id="answeredCount" class="ui-badge-primary shrink-0" aria-live="polite" aria-atomic="true">0 / @Model.Exam.Questions.Count answered</span>
+        </div>
+    </div>
+</div>
+
+<div class="mx-auto max-w-6xl">
+
+    <div class="ui-alert-info mb-3">
+        <div class="ui-alert-icon"><i data-lucide="shield" class="h-4 w-4"></i></div>
+        <div class="flex-1">
+            <div>Browser compatibility, internet connectivity, tab switching, copy/paste, and full-screen activity are monitored for this eligibility assessment.</div>
+            <div class="flex flex-wrap gap-2 mt-2">
+                <button type="button" class="ui-btn-outline !px-3 !py-1.5 text-xs" onclick="enterFullScreen()">
+                    <i data-lucide="maximize" class="h-3.5 w-3.5"></i>Enter Full Screen
+                </button>
+                <button type="button" class="ui-btn-secondary !px-3 !py-1.5 text-xs" onclick="requestMediaPermissions()">
+                    <i data-lucide="camera" class="h-3.5 w-3.5"></i>Check Camera/Mic
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="ui-card mb-3">
+        <div class="ui-card-body !py-3">
+            <div class="text-xs font-semibold text-[var(--vw-text-muted)] mb-2" id="questionNavLabel">Jump to question</div>
+            <nav class="flex flex-wrap gap-2" id="questionNav" aria-labelledby="questionNavLabel">
+                @for (int i = 0; i < Model.Exam.Questions.Count; i++)
+                {
+                    <a href="#qCard_@Model.Exam.Questions[i].Id" id="qNavBtn_@Model.Exam.Questions[i].Id" class="vw-qnav-btn" aria-label="Jump to question @(i + 1)">@(i + 1)</a>
+                }
+            </nav>
+        </div>
+    </div>
+
+    <form asp-action="Submit" method="post" id="examForm">
+        <input type="hidden" name="attemptId" value="@Model.AttemptId" />
+
+        @for (int i = 0; i < Model.Exam.Questions.Count; i++)
+        {
+            var q = Model.Exam.Questions[i];
+            <div class="ui-card vw-question-card mb-3" id="qCard_@q.Id">
+                <div class="ui-card-body">
+                    <div class="flex gap-3 mb-3">
+                        <span class="ui-badge-primary !rounded-full !p-0 h-7 w-7 shrink-0 flex items-center justify-center">@(i + 1)</span>
+                        <p class="font-semibold mb-0" id="qText_@q.Id">@q.Text</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <span class="ui-badge-neutral vw-tag">@q.QuestionType</span>
+                        <span class="ui-badge-info vw-tag">@q.Category</span>
+                        <span class="ui-badge-warning vw-tag">@q.Marks mark(s)</span>
+                        @if (q.NegativeMarks > 0 || Model.Exam.NegativeMarks > 0)
+                        {
+                            <span class="ui-badge-danger vw-tag">-@(q.NegativeMarks > 0 ? q.NegativeMarks : Model.Exam.NegativeMarks) negative</span>
+                        }
+                    </div>
+                    @{
+                        var options = new[] { ("A", q.OptionA), ("B", q.OptionB), ("C", q.OptionC), ("D", q.OptionD) };
+                        var orderedOptions = Model.Exam.RandomizeOptions ? options.OrderBy(opt => (Model.AttemptId * 31 + q.Id * 17 + opt.Item1.GetHashCode()) & int.MaxValue).ToList() : options.ToList();
+                        var existingAnswer = Model.Answers.TryGetValue(q.Id, out var savedAnswer) ? savedAnswer : "";
+                        var existingText = Model.TextAnswers.TryGetValue(q.Id, out var savedText) ? savedText : "";
+                        var isMultiple = q.QuestionType.Contains("Multiple", StringComparison.OrdinalIgnoreCase);
+                        var isObjective = q.QuestionType.Contains("MCQ", StringComparison.OrdinalIgnoreCase) || q.QuestionType.Contains("True", StringComparison.OrdinalIgnoreCase);
+                    }
+                    @if (q.QuestionType.Contains("True", StringComparison.OrdinalIgnoreCase))
+                    {
+                        orderedOptions = new[] { ("True", "True"), ("False", "False") }.ToList();
+                    }
+                    <div class="grid sm:grid-cols-2 gap-2" role="@(isObjective ? (isMultiple ? "group" : "radiogroup") : null)" aria-labelledby="@(isObjective ? $"qText_{q.Id}" : null)">
+                        @if (isObjective)
+                        {
+                            @foreach (var opt in orderedOptions)
+                            {
+                                var checkedAttr = isMultiple
+                                    ? existingAnswer.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Contains(opt.Item1)
+                                    : existingAnswer == opt.Item1;
+                                <label class="vw-option-card">
+                                    <input type="@(isMultiple ? "checkbox" : "radio")" name="q_@q.Id" value="@opt.Item1" class="option-radio @(isMultiple ? "ui-checkbox" : "ui-radio")" data-qid="@q.Id" @(checkedAttr ? "checked" : "") />
+                                    <span class="ui-badge-primary">@opt.Item1</span>
+                                    <span>@opt.Item2</span>
+                                </label>
+                            }
+                        }
+                    </div>
+                    @if (q.QuestionType.Contains("Short", StringComparison.OrdinalIgnoreCase) || q.QuestionType.Contains("Subjective", StringComparison.OrdinalIgnoreCase) || q.QuestionType.Contains("Blank", StringComparison.OrdinalIgnoreCase) || q.QuestionType.Contains("Case", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <div class="mt-3">
+                            <label class="ui-label">@(q.QuestionType.Contains("Blank", StringComparison.OrdinalIgnoreCase) ? "Answer" : "Written Answer")</label>
+                            <textarea name="text_@q.Id" class="ui-field auto-save-text" data-qid="@q.Id" rows="@(q.QuestionType.Contains("Blank", StringComparison.OrdinalIgnoreCase) ? 2 : 5)">@existingText</textarea>
+                        </div>
+                    }
+                    @if (q.QuestionType.Contains("Coding", StringComparison.OrdinalIgnoreCase))
+                    {
+                        <div class="mt-3">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="ui-label !mb-0">Integrated Code Editor</label>
+                                <select name="language_@q.Id" class="ui-field !py-1.5 text-sm w-[170px]">
+                                    @foreach (var language in (q.CodingQuestion?.SupportedLanguages ?? "C#, JavaScript, Python").Split(',', StringSplitOptions.TrimEntries))
+                                    {
+                                        <option>@language</option>
+                                    }
+                                </select>
+                            </div>
+                            <textarea name="code_@q.Id" class="ui-field font-mono auto-save-text" data-qid="@q.Id" rows="10">@(string.IsNullOrWhiteSpace(existingText) ? q.CodingQuestion?.StarterCode : existingText)</textarea>
+                            <div class="grid sm:grid-cols-2 gap-2 mt-2 text-xs text-[var(--vw-text-secondary)]">
+                                <div><strong class="text-[var(--vw-text)]">Sample Tests:</strong> @(q.CodingQuestion?.SampleTestCases)</div>
+                                <div><strong class="text-[var(--vw-text)]">Runtime:</strong> @(q.CodingQuestion?.RuntimeLimitSeconds ?? 2)s, <strong class="text-[var(--vw-text)]">Memory:</strong> @(q.CodingQuestion?.MemoryLimitMb ?? 128) MB</div>
+                            </div>
+                            <button type="button" class="ui-btn-outline !px-3 !py-1.5 text-xs mt-2" onclick="runCode(@q.Id)">
+                                <i data-lucide="play" class="h-3.5 w-3.5"></i>Run Sample Tests
+                            </button>
+                            <pre class="rounded-lg border border-[var(--vw-border)] bg-[var(--vw-surface-muted)] p-2.5 mt-2 text-xs overflow-x-auto" id="codeOutput_@q.Id">Output will appear here.</pre>
+                        </div>
+                    }
+                    <label class="ui-check-row mt-3 items-center">
+                        <input class="ui-checkbox review-box" type="checkbox" name="review_@q.Id" data-qid="@q.Id" id="review_@q.Id">
+                        <span class="ui-check-label font-semibold">Mark for review</span>
+                    </label>
+                </div>
+            </div>
+        }
+
+        <div class="ui-card">
+            <div class="ui-card-body">
+                <div class="ui-alert-warning mb-3">
+                    <div class="ui-alert-icon"><i data-lucide="triangle-alert" class="h-4 w-4"></i></div>
+                    <div>Once submitted, you cannot change your answers.</div>
+                </div>
+                <div class="flex flex-wrap gap-3 justify-between items-center">
+                    <div class="text-sm text-[var(--vw-text-muted)]" id="submitWarning"></div>
+                    <button type="button" class="ui-btn-primary" onclick="confirmSubmit()">
+                        <i data-lucide="send" class="h-4 w-4"></i>Submit Assessment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+@* ================================================================
+   Page-scoped submit confirmation modal — built with the same
+   ui-modal-* component classes used app-wide, but wired locally
+   (rather than through the shared data-confirm-* auto-wiring) since
+   its message needs to reflect the live unanswered-question count
+   at the moment the candidate clicks Submit.
+   ================================================================ *@
+<div class="ui-modal hidden" id="submitConfirmModal">
+    <div class="ui-modal-backdrop" data-submit-cancel></div>
+    <div class="ui-modal-panel ui-modal-panel-sm" role="alertdialog" aria-modal="true" aria-labelledby="submitConfirmTitle">
+        <div class="ui-modal-grip"></div>
+        <div class="ui-modal-header">
+            <div class="flex items-start gap-3">
+                <div class="ui-modal-icon-warning"><i data-lucide="send" class="h-5 w-5"></i></div>
+                <h3 id="submitConfirmTitle" class="ui-modal-title pt-1.5">Submit assessment?</h3>
+            </div>
+            <button type="button" class="ui-modal-close" data-submit-cancel aria-label="Close">
+                <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
+        </div>
+        <div class="ui-modal-body"><p id="submitConfirmMessage" class="mb-0"></p></div>
+        <div class="ui-modal-footer">
+            <button type="button" class="ui-btn-secondary" data-submit-cancel>Keep Working</button>
+            <button type="button" class="ui-btn-primary" id="submitConfirmOk">Submit</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Prevent browser back button during exam
+    history.pushState(null, '', window.location.href);
+    window.addEventListener('popstate', function () {
+        history.pushState(null, '', window.location.href);
+        if (!submitted) {
+            logViolation('Back Button', 'Candidate attempted to navigate back during assessment.', 3);
+        }
+    });
+
+    const totalSecs = @ViewBag.RemainingSeconds;
+    const attemptId = @Model.AttemptId;
+    const proctoringSessionId = '@(ViewBag.ProctoringSessionId ?? "")';
+    const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+    let secs = totalSecs;
+    const timerEl = document.getElementById('timer');
+    const countEl = document.getElementById('answeredCount');
+    const total = @Model.Exam.Questions.Count;
+    let answered = new Set();
+    let submitted = false;
+    let focusLossCount = 0;
+    let tabSwitchCount = 0;
+    const browserInfo = `${navigator.userAgent}; platform=${navigator.platform}; lang=${navigator.language}`;
+
+    const timerAnnouncerEl = document.getElementById('timerAnnouncer');
+    function announceTimeRemaining(totalSecs) {
+        if (!timerAnnouncerEl) return;
+        // Only announce at a few key milestones so screen reader users get a
+        // heads-up without the countdown being read out loud every second.
+        if (totalSecs === 300) timerAnnouncerEl.textContent = '5 minutes remaining.';
+        else if (totalSecs === 60) timerAnnouncerEl.textContent = '1 minute remaining.';
+        else if (totalSecs === 30) timerAnnouncerEl.textContent = '30 seconds remaining.';
+    }
+    function updateTimer() {
+        if (secs <= 0) { autoSubmit('Session Timeout', 'Assessment timer expired.'); return; }
+        const m = Math.floor(secs / 60), s = secs % 60;
+        timerEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        timerEl.style.color = secs <= 300 ? 'var(--vw-danger)' : 'var(--vw-accent)';
+        announceTimeRemaining(secs);
+        secs--;
+    }
+    updateTimer();
+    setInterval(updateTimer, 1000);
+    setInterval(sendHeartbeat, 15000);
+    setInterval(autoSaveAllTextAnswers, 30000);
+    document.addEventListener('DOMContentLoaded', initializeProctoring);
+
+    // Updates the "jump to question" nav button state (answered / marked
+    // for review) so the strip doubles as a progress-at-a-glance map —
+    // purely visual, driven off the same events that already save answers.
+    function updateNavState(qid) {
+        const btn = document.getElementById('qNavBtn_' + qid);
+        if (!btn) return;
+        btn.classList.toggle('is-answered', answered.has(String(qid)));
+        const reviewBox = document.querySelector(`.review-box[data-qid="${qid}"]`);
+        btn.classList.toggle('is-marked', !!reviewBox && reviewBox.checked);
+    }
+
+    document.querySelectorAll('.option-radio').forEach(r => {
+        if (r.checked) answered.add(r.dataset.qid);
+        r.addEventListener('change', function() {
+            answered.add(this.dataset.qid);
+            countEl.textContent = answered.size + ' / ' + total + ' answered';
+            document.getElementById('qCard_' + this.dataset.qid)?.classList.add('is-answered');
+            updateNavState(this.dataset.qid);
+            const values = Array.from(document.querySelectorAll(`[name="q_${this.dataset.qid}"]:checked`)).map(x => x.value).join(',');
+            autoSave(this.dataset.qid, values || this.value, '', false);
+        });
+    });
+
+    document.querySelectorAll('.auto-save-text').forEach(t => {
+        if (t.value.trim()) answered.add(t.dataset.qid);
+        t.addEventListener('change', function() {
+            if (this.value.trim()) {
+                answered.add(this.dataset.qid);
+                document.getElementById('qCard_' + this.dataset.qid)?.classList.add('is-answered');
+                countEl.textContent = answered.size + ' / ' + total + ' answered';
+                updateNavState(this.dataset.qid);
+            }
+            autoSave(this.dataset.qid, '', this.value, false);
+        });
+    });
+    countEl.textContent = answered.size + ' / ' + total + ' answered';
+    document.querySelectorAll('.review-box').forEach(t => {
+        t.addEventListener('change', function() {
+            updateNavState(this.dataset.qid);
+            autoSave(this.dataset.qid, '', '', this.checked);
+        });
+    });
+    // Paint initial nav state for anything pre-filled from a resumed attempt.
+    answered.forEach(qid => updateNavState(qid));
+
+    function confirmSubmit() {
+        const unanswered = total - answered.size;
+        const modal = document.getElementById('submitConfirmModal');
+        document.getElementById('submitConfirmMessage').textContent = unanswered > 0
+            ? `You have ${unanswered} unanswered question(s). Submit anyway?`
+            : 'This will finalize your responses. Submit the assessment?';
+        modal.classList.remove('hidden');
+        document.documentElement.classList.add('overflow-hidden');
+
+        function close() { modal.classList.add('hidden'); document.documentElement.classList.remove('overflow-hidden'); cleanup(); }
+        function confirmOk() { close(); submitAssessment(); }
+        function cleanup() {
+            modal.querySelectorAll('[data-submit-cancel]').forEach(c => c.removeEventListener('click', close));
+            document.getElementById('submitConfirmOk').removeEventListener('click', confirmOk);
+        }
+        modal.querySelectorAll('[data-submit-cancel]').forEach(c => c.addEventListener('click', close));
+        document.getElementById('submitConfirmOk').addEventListener('click', confirmOk);
+    }
+
+    function submitAssessment() {
+        if (submitted) return;
+        submitted = true;
+        if (window.vwShowOverlay) window.vwShowOverlay('Submitting your assessment…');
+        document.getElementById('examForm').submit();
+    }
+
+    function autoSubmit(eventType, details) {
+        logViolation(eventType, details, 5);
+        setTimeout(submitAssessment, 350);
+    }
+
+    function autoSave(questionId, answer, textAnswer, markedForReview) {
+        const body = new URLSearchParams({ attemptId, questionId, answer: answer || '', textAnswer: textAnswer || '', markedForReview: markedForReview || false, __RequestVerificationToken: csrfToken });
+        fetch('/Exam/AutoSave', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    }
+
+    function logViolation(eventType, details, severity = 1) {
+        const body = new URLSearchParams({ attemptId, eventType, details, severity, __RequestVerificationToken: csrfToken });
+        fetch('/Exam/LogViolation', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    }
+
+    function sendHeartbeat() {
+        const body = new URLSearchParams({
+            attemptId,
+            sessionId: proctoringSessionId,
+            browserInfo,
+            online: navigator.onLine,
+            fullScreen: !!document.fullscreenElement,
+            __RequestVerificationToken: csrfToken
+        });
+        fetch('/Exam/ProctorHeartbeat', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    }
+
+    function autoSaveAllTextAnswers() {
+        document.querySelectorAll('.auto-save-text').forEach(t => {
+            autoSave(t.dataset.qid, '', t.value, false);
+        });
+    }
+
+    function runCode(questionId) {
+        const code = document.querySelector(`[name="code_${questionId}"]`).value;
+        const language = document.querySelector(`[name="language_${questionId}"]`).value;
+        const body = new URLSearchParams({ attemptId, questionId, language, sourceCode: code, __RequestVerificationToken: csrfToken });
+        fetch('/Exam/RunCode', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
+            .then(r => r.json()).then(d => document.getElementById(`codeOutput_${questionId}`).textContent = d.output);
+    }
+
+    function enterFullScreen() {
+        document.documentElement.requestFullscreen?.()
+            .then(() => logViolation('Fullscreen Entered', 'Candidate entered browser fullscreen mode.', 1))
+            .catch(() => logViolation('Fullscreen Denied', 'Browser refused fullscreen request.', 3));
+    }
+
+    function initializeProctoring() {
+        checkBrowserCompatibility();
+        requestMediaPermissions();
+        sendHeartbeat();
+        if (!document.fullscreenElement) logViolation('Fullscreen Not Active', 'Assessment loaded outside fullscreen mode.', 2);
+    }
+
+    function checkBrowserCompatibility() {
+        const ua = navigator.userAgent;
+        const supported = /Chrome|Edg|Firefox/.test(ua) && !!window.fetch && !!navigator.mediaDevices;
+        if (!supported) logViolation('Browser Compatibility', `Potentially unsupported browser: ${ua}`, 4);
+    }
+
+    function requestMediaPermissions() {
+        const status = document.getElementById('mediaStatus');
+        if (!navigator.mediaDevices?.getUserMedia) {
+            status.textContent = 'Camera/mic unsupported';
+            status.dataset.state = 'danger';
+            logViolation('Media Unsupported', 'Camera/microphone permission API is unavailable.', 4);
+            return;
+        }
+        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+            .then(stream => {
+                stream.getTracks().forEach(track => track.stop());
+                status.textContent = 'Camera and mic ready';
+                status.dataset.state = 'ok';
+                logViolation('Media Permission Granted', 'Camera and microphone permissions granted.', 1);
+            })
+            .catch(error => {
+                status.textContent = 'Camera/mic blocked';
+                status.dataset.state = 'danger';
+                logViolation('Media Permission Denied', error.message || 'Camera/microphone permission denied.', 5);
+            });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            tabSwitchCount++;
+            logViolation('Tab Switch', `Candidate left the assessment tab. Count=${tabSwitchCount}`, 4);
+            if (tabSwitchCount >= 3) autoSubmit('Repeated Tab Switching', 'Assessment auto-submitted after repeated tab switching.');
+        }
+    });
+    let blurTimer = null;
+    window.addEventListener('blur', () => {
+        // Only count as violation if focus is lost for more than 800ms (ignores OS dialogs, tooltips)
+        blurTimer = setTimeout(() => {
+            focusLossCount++;
+            document.getElementById('focusStatus').textContent = 'Focus lost';
+            document.getElementById('focusStatus').dataset.state = 'danger';
+            logViolation('Window Focus Lost', `Assessment window lost focus. Count=${focusLossCount}`, 4);
+            if (focusLossCount >= 5) autoSubmit('Repeated Focus Loss', 'Assessment auto-submitted after repeated window focus loss.');
+        }, 800);
+    });
+    window.addEventListener('focus', () => {
+        if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
+        document.getElementById('focusStatus').textContent = 'Focused';
+        document.getElementById('focusStatus').dataset.state = 'ok';
+    });
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) logViolation('Fullscreen Exit', 'Candidate exited fullscreen mode.', 4);
+    });
+    document.addEventListener('copy', e => { e.preventDefault(); logViolation('Copy Blocked', 'Copy attempted.', 3); });
+    document.addEventListener('cut', e => { e.preventDefault(); logViolation('Cut Blocked', 'Cut attempted.', 3); });
+    document.addEventListener('paste', e => { e.preventDefault(); logViolation('Paste Blocked', 'Paste attempted.', 3); });
+    document.addEventListener('contextmenu', e => { e.preventDefault(); logViolation('Right Click Blocked', 'Right click/context menu attempted.', 2); });
+    document.addEventListener('keydown', e => {
+        const blocked = (e.ctrlKey || e.metaKey) && ['c', 'v', 'x', 'a', 'p', 's', 'u'].includes(e.key.toLowerCase());
+        if (blocked) {
+            e.preventDefault();
+            logViolation('Keyboard Shortcut Blocked', `Blocked shortcut: ${e.key}`, 3);
+        }
+    });
+    window.addEventListener('offline', () => {
+        document.getElementById('networkStatus').textContent = 'Offline';
+        document.getElementById('networkStatus').dataset.state = 'danger';
+        logViolation('Connectivity', 'Internet connection lost.', 2);
+    });
+    window.addEventListener('online', () => {
+        document.getElementById('networkStatus').textContent = 'Online';
+        document.getElementById('networkStatus').dataset.state = 'ok';
+    });
+    window.addEventListener('beforeunload', () => {
+        navigator.sendBeacon?.('/Exam/LogViolation', new URLSearchParams({ attemptId, eventType: 'Page Unload', details: 'Candidate attempted to leave or refresh assessment page.', severity: 4, __RequestVerificationToken: csrfToken }));
+    });
+</script>
+}

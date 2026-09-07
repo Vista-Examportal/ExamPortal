@@ -1,0 +1,348 @@
+@using System.Text.RegularExpressions
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1B2027" />
+    <title>@ViewData["Title"] - VISTAWAYS TECH</title>
+    @{
+        // Pages can set ViewData["MetaDescription"] before this layout renders
+        // (see Views/Site/Index.cshtml for the Careers page's version) — falls
+        // back to a generic site-wide description so every page still has one.
+        var metaDescription = ViewData["MetaDescription"] as string
+            ?? "VISTAWAYS TECH's recruitment and assessment portal — apply, take skills assessments, and track your hiring pipeline.";
+    }
+    <meta name="description" content="@metaDescription" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VISTAWAYS TECH" />
+    <meta property="og:title" content="@ViewData["Title"] - VISTAWAYS TECH" />
+    <meta property="og:description" content="@metaDescription" />
+
+    @* ---- Fonts -------------------------------------------------- *@
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+    @* ---- Tailwind CSS (replaces Bootstrap for all NEW shared-layout
+         markup below: sidebar, topbar, breadcrumbs, menus, UI kit).
+         Previously loaded from the Play CDN (cdn.tailwindcss.com), which
+         compiles utility classes in the browser at runtime via eval() and
+         therefore depends on that script executing successfully — any
+         network block, ad blocker, or stricter CSP silently drops all
+         styling with no fallback. Now precompiled ahead of time with the
+         Tailwind CLI into a plain static stylesheet (see
+         wwwroot/css/tailwind-built.css and the build notes in
+         tailwind.config.js at the repo root), so styling no longer
+         depends on any external script loading or on 'unsafe-eval'. ---- *@
+    <link href="~/css/tailwind-built.css" rel="stylesheet" asp-append-version="true" />
+
+    @* ---- Lucide icons (replaces Font Awesome for all NEW markup) ---- *@
+    <script src="https://unpkg.com/lucide@0.383.0" defer></script>
+
+    @* ---- Legacy Bootstrap bridge — REMOVED -------------------------
+         Every view has now been migrated to the Tailwind UI kit above
+         (buttons, cards, forms, grids, modals, accordions all render
+         through ui-*/vw-*/app-* classes). The Bootstrap CSS/JS CDN
+         includes and the jQuery-driven data-bs-* widgets they powered
+         are no longer loaded anywhere in the app.
+
+         Font Awesome was removed in an earlier pass — every icon
+         renders through Lucide via data-lucide, so no icon font is
+         loaded at all anymore either. ---- *@
+
+    <link href="~/css/site.min.css" rel="stylesheet" asp-append-version="true" />
+    <link rel="icon" type="image/png" href="~/logo.png" />
+
+    @* ---- Reusable UI kit: buttons, cards, modals, alerts, badges,
+         toast, loader. Defined once in _UiKitStyles.cshtml (shared
+         partial) so both this layout and any standalone Layout=null
+         page (e.g. Views/Account/Login.cshtml) render the exact same
+         component styles instead of keeping separate copies. ---- *@
+    <partial name="_UiKitStyles" />
+</head>
+<body class="bg-canvas text-slate-800 dark:text-slate-100 font-sans antialiased">
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+@{
+    bool isAuthed = User.Identity?.IsAuthenticated == true;
+    var currentController = ViewContext.RouteData.Values["controller"]?.ToString() ?? "";
+    var currentAction = ViewContext.RouteData.Values["action"]?.ToString() ?? "";
+
+    Func<string, string, bool> isCurrent = (controller, action) =>
+        string.Equals(currentController, controller, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(currentAction, action, StringComparison.OrdinalIgnoreCase);
+
+    var homeAction = User.IsInRole(PortalRoles.Admin) ? ("Admin", "Index")
+        : User.IsInRole(PortalRoles.Recruiter) ? ("Recruiter", "Index")
+        : User.IsInRole(PortalRoles.Hr) ? ("Hr", "Index")
+        : ("Home", "Index");
+
+    // Breadcrumb trail: role home -> current section -> page title.
+    var pageTitle = ViewData["Title"] as string;
+    var friendlyAction = string.IsNullOrEmpty(currentAction) ? "" : Regex.Replace(currentAction, "([a-z])([A-Z])", "$1 $2");
+    var friendlyController = string.IsNullOrEmpty(currentController) ? "" : Regex.Replace(currentController, "([a-z])([A-Z])", "$1 $2");
+    var breadcrumbLeaf = !string.IsNullOrWhiteSpace(pageTitle) ? pageTitle : friendlyAction;
+
+    List<ExamPortal.Models.NotificationMessage>? notifications = ViewBag.Notifications as List<ExamPortal.Models.NotificationMessage>;
+    var unreadCount = notifications?.Count(n => !n.IsRead) ?? 0;
+    var givenName = User.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value;
+    var roleLabel = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+    var candidateId = User.FindFirst("CandidateId")?.Value;
+    var successMessage = TempData["Success"] as string;
+    var errorMessage = TempData["Error"] as string;
+    var warningMessage = TempData["Warning"] as string;
+    var infoMessage = TempData["Info"] as string;
+}
+
+@* ---------------------------------------------------------------- *@
+@* Flash messages -> real toasts (TempData is untouched; this only    *@
+@* changes how it's presented). Success/Error keys are unchanged from *@
+@* before; Warning/Info are new keys controllers can now set the same *@
+@* way (TempData["Warning"] = "...", TempData["Info"] = "...") to get *@
+@* the matching toast styling.                                        *@
+@* ---------------------------------------------------------------- *@
+<div id="appToastHost" class="pointer-events-none fixed top-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2" aria-live="polite"></div>
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="hidden" data-flash-message="@successMessage" data-flash-variant="success"></div>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="hidden" data-flash-message="@errorMessage" data-flash-variant="error"></div>
+}
+@if (!string.IsNullOrEmpty(warningMessage))
+{
+    <div class="hidden" data-flash-message="@warningMessage" data-flash-variant="warning"></div>
+}
+@if (!string.IsNullOrEmpty(infoMessage))
+{
+    <div class="hidden" data-flash-message="@infoMessage" data-flash-variant="info"></div>
+}
+
+@if (!isAuthed)
+{
+    @* Public pages (landing, login, register, etc.) share one nav. Pages
+       that set ViewData["TransparentHero"] = true (currently just the
+       careers landing page) get the transparent-over-hero treatment,
+       which JS then swaps to solid once the page scrolls past the hero
+       (see initHeroNav in app.js). Every other public page (Login,
+       Register, ...) renders the exact same nav already solid — this is
+       an additive change, not a special-case fork of the markup. *@
+    bool transparentHero = ViewData["TransparentHero"] as bool? == true;
+    <header class="app-topbar @(transparentHero ? "is-hero-nav" : "") sticky top-0 z-30 flex items-center justify-between gap-4 px-4 sm:px-6">
+        <a class="app-topbar-brand flex shrink-0 items-center" asp-controller="Site" asp-action="Index">
+            <img src="~/logo-full-light.png" alt="VISTAWAYS TECH — Innovation. Integration. Impact." class="app-topbar-logo-light h-[72px] w-auto object-contain" width="2047" height="561" />
+            <img src="~/logo-full.png" alt="VISTAWAYS TECH — Innovation. Integration. Impact." class="app-topbar-logo-dark h-[72px] w-auto object-contain" width="2047" height="561" />
+        </a>
+        <nav class="hidden md:flex items-center gap-1" aria-label="Primary">
+            <a href="/#why-join" class="app-navlink">Why VISTAWAYS TECH</a>
+            <a href="/#careers" class="app-navlink">Careers</a>
+            <a href="/#culture" class="app-navlink">Culture</a>
+            <a asp-controller="Site" asp-action="AboutUs" class="app-navlink">About</a>
+            <a asp-controller="Site" asp-action="ContactUs" class="app-navlink">Contact</a>
+        </nav>
+        <div class="flex shrink-0 items-center gap-2">
+            <button type="button" data-theme-toggle class="ui-btn-ghost ui-btn-icon" aria-label="Toggle dark mode">
+                <i data-theme-icon data-lucide="moon" class="h-5 w-5"></i>
+            </button>
+            <a asp-controller="Account" asp-action="Login" class="app-navlink hidden sm:inline-flex">Sign in</a>
+            <a asp-controller="Account" asp-action="Register" class="ui-btn-primary !px-4 !py-2 !text-sm">Apply now</a>
+        </div>
+    </header>
+    <main id="main-content">
+        @RenderBody()
+    </main>
+    <partial name="_Footer" />
+}
+else
+{
+    <div class="app-shell flex">
+        @* ============================== SIDEBAR ============================== *@
+        <div id="appSidebarBackdrop" class="app-backdrop fixed inset-0 z-30 hidden lg:hidden"></div>
+        <aside id="appSidebar" class="app-sidebar fixed lg:sticky top-0 h-dvh flex flex-col shrink-0 lg:translate-x-0" aria-label="Primary">
+            <div class="flex h-[var(--vw-topbar-height)] items-center gap-2 px-4 border-b border-white/10">
+                <img src="~/logo.png" alt="VISTAWAYS TECH Logo" class="h-12 w-12 rounded-md object-contain shrink-0" width="256" height="256" />
+                <span class="app-sidebar-label flex flex-col leading-tight truncate">
+                    <span class="text-2xl font-bold text-white truncate">VISTAWAYS TECH</span>
+                    @* tracking-[0.19em] (not the default tracking-wider=0.025em) is deliberate:
+                       in the source logo artwork, this tagline is letter-spaced out to end at
+                       almost exactly the same width as "VISTAWAYS TECH" above it. This header
+                       renders them as two independent text elements rather than a single image
+                       (kept compact for the sidebar), so nothing enforces that match automatically
+                       — this value approximates it against Inter (the font loaded in <head>).
+                       Re-check if the wordmark or tagline copy ever changes. *@
+                    <span class="text-[9px] font-semibold uppercase tracking-[0.19em] text-[#5EEAD4] truncate">Innovation. Integration. Impact.</span>
+                </span>
+                <div class="flex-1"></div>
+                <button type="button" data-sidebar-mobile-close class="app-sidebar-mobile-close ui-btn-ghost ui-btn-icon !text-slate-300 hover:!text-white hover:!bg-white/10" aria-label="Close menu">
+                    <i data-lucide="x" class="h-5 w-5"></i>
+                </button>
+            </div>
+
+            <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-1" aria-label="Primary navigation">
+                @* Sidebar links are now sourced from SidebarNavMap (Services/SidebarNavMap.cs)
+                   via this view component, instead of being hardcoded per-role Razor markup
+                   here. Same links as before — see the component for details. *@
+                <vc:sidebar-nav current-controller="@currentController" current-action="@currentAction"></vc:sidebar-nav>
+            </nav>
+
+            <div class="border-t border-white/10 p-3">
+                <button type="button" data-sidebar-collapse-toggle data-tooltip="Expand" class="app-sidebar-link hidden lg:flex w-full items-center gap-3 px-3 py-2.5 text-sm">
+                    <i data-lucide="panel-left-close" class="h-5 w-5 shrink-0"></i><span class="app-sidebar-label">Collapse</span>
+                </button>
+            </div>
+        </aside>
+
+        @* ============================== MAIN COLUMN ============================== *@
+        <div class="flex min-h-dvh flex-1 flex-col min-w-0">
+            <header class="app-topbar sticky top-0 z-20 flex items-center gap-3 px-4 sm:px-6">
+                <button type="button" data-sidebar-mobile-toggle class="ui-btn-ghost ui-btn-icon lg:hidden" aria-label="Open menu">
+                    <i data-lucide="menu" class="h-5 w-5"></i>
+                </button>
+                <button type="button" data-sidebar-collapse-toggle class="ui-btn-ghost ui-btn-icon hidden lg:inline-flex" aria-label="Toggle sidebar">
+                    <i data-lucide="panel-left" class="h-5 w-5"></i>
+                </button>
+
+                @* Breadcrumbs — full trail on tablet/desktop; on phones this
+                   collapses to just "Home ... Current page" (skipping the
+                   middle section crumb) instead of disappearing entirely,
+                   so there's still wayfinding context in the topbar. *@
+                <nav aria-label="Breadcrumb" class="min-w-0 overflow-hidden">
+                    <ol class="flex items-center gap-1.5 text-sm text-slate-500 dark:text-slate-400 overflow-hidden">
+                        <li class="flex items-center gap-1.5 shrink-0">
+                            <a asp-controller="@homeAction.Item1" asp-action="@homeAction.Item2" class="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-[var(--vw-surface-muted)] hover:text-slate-800 dark:hover:text-white">
+                                <i data-lucide="home" class="h-3.5 w-3.5"></i><span>Home</span>
+                            </a>
+                        </li>
+                        @if (!isCurrent(homeAction.Item1, homeAction.Item2))
+                        {
+                            <li class="hidden items-center gap-1.5 sm:flex shrink-0"><i data-lucide="chevron-right" class="h-3.5 w-3.5 opacity-60"></i><span>@friendlyController</span></li>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(breadcrumbLeaf) && !string.Equals(breadcrumbLeaf, friendlyController, StringComparison.OrdinalIgnoreCase))
+                        {
+                            <li class="flex items-center gap-1.5 min-w-0" aria-current="page">
+                                <i data-lucide="chevron-right" class="h-3.5 w-3.5 opacity-60 shrink-0"></i>
+                                <span class="truncate rounded-full px-2 py-0.5 font-medium bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]">@breadcrumbLeaf</span>
+                            </li>
+                        }
+                    </ol>
+                </nav>
+
+                <div class="flex-1"></div>
+
+                @* Dark mode *@
+                <button type="button" data-theme-toggle class="ui-btn-ghost ui-btn-icon" aria-label="Toggle dark mode">
+                    <i data-theme-icon data-lucide="moon" class="h-5 w-5"></i>
+                </button>
+
+                @* Notifications *@
+                <div class="relative">
+                    <button type="button" data-menu-trigger="notifMenuPanel" class="ui-btn-ghost ui-btn-icon relative" aria-haspopup="true" aria-label="Notifications">
+                        <i data-lucide="bell" class="h-5 w-5"></i>
+                        @if (unreadCount > 0)
+                        {
+                            <span class="absolute -top-0.5 -right-0.5 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[var(--vw-surface)]" aria-hidden="true"></span>
+                            <span class="sr-only">@unreadCount unread notification@(unreadCount == 1 ? "" : "s")</span>
+                        }
+                    </button>
+                    <div id="notifMenuPanel" class="app-menu-panel hidden absolute right-0 mt-2 w-80 max-w-[90vw] rounded-xl">
+                        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                            <span class="text-sm font-semibold">Notifications</span>
+                            @if (unreadCount > 0)
+                            {
+                                <span class="ui-badge-primary">@unreadCount new</span>
+                            }
+                        </div>
+                        <ul class="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                            @if (notifications == null || !notifications.Any())
+                            {
+                                <li class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">You're all caught up — no notifications.</li>
+                            }
+                            else
+                            {
+                                @foreach (var n in notifications.Take(8))
+                                {
+                                    <li class="flex gap-3 px-4 py-3 @(!n.IsRead ? "bg-slate-50 dark:bg-slate-700/40" : "")">
+                                        <i data-lucide="@(n.IsRead ? "mail-open" : "mail")" class="h-4 w-4 mt-0.5 shrink-0 text-slate-400"></i>
+                                        <div class="min-w-0">
+                                            <div class="truncate text-sm font-medium text-slate-800 dark:text-slate-100">@n.Subject</div>
+                                            <div class="text-xs text-slate-500 dark:text-slate-400">@n.CreatedAt.ToLocalTime().ToString("MMM d, h:mm tt")</div>
+                                        </div>
+                                    </li>
+                                }
+                            }
+                        </ul>
+                    </div>
+                </div>
+
+                @* Profile *@
+                <div class="relative">
+                    <button type="button" data-menu-trigger="profileMenuPanel" class="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-haspopup="true">
+                        <span class="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--vw-accent)] text-xs font-semibold text-white">
+                            @((givenName ?? "U").Substring(0, 1).ToUpperInvariant())
+                        </span>
+                        <span class="hidden sm:block text-sm font-medium max-w-[8rem] truncate">@givenName</span>
+                        <i data-lucide="chevron-down" class="h-4 w-4 text-slate-400 hidden sm:block"></i>
+                    </button>
+                    <div id="profileMenuPanel" class="app-menu-panel hidden absolute right-0 mt-2 w-64 rounded-xl py-2">
+                        <div class="px-4 py-2 border-b border-slate-100 dark:border-slate-700">
+                            <div class="text-sm font-semibold truncate">@givenName</div>
+                            <span class="ui-badge-neutral mt-1">@roleLabel</span>
+                            @if (User.IsInRole(PortalRoles.Candidate) && !string.IsNullOrEmpty(candidateId))
+                            {
+                                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">ID: <span class="vw-mono">@candidateId</span></div>
+                            }
+                        </div>
+                        <form asp-controller="Account" asp-action="Logout" method="post" class="px-2 pt-2">
+                            <button type="submit" class="ui-btn-ghost w-full !justify-start text-red-600 dark:text-red-400">
+                                <i data-lucide="log-out" class="h-4 w-4"></i>Logout
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </header>
+
+            <main id="main-content" class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+                @RenderBody()
+            </main>
+        </div>
+    </div>
+}
+
+@* jQuery + jQuery Validate stay: unobtrusive client-side validation logic is out of scope and untouched. *@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.20.1/jquery.validate.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validation-unobtrusive/4.0.0/jquery.validate.unobtrusive.min.js"></script>
+@* Bootstrap's JS bundle has been removed — no remaining view uses its modal/dropdown/collapse/accordion widgets. *@
+<script src="~/js/app.min.js"></script>
+<script>
+    // Prevent duplicate submissions: disable the submit button once a form
+    // actually submits, so a slow network or an eager double-click can't
+    // fire the same POST twice. Runs after jQuery Unobtrusive Validation's
+    // own submit handler, so e.defaultPrevented is already set if the form
+    // failed client-side validation — in that case we leave the button alone.
+    document.addEventListener('submit', function (e) {
+        if (e.defaultPrevented) return;
+        var form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+        if (submitBtn && !submitBtn.disabled) {
+            setTimeout(function () {
+                submitBtn.disabled = true;
+                if (submitBtn.tagName === 'BUTTON') {
+                    submitBtn.innerHTML = '<span class="ui-loader me-2"></span>Please wait…';
+                }
+            }, 0);
+        }
+        // Opt-in full-screen overlay for submits that navigate away and
+        // leave nothing else on screen to show progress (data-loading-overlay="Message").
+        if (form.hasAttribute('data-loading-overlay') && window.vwShowOverlay) {
+            window.vwShowOverlay(form.getAttribute('data-loading-overlay'));
+        }
+    }, false);
+</script>
+<partial name="_CookieConsent" />
+@RenderSection("Scripts", required: false)
+</body>
+</html>

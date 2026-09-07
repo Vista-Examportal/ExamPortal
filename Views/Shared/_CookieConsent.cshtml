@@ -1,0 +1,35 @@
+@* Lightweight cookie consent notice. No consent-management library — every cookie this
+   site sets is functional/essential (see Views/Site/CookiePolicy.cshtml), so this is a
+   notice-and-dismiss banner rather than a granular opt-in/opt-out picker. Dismissal is
+   remembered via its own first-party cookie (vwt_cookie_consent) for 1 year; the inline
+   script only ever reads/writes that one cookie, nothing else. *@
+<div id="cookieConsentBanner" class="fixed inset-x-0 bottom-0 z-[90] hidden border-t border-slate-200 bg-white px-4 py-4 shadow-lg dark:border-slate-700 dark:bg-slate-900 sm:px-6" role="region" aria-label="Cookie notice">
+    <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 sm:flex-row">
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+            We use a small number of essential cookies to keep you signed in and to complete
+            sign-in redirects. See our
+            <a asp-controller="Site" asp-action="CookiePolicy" class="font-semibold text-[var(--vw-accent)] hover:underline">Cookie Policy</a>.
+        </p>
+        <button type="button" id="cookieConsentDismiss" class="ui-btn-primary shrink-0 !px-4 !py-2 !text-sm">Got it</button>
+    </div>
+</div>
+<script>
+    (function () {
+        function getCookie(name) {
+            return document.cookie.split('; ').find(function (row) { return row.indexOf(name + '=') === 0; });
+        }
+        var banner = document.getElementById('cookieConsentBanner');
+        var dismissBtn = document.getElementById('cookieConsentDismiss');
+        if (!banner || !dismissBtn) return;
+
+        if (!getCookie('vwt_cookie_consent')) {
+            banner.classList.remove('hidden');
+        }
+
+        dismissBtn.addEventListener('click', function () {
+            var oneYear = 60 * 60 * 24 * 365;
+            document.cookie = 'vwt_cookie_consent=1; max-age=' + oneYear + '; path=/; SameSite=Lax';
+            banner.classList.add('hidden');
+        });
+    })();
+</script>

@@ -1,0 +1,2054 @@
+/* ================================================================
+   VISTAWAYS TECH design tokens
+   ----------------------------------------------------------------
+   Every view now renders through the Tailwind + Lucide shared layout
+   (sidebar, topbar, breadcrumbs, menus, UI kit) defined in
+   Views/Shared/_Layout.cshtml and the ui-, vw-, and app- prefixed
+   component classes below and in tailwind-input.css. Bootstrap's CSS/JS have
+   been fully removed from the app. Every color is still expressed as
+   a CSS variable so the whole app (including the vanilla-JS accordion
+   and other custom widgets) follows one theme and one dark-mode switch.
+   ================================================================ */
+:root {
+    /* ---- Neutrals: Tailwind slate palette ---- */
+    --vw-bg: #F8FAFC;
+    --vw-surface: #FFFFFF;
+    --vw-surface-muted: #F1F5F9;
+    --vw-surface-raised: #FFFFFF;
+    --vw-border: #E2E8F0;
+    --vw-border-strong: #CBD5E1;
+
+    --vw-text: #0F172A;
+    /* Dedicated, theme-independent background for the login page's brand
+       panel — see the note on --vw-brand-panel-bg below; kept as its own
+       token rather than reusing --vw-text so it can never silently invert
+       when the theme's text color changes for a re-brand or a dark-mode
+       edit like this one. */
+    --vw-brand-panel-bg: #0F172A;
+    --vw-text-secondary: #475569;
+    --vw-text-muted: #64748B;
+    --vw-text-inverse: #FFFFFF;
+
+    /* ---- Primary: blue-600 ---- */
+    --vw-accent: #2563EB;
+    --vw-accent-hover: #1D4ED8;
+    --vw-accent-bg: #EFF6FF;
+    --vw-accent-text: #1D4ED8;
+
+    /* ---- Secondary: indigo-600 (new token — available for secondary
+       brand accents: decorative panels, secondary highlights, badges
+       that want a distinct-from-primary but still on-brand color).
+       Deliberately NOT wired into .ui-btn-secondary, which is a neutral
+       outline button pattern, not a "second brand color" button. ---- */
+    --vw-secondary: #4F46E5;
+    --vw-secondary-hover: #4338CA;
+    --vw-secondary-bg: #EEF2FF;
+    --vw-secondary-text: #4338CA;
+
+    /* ---- Status colors ----
+       Same hex value used in both light and dark mode for success/
+       warning/danger/info (see the dark block below) rather than a
+       separate "brightened for dark backgrounds" shade — deliberately,
+       after the "Accept Offer" button bug this session where a
+       dark-mode-brightened success green dropped white button-text
+       contrast to 2.41:1. Every value below was checked against white
+       button text (>=4.5:1) AND against the dark surface color for
+       visibility (>=3:1) before being used here, so this can't recur. */
+    --vw-success: #047857;
+    --vw-success-bg: #ECFDF5;
+    --vw-success-text: #047857;
+    --vw-warning: #B45309;
+    --vw-warning-bg: #FFFBEB;
+    --vw-warning-text: #B45309;
+    --vw-danger: #DC2626;
+    --vw-danger-hover: #B91C1C;
+    --vw-danger-bg: #FEF2F2;
+    --vw-danger-text: #B91C1C;
+    /* ---- Accent: cyan-700 (mapped onto the "info" status role) ---- */
+    --vw-info: #0E7490;
+    --vw-info-bg: #ECFEFF;
+    --vw-info-text: #0E7490;
+
+    --vw-radius: 8px;
+    --vw-radius-lg: 12px;
+    --vw-radius-xl: 16px;
+    --vw-font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    --vw-font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+
+    /* Typography scale — this app's font-size values had drifted into 20
+       near-duplicate ad-hoc numbers (.78rem, .8rem, .82rem, .84rem, .85rem,
+       .86rem, .88rem were all "small UI text" that nobody meant to make
+       seven different sizes). Consolidated here into deliberate steps and
+       applied throughout site.css below; every consolidation was checked
+       to shift the rendered size by well under a pixel, and only ever
+       rounds a size up, never down, so nothing gets harder to read.
+       --vw-text-badge is deliberately its own outlier, not folded into
+       -xs: it's the numeral inside a small circular notification dot, a
+       different design context than any body/caption text. */
+    --vw-text-badge: .65rem;
+    --vw-text-xs: .75rem;
+    --vw-text-sm: .85rem;
+    --vw-text-md: .9375rem;
+    --vw-text-lg: 1rem;
+    --vw-text-xl: 1.25rem;
+    --vw-text-2xl: 1.3rem;
+    --vw-text-3xl: 1.6rem;
+
+    /* Elevation scale — one shared set of shadow tokens used by every
+       card-like surface (legacy .card, the Tailwind .ui-card kit, and
+       the semantic .vw-stat-card / .vw-summary-card / .vw-info-card
+       variants below) so "modernized" cards share one consistent
+       depth language instead of each screen inventing its own
+       shadow-sm / inline box-shadow value. */
+    --vw-shadow-xs: 0 1px 2px 0 rgba(15, 18, 22, .04);
+    --vw-shadow-sm: 0 1px 3px 0 rgba(15, 18, 22, .05), 0 1px 2px -1px rgba(15, 18, 22, .04);
+    --vw-shadow-md: 0 6px 16px -4px rgba(15, 18, 22, .08), 0 2px 6px -2px rgba(15, 18, 22, .05);
+    --vw-shadow-lg: 0 16px 32px -10px rgba(15, 18, 22, .16);
+
+    /* Spacing rhythm shared by card headers/bodies/footers and the
+       gaps between stacked cards, so padding and gutters line up
+       across statistics / summary / information cards. */
+    --vw-space-xs: .5rem;
+    --vw-space-sm: .75rem;
+    --vw-space-md: 1rem;
+    --vw-space-lg: 1.25rem;
+    --vw-space-xl: 1.75rem;
+
+    /* Motion tokens — one shared easing/duration vocabulary so every
+       hover, focus, button-press, and card-lift animation feels like
+       part of the same system instead of ad-hoc per-component values.
+       -out: snappy deceleration for things appearing/responding to input.
+       -spring: slightly overshooting curve for card lifts & press feedback. */
+    --vw-ease-out: cubic-bezier(.16, 1, .3, 1);
+    --vw-ease-spring: cubic-bezier(.34, 1.35, .64, 1);
+    --vw-dur-fast: .12s;
+    --vw-dur-base: .18s;
+    --vw-dur-slow: .28s;
+
+    /* Shared-layout chrome */
+    --vw-sidebar-bg: #0F172A;
+    --vw-sidebar-bg-hover: rgba(255, 255, 255, .06);
+    --vw-sidebar-text: #CBD5E1;
+    --vw-sidebar-text-active: #FFFFFF;
+    --vw-sidebar-width: 20rem;
+    --vw-sidebar-width-collapsed: 5.5rem;
+    --vw-topbar-height: 5rem;
+    --vw-focus-ring: #2563EB;
+
+    color-scheme: light;
+}
+
+/* ================================================================
+   Dark mode — toggled by JS setting data-theme="dark" on <html>.
+   Because everything above is a variable, this single block re-themes
+   both the new Tailwind UI kit AND the legacy Bootstrap screens.
+   ================================================================ */
+[data-theme="dark"] {
+    color-scheme: dark;
+    --vw-bg: #0B1120;
+    --vw-surface: #10151C;
+    --vw-surface-muted: #1B222B;
+    --vw-surface-raised: #1D242D;
+    --vw-border: #26303B;
+    --vw-border-strong: #38424F;
+
+    --vw-text: #E8E9EB;
+    --vw-text-secondary: #A8B0BA;
+    --vw-text-muted: #8B95A1;
+    --vw-text-inverse: #10151C;
+
+    --vw-accent: #2563EB;
+    --vw-accent-hover: #3B82F6;
+    --vw-accent-bg: rgba(37, 99, 235, .16);
+    --vw-accent-text: #93C5FD;
+
+    --vw-secondary: #4F46E5;
+    --vw-secondary-hover: #6366F1;
+    --vw-secondary-bg: rgba(79, 70, 229, .16);
+    --vw-secondary-text: #A5B4FC;
+
+    --vw-success: #047857;
+    --vw-success-bg: rgba(4, 120, 87, .16);
+    --vw-success-text: #6EE7B7;
+    --vw-warning: #B45309;
+    --vw-warning-bg: rgba(180, 83, 9, .16);
+    --vw-warning-text: #FCD34D;
+    --vw-danger: #DC2626;
+    --vw-danger-hover: #EF4444;
+    --vw-danger-bg: rgba(220, 38, 38, .16);
+    --vw-danger-text: #FCA5A5;
+    --vw-info: #0E7490;
+    --vw-info-bg: rgba(14, 116, 144, .16);
+    --vw-info-text: #67E8F9;
+
+    --vw-focus-ring: #3B82F6;
+    --vw-sidebar-bg: #070B12;
+    --vw-sidebar-bg-hover: rgba(255, 255, 255, .05);
+
+    /* Dark surfaces need darker, slightly more opaque shadows to read
+       against an already-dark page background. */
+    --vw-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, .28);
+    --vw-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, .32), 0 1px 2px -1px rgba(0, 0, 0, .28);
+    --vw-shadow-md: 0 6px 16px -4px rgba(0, 0, 0, .42), 0 2px 6px -2px rgba(0, 0, 0, .3);
+    --vw-shadow-lg: 0 16px 32px -10px rgba(0, 0, 0, .55);
+}
+
+* { scrollbar-color: var(--vw-border-strong) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--vw-border-strong); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+    background-color: var(--vw-bg);
+    font-family: var(--vw-font-sans);
+    color: var(--vw-text);
+    transition: background-color var(--vw-dur-base) ease, color var(--vw-dur-base) ease;
+}
+
+/* Respect reduced-motion preferences across both design systems */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
+
+/* Bootstrap's reboot (loaded between tailwind-built.css and this file —
+   see _Layout.cshtml) sets `a { text-decoration: underline }` globally,
+   re-enabling the browser underline that Tailwind's own preflight had
+   already neutralized.
+
+   Earlier attempts at this fix patched individual component classes
+   one at a time (.ui-btn, .app-sidebar-link, .vw-filter-reset, a
+   breadcrumb selector, ...) and kept missing spots — e.g. .ui-btn-primary
+   / .ui-btn-outline / etc. are fully self-contained selectors baked by
+   Tailwind's `@apply ui-btn ...` at build time (see wwwroot/styleguide.html),
+   so they never actually inherited a fix aimed at the bare `.ui-btn`
+   class. An app-wide audit of every <a> in Views/ (grep, not guesswork)
+   turned up still more unstyled instances that had never been touched:
+   the "Back to Dashboard" link on Exam/Details, the document-name link
+   on Admin/CandidateDetail, the logged-out header logo in this file, and
+   the portal-module card links in _PortalDashboard.
+
+   Rather than keep patching one selector at a time, fix it at the root:
+   every <a> in the app is unstyled (no text-decoration) by default, so
+   reset the element itself. Genuine inline text links opt back in via
+   the explicit .underline / .hover:underline utility classes already
+   used consistently across the auth pages (Login, Register, etc.) —
+   those are class (and class+:hover) selectors, so they still win over
+   this plain-element rule regardless of load order. This is the one
+   rule that needs to exist; anything more specific below is redundant
+   but left in place as documentation of the classes it was chasing. */
+a {
+    text-decoration: none;
+}
+
+/* Consistent, visible keyboard focus everywhere (WCAG 2.4.7).
+   The ring fades/eases in on arrival instead of snapping into place —
+   subtle, but it reads as intentional rather than a hard flash. */
+a, button, input, select, textarea, [tabindex] {
+    transition: outline-offset var(--vw-dur-fast) var(--vw-ease-out);
+}
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible,
+textarea:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--vw-focus-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+    background: var(--vw-accent);
+    color: #fff;
+    padding: .6rem 1rem;
+    border-radius: 0 0 var(--vw-radius) 0;
+    text-decoration: none;
+}
+.skip-link:focus { left: 0; }
+
+/* ================================================================
+   Standalone auth pages (Login, Register, Forgot/Reset Password,
+   Verify Email OTP, Assessment Auth, Accept Offer). These render
+   with Layout = null (own <head>, no shared sidebar/topbar), so they
+   previously each redeclared the same "centered card on a tinted
+   page" chrome in a local <style> block. Defined once here instead —
+   every rule is expressed with the shared --vw-* tokens, so dark
+   mode (driven by [data-theme="dark"] on <html>) applies exactly the
+   same way it does for the rest of the app, with nothing extra to
+   verify per page.
+   ================================================================ */
+.vw-auth-page {
+    background-color: var(--vw-bg);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    font-family: var(--vw-font-sans);
+    color: var(--vw-text);
+}
+/* Multi-step registration reads better top-anchored with page-level
+   scroll (long form) instead of vertically centered like the single
+   -field auth pages. */
+.vw-auth-page-top { display: block; padding: 2rem 0; }
+
+.vw-auth-card {
+    border-radius: var(--vw-radius-lg);
+    box-shadow: none;
+    border: 1px solid var(--vw-border);
+    background-color: var(--vw-surface);
+    color: var(--vw-text);
+}
+
+/* Accept-offer letter: same card, plus a dark header band and a
+   wider max-width since it reads more like a document than a form. */
+.vw-offer-card { max-width: 700px; margin: 3rem auto; }
+.vw-offer-card .vw-auth-card-header {
+    background-color: var(--vw-text);
+    color: var(--vw-text-inverse);
+    border-radius: var(--vw-radius-lg) var(--vw-radius-lg) 0 0;
+}
+.vw-auth-info-row { border-bottom: 1px solid var(--vw-surface-muted); padding: .75rem 0; }
+.vw-auth-actions { display: flex; gap: 1rem; }
+@media (max-width: 575.98px) { .vw-auth-actions { flex-direction: column; } }
+
+/* Verify-email OTP input */
+.vw-otp-input { letter-spacing: .5em; }
+
+/* Assessment-auth "secure link" badge */
+.vw-secure-badge {
+    background-color: var(--vw-success-bg);
+    border: 1px solid var(--vw-success);
+    color: var(--vw-success-text);
+    font-size: var(--vw-text-sm);
+    border-radius: var(--vw-radius);
+}
+
+/* Register: segmented step-progress track above the form. */
+.vw-step-progress-label { display: flex; justify-content: space-between; font-size: var(--vw-text-xs); color: var(--vw-text-secondary); margin-bottom: .4rem; }
+.vw-step-progress-track { display: flex; gap: 4px; margin-bottom: 1.5rem; }
+.vw-step-progress-seg { height: 4px; flex: 1; border-radius: 4px; background-color: var(--vw-surface-muted); }
+.vw-step-progress-seg.done { background-color: var(--vw-accent); }
+
+/* ================================================================
+   App shell — sidebar + topbar + content, used only by the new
+   shared layout markup (Tailwind utility classes handle layout;
+   these rules cover the bits Tailwind's CDN utilities can't, like
+   width transitions keyed off a toggled class).
+   ================================================================ */
+.app-shell { min-height: 100dvh; background-color: var(--vw-bg); }
+
+.app-sidebar {
+    background-color: var(--vw-sidebar-bg);
+    width: var(--vw-sidebar-width);
+    transition: width var(--vw-dur-base) ease, transform var(--vw-dur-base) ease;
+}
+.app-sidebar.is-collapsed { width: var(--vw-sidebar-width-collapsed); }
+.app-sidebar.is-collapsed .app-sidebar-label,
+.app-sidebar.is-collapsed .app-sidebar-section-title { display: none; }
+
+.app-sidebar-link {
+    position: relative;
+    color: var(--vw-sidebar-text);
+    border-radius: var(--vw-radius);
+    text-decoration: none;
+    transition: background-color var(--vw-dur-fast) ease, color var(--vw-dur-fast) ease, transform var(--vw-dur-fast) ease, padding-left var(--vw-dur-fast) ease;
+}
+.app-sidebar-link:hover { background-color: var(--vw-sidebar-bg-hover); color: #fff; transform: translateX(2px); }
+.app-sidebar-link.is-active {
+    background-color: var(--vw-accent);
+    color: #fff;
+    box-shadow: inset 3px 0 0 0 rgba(255,255,255,.85);
+}
+.app-sidebar-link.is-active:hover { transform: none; }
+
+/* Collapsed desktop sidebar: labels are hidden (see .is-collapsed rule
+   above), so each link's own accessible name (data-tooltip, mirroring
+   its visible label) is surfaced as a small flyout on hover/focus —
+   otherwise a collapsed rail would be icon-only with no way to tell
+   what each link does without expanding it again. */
+.app-sidebar.is-collapsed .app-sidebar-link[data-tooltip] {
+    overflow: visible;
+}
+.app-sidebar.is-collapsed .app-sidebar-link[data-tooltip]:hover::after,
+.app-sidebar.is-collapsed .app-sidebar-link[data-tooltip]:focus-visible::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + .625rem);
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    background-color: var(--vw-text);
+    color: var(--vw-surface);
+    font-size: var(--vw-text-xs);
+    font-weight: 600;
+    padding: .35rem .65rem;
+    border-radius: .375rem;
+    box-shadow: 0 6px 16px -4px rgba(15, 18, 22, .35);
+    z-index: 50;
+    pointer-events: none;
+    animation: vw-menu-in .1s ease-out;
+}
+
+.app-topbar {
+    height: var(--vw-topbar-height);
+    background-color: var(--vw-surface);
+    border-bottom: 1px solid var(--vw-border);
+    transition: background-color var(--vw-dur-base) ease, border-color var(--vw-dur-base) ease;
+}
+
+/* Public nav links — animated underline grows from the left on hover,
+   matching the "hiring pipeline" visual language used elsewhere on the
+   landing page rather than a generic centered underline. */
+.app-navlink {
+    position: relative;
+    padding: .5rem .75rem;
+    font-size: var(--vw-text-md);
+    font-weight: 500;
+    color: var(--vw-text-secondary);
+    border-radius: .5rem;
+    transition: color var(--vw-dur-fast) ease;
+}
+.app-navlink:hover { color: var(--vw-text); }
+.app-navlink::after {
+    content: "";
+    position: absolute;
+    left: .75rem;
+    right: .75rem;
+    bottom: .25rem;
+    height: 2px;
+    background: var(--vw-accent);
+    border-radius: 1px;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--vw-dur-base) var(--vw-ease-out);
+}
+.app-navlink:hover::after, .app-navlink.is-active::after { transform: scaleX(1); }
+
+/* Transparent-over-hero nav — opt-in per page (see _Layout.cshtml).
+   Starts as a soft, blurred scrim (not fully transparent) with light text
+   over the hero's dark gradient; .is-scrolled (toggled by initHeroNav in
+   app.js once the page scrolls past the hero) crossfades it to the normal
+   solid topbar. Both states are plain CSS so there's no flash of the wrong
+   style before JS runs.
+
+   Fully transparent (no background at all) used to let the hero's own
+   heading/stats scroll up underneath this sticky nav and visually collide
+   with the nav's own text — both are light-on-dark at that point, so they
+   became unreadable together. A low-opacity gradient + backdrop-filter
+   blur keeps the "see-through" hero look while guaranteeing the nav stays
+   legible no matter what's scrolled behind it. */
+.app-topbar.is-hero-nav {
+    background: linear-gradient(to bottom, rgba(11, 17, 32, .55), rgba(11, 17, 32, .18));
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-bottom-color: transparent;
+    color: #fff;
+}
+.app-topbar.is-hero-nav .app-navlink { color: rgba(255, 255, 255, .82); }
+.app-topbar.is-hero-nav .app-navlink:hover { color: #fff; }
+.app-topbar.is-hero-nav .ui-btn-ghost { color: rgba(255, 255, 255, .82); }
+.app-topbar.is-hero-nav .ui-btn-ghost:hover { color: #fff; background-color: rgba(255, 255, 255, .12); }
+.app-topbar.is-hero-nav.is-scrolled .ui-btn-ghost { color: var(--vw-text-secondary); }
+.app-topbar.is-hero-nav.is-scrolled .ui-btn-ghost:hover { color: var(--vw-text); background-color: var(--vw-surface-muted); }
+.app-topbar.is-hero-nav.is-scrolled {
+    background-color: var(--vw-surface);
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border-bottom-color: var(--vw-border);
+    color: var(--vw-text);
+}
+.app-topbar.is-hero-nav.is-scrolled .app-navlink { color: var(--vw-text-secondary); }
+.app-topbar.is-hero-nav.is-scrolled .app-navlink:hover { color: var(--vw-text); }
+
+/* Logo swap: the wordmark is dark navy, which disappears against a dark
+   topbar. Two logo images are stacked in the markup and toggled with
+   plain CSS (no JS) to match whichever background is actually showing —
+   the light-text version over the hero's dark gradient (or dark theme's
+   near-black surface), the dark-text version over a solid white surface. */
+.app-topbar-logo-dark { display: block; }
+.app-topbar-logo-light { display: none; }
+.app-topbar.is-hero-nav:not(.is-scrolled) .app-topbar-logo-dark { display: none; }
+.app-topbar.is-hero-nav:not(.is-scrolled) .app-topbar-logo-light { display: block; }
+[data-theme="dark"] .app-topbar-logo-dark { display: none; }
+[data-theme="dark"] .app-topbar-logo-light { display: block; }
+
+/* Makes the hero section render BEHIND the sticky topbar instead of
+   below it, so a transparent topbar (.is-hero-nav) actually reveals
+   the hero's own dark background rather than the page's light --vw-bg
+   sitting behind it in normal flow. Pull the section up by exactly
+   the topbar's height, then push its content back down by the same
+   amount so nothing shifts visually — only the background extends
+   underneath the nav. */
+[data-hero] {
+    margin-top: calc(-1 * var(--vw-topbar-height));
+    padding-top: var(--vw-topbar-height);
+}
+
+/* Mobile drawer close (X) button — only meaningful once the sidebar is
+   an overlay drawer (< lg), so it's hidden at desktop widths where the
+   rail is always visible and "closing" it means something else
+   entirely (the collapse toggle). */
+.app-sidebar-mobile-close { display: none; }
+
+@media (max-width: 1023px) {
+    .app-sidebar { position: fixed; inset-block: 0; left: 0; z-index: 40; transform: translateX(-100%); width: var(--vw-sidebar-width); }
+    .app-sidebar.is-mobile-open { transform: translateX(0); box-shadow: 0 0 0 100vmax rgba(0,0,0,.4); }
+    .app-sidebar-mobile-close { display: inline-flex; }
+}
+
+.app-backdrop {
+    background: rgba(15, 18, 22, .5);
+    transition: opacity var(--vw-dur-base) ease;
+}
+
+/* Dropdown / menu panels (profile, notifications) */
+.app-menu-panel {
+    background-color: var(--vw-surface);
+    border: 1px solid var(--vw-border);
+    box-shadow: 0 12px 28px -8px rgba(15, 18, 22, .22);
+    transform-origin: top right;
+    animation: vw-menu-in var(--vw-dur-fast) ease-out;
+}
+.app-menu-panel.is-closing {
+    animation: vw-menu-out .1s ease-in forwards;
+}
+@keyframes vw-menu-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes vw-menu-out { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-4px) scale(.98); } }
+
+/* Keyboard/roving-focus highlight for items inside a menu panel, distinct
+   from :focus-visible so arrow-key navigation (mouse-less) is always
+   visible even in browsers that suppress focus rings on JS-driven
+   focus() calls. */
+.app-menu-item.is-focused { background-color: var(--vw-surface-muted); }
+
+/* Toasts */
+.app-toast { animation: vw-toast-in .18s ease-out; }
+.app-toast.is-leaving { animation: vw-toast-out var(--vw-dur-base) ease-in forwards; }
+@keyframes vw-toast-in { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes vw-toast-out { from { opacity: 1; transform: translateX(0); max-height: 200px; } to { opacity: 0; transform: translateX(16px); max-height: 200px; } }
+
+/* Slim time-to-dismiss indicator along the bottom edge of each toast.
+   Counts down via a shrinking scaleX animation, colored with the toast's
+   own text color at low opacity so it inherits per-variant tinting for
+   free. Paused (via .is-paused, applied on hover/focus) so a toast a
+   person is actively reading never disappears out from under them. */
+.app-toast-progress {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 3px;
+    background-color: currentColor;
+    opacity: .35;
+    transform-origin: left;
+    animation-name: vw-toast-progress;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+.app-toast.is-paused .app-toast-progress { animation-play-state: paused; }
+@keyframes vw-toast-progress { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .app-toast, .app-toast.is-leaving, .app-toast-progress { animation: none; }
+}
+
+
+
+/* ================================================================
+   Modernized card system — statistics / summary / information cards
+   ----------------------------------------------------------------
+   These three semantic variants sit on top of the plain .card base
+   above (same border/radius/surface) and just add the layout +
+   elevation behavior specific to each job:
+     .vw-stat-card     a single number + label, optionally with a
+                        colored icon chip — used for dashboard KPIs.
+     .vw-summary-card  an icon-led card summarizing a link/module/
+                        record list (module cards, "Active Links",
+                        "Templates", etc.)
+     .vw-info-card     a quieter card for supporting detail/read-only
+                        context (side panels, section breakdowns).
+   All three share the same padding rhythm (--vw-space-*) and the
+   same hover-lift so a dashboard built from a mix of the three still
+   reads as one consistent grid instead of three unrelated widgets.
+   ================================================================ */
+.vw-stat-card, .vw-summary-card, .vw-info-card {
+    height: 100%;
+    padding: var(--vw-space-lg);
+    display: flex;
+    gap: var(--vw-space-md);
+    transition: border-color var(--vw-dur-base) var(--vw-ease-out),
+        box-shadow var(--vw-dur-slow) var(--vw-ease-out),
+        transform var(--vw-dur-slow) var(--vw-ease-spring);
+}
+.vw-stat-card:hover, .vw-summary-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--vw-shadow-lg) !important;
+}
+
+/* --- Statistics card ------------------------------------------- */
+.vw-stat-card { align-items: center; }
+.vw-stat-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--vw-radius);
+    background: var(--vw-surface-muted);
+    color: var(--vw-accent);
+}
+.vw-stat-icon svg, .vw-stat-icon i { width: 20px; height: 20px; }
+.vw-stat-icon.is-primary { background: var(--vw-accent-bg); color: var(--vw-accent); }
+.vw-stat-icon.is-success { background: var(--vw-success-bg); color: var(--vw-success); }
+.vw-stat-icon.is-warning { background: var(--vw-warning-bg); color: var(--vw-warning); }
+.vw-stat-icon.is-danger  { background: var(--vw-danger-bg);  color: var(--vw-danger); }
+.vw-stat-icon.is-info    { background: var(--vw-info-bg);    color: var(--vw-info); }
+.vw-stat-body { min-width: 0; }
+.vw-stat-label {
+    font-size: var(--vw-text-sm);
+    color: var(--vw-text-secondary);
+    margin-bottom: .2rem;
+}
+.vw-stat-value {
+    font-size: var(--vw-text-3xl);
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--vw-text);
+}
+.vw-stat-trend { font-size: var(--vw-text-xs); font-weight: 600; margin-top: .15rem; }
+.vw-stat-trend.is-up { color: var(--vw-success-text); }
+.vw-stat-trend.is-down { color: var(--vw-danger-text); }
+
+/* --- Summary card ------------------------------------------------ */
+.vw-summary-card { align-items: flex-start; }
+.vw-summary-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--vw-radius);
+}
+.vw-summary-icon svg, .vw-summary-icon i { width: 19px; height: 19px; }
+.vw-summary-title { font-weight: 700; color: var(--vw-text); margin-bottom: .2rem; }
+.vw-summary-desc { font-size: var(--vw-text-sm); color: var(--vw-text-secondary); }
+.vw-summary-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--vw-space-sm);
+    padding: var(--vw-space-lg) var(--vw-space-lg) 0;
+}
+.vw-summary-card-header h5, .vw-summary-card-header h6 { margin-bottom: 0; }
+
+/* --- Information card -------------------------------------------- */
+.vw-info-card { flex-direction: column; gap: var(--vw-space-sm); background-color: var(--vw-surface); }
+.vw-info-card-header {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: var(--vw-text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--vw-text-muted);
+}
+.vw-info-card-header svg, .vw-info-card-header i { width: 14px; height: 14px; }
+.vw-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--vw-space-sm);
+    padding: var(--vw-space-sm) 0;
+    border-bottom: 1px solid var(--vw-border);
+}
+.vw-info-row:last-child { border-bottom: none; padding-bottom: 0; }
+.vw-info-row-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--vw-radius);
+    background: var(--vw-surface-muted);
+}
+.vw-info-row-icon svg, .vw-info-row-icon i { width: 16px; height: 16px; }
+.vw-info-empty { padding: var(--vw-space-lg) 0; text-align: center; color: var(--vw-text-muted); font-size: var(--vw-text-sm); }
+
+@media (max-width: 575.98px) {
+    .vw-stat-card, .vw-summary-card, .vw-info-card { padding: var(--vw-space-md); }
+}
+
+/* ================================================================
+   Page headers — the title/subtitle/actions block sitting at the top
+   of nearly every screen. Standardizes the icon-badge + title +
+   subtitle + wrapped-actions layout already used on the newer
+   Tailwind app-shell pages (Admin/Home dashboards) so the legacy
+   Bootstrap views (Students, Pipeline, CreateExam, ExamResults,
+   Recruiter, Results, etc.) share the exact same header language:
+   same icon size/position, same subtitle color/size, same action
+   button gap, and the same stack-to-column behavior on mobile.
+   ================================================================ */
+.vw-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--vw-space-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--vw-space-xl);
+}
+.vw-page-header-main { display: flex; align-items: flex-start; gap: var(--vw-space-md); min-width: 0; }
+.vw-page-header-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--vw-radius);
+    background: var(--vw-accent-bg);
+    color: var(--vw-accent);
+    margin-top: .1rem;
+}
+.vw-page-header-icon svg, .vw-page-header-icon i { width: 20px; height: 20px; }
+.vw-page-title {
+    font-size: var(--vw-text-2xl);
+    font-weight: 700;
+    color: var(--vw-text);
+    margin: 0;
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+/* Header used inline without an icon chip (e.g. next to an avatar) still
+   gets consistent size/weight/line-height via this modifier. */
+.vw-page-title.no-icon { font-size: var(--vw-text-xl); }
+.vw-page-subtitle {
+    margin: .2rem 0 0;
+    font-size: var(--vw-text-sm);
+    color: var(--vw-text-secondary);
+}
+.vw-page-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+}
+@media (max-width: 575.98px) {
+    .vw-page-header { margin-bottom: var(--vw-space-lg); }
+    .vw-page-actions { width: 100%; }
+    .vw-page-actions .btn { flex: 1; }
+}
+.vw-section-title {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin-bottom: .85rem;
+    font-size: var(--vw-text-xs);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--vw-accent);
+}
+.vw-section-title i, .vw-section-title svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+
+/* Buttons grouped together (toolbars, table row actions) get consistent, even spacing
+   instead of relying on ad-hoc margin utilities scattered across views. */
+.vw-btn-group { display: inline-flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+
+
+/* Tags/chips of contextual metadata (exam subject, question type,
+   category, marks, duration…) use the same tokens as status badges
+   but a slightly smaller, uppercase treatment so they read as
+   "descriptive tag" rather than "state" at a glance. Opt in with
+   .vw-tag alongside the usual bg-*-subtle color classes. */
+.vw-tag {
+    font-size: var(--vw-text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: .3rem .6rem;
+}
+
+
+/* ================================================================
+   Sortable column headers — opt-in via data-sortable / data-sort-key
+   (wired up client-side by app.js, initSortableTables). Works for
+   both the legacy Bootstrap .table headers and the newer .ui-table
+   headers, since it targets the header cell itself rather than a
+   specific table system.
+   ================================================================ */
+.vw-sortable-th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color var(--vw-dur-fast) ease, background-color var(--vw-dur-fast) ease;
+}
+.vw-sortable-th:hover { color: var(--vw-text) !important; background-color: var(--vw-surface-muted); }
+.vw-sortable-th:focus-visible { outline: 2px solid var(--vw-accent); outline-offset: -2px; }
+.vw-sortable-th.is-sorted { color: var(--vw-accent) !important; }
+.vw-sort-icon {
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: .35rem;
+    opacity: .5;
+    color: inherit;
+}
+.vw-sort-icon i, .vw-sort-icon svg { width: 13px; height: 13px; }
+.vw-sortable-th.is-sorted .vw-sort-icon { opacity: 1; }
+
+/* ================================================================
+   Smart-table toolbar — shared by Views/Shared/_TableToolbar.cshtml.
+   Search box + results count + optional page-size select, sitting
+   directly above a table[data-smart-table]. Paired visually with the
+   pagination block below it, which is why the two live together here.
+   ================================================================ */
+.vw-table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .75rem;
+}
+.vw-table-toolbar-search { max-width: 20rem; flex: 1 1 16rem; }
+.vw-table-toolbar-meta {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.vw-table-toolbar-count {
+    font-size: var(--vw-text-sm);
+    font-weight: 600;
+    color: var(--vw-text-muted);
+    white-space: nowrap;
+}
+.vw-table-toolbar-pagesize select { min-width: 8rem; }
+@media (max-width: 575.98px) {
+    .vw-table-toolbar { flex-direction: column; align-items: stretch; }
+    .vw-table-toolbar-search { max-width: none; }
+    .vw-table-toolbar-meta { margin-left: 0; justify-content: space-between; }
+}
+
+/* ================================================================
+   Pagination — shared by Views/Shared/_Pagination.cshtml, and reused
+   as-is by the JS-built smart-table pager (initSmartTables in app.js),
+   which renders <button> instead of <a> for the same visual language
+   since it never navigates to a new URL. The .vw-page-btn/.vw-page-num
+   rules above already apply to both tags; these add button-specific
+   resets (no native border/background/font inheritance issues).
+   Renders as Previous [1 2 3 … 9] Next on desktop; on narrow screens
+   the numbered list collapses to a single "Page X of Y" label between
+   the two buttons so it never wraps or overflows.
+   ================================================================ */
+button.vw-page-btn, button.vw-page-num {
+    appearance: none;
+    -webkit-appearance: none;
+    font-family: inherit;
+    cursor: pointer;
+}
+button.vw-page-num { background-color: transparent; border: none; }
+button.vw-page-num:hover:not(.is-active) { background-color: var(--vw-surface-muted); color: var(--vw-text); }
+.vw-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    flex-wrap: wrap;
+}
+.vw-page-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .9rem;
+    font-size: var(--vw-text-sm);
+    font-weight: 600;
+    color: var(--vw-text);
+    background-color: var(--vw-surface);
+    border: 1.5px solid var(--vw-border);
+    border-radius: var(--vw-radius);
+    text-decoration: none;
+    transition: background-color var(--vw-dur-fast) ease, border-color var(--vw-dur-fast) ease, color var(--vw-dur-fast) ease;
+}
+.vw-page-btn:hover:not(.disabled) { background-color: var(--vw-surface-muted); border-color: var(--vw-border-strong); color: var(--vw-text); text-decoration: none; }
+.vw-page-btn:focus-visible { outline: none; box-shadow: 0 0 0 3.5px var(--vw-accent-bg); border-color: var(--vw-accent); }
+.vw-page-btn.disabled { opacity: .45; pointer-events: none; cursor: not-allowed; }
+
+.vw-page-numbers { display: flex; align-items: center; gap: .25rem; }
+.vw-page-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.15rem;
+    height: 2.15rem;
+    padding: 0 .4rem;
+    font-size: var(--vw-text-sm);
+    font-weight: 600;
+    color: var(--vw-text-secondary);
+    border-radius: var(--vw-radius);
+    text-decoration: none;
+    transition: background-color var(--vw-dur-fast) ease, color var(--vw-dur-fast) ease;
+}
+a.vw-page-num:hover { background-color: var(--vw-surface-muted); color: var(--vw-text); text-decoration: none; }
+.vw-page-num.is-active { background-color: var(--vw-accent); color: #fff; }
+.vw-page-ellipsis { display: inline-flex; align-items: center; justify-content: center; min-width: 1.5rem; color: var(--vw-text-muted); }
+
+.vw-page-mobile-status { display: none; font-size: var(--vw-text-sm); font-weight: 600; color: var(--vw-text-secondary); }
+
+/* Mobile pagination — hide the individual page-number pills (they don't
+   fit well next to full-width Prev/Next buttons on a phone) in favor of
+   a compact "Page X of Y" readout, and let Previous/Next fill the row. */
+@media (max-width: 575.98px) {
+    .vw-page-numbers { display: none; }
+    .vw-page-mobile-status { display: inline-flex; }
+    .vw-page-btn { flex: 1; justify-content: center; }
+    .vw-page-btn-label { display: inline; }
+}
+
+/* ================================================================
+   Exam-taking screen (Views/Exam/Take.cshtml)
+   ----------------------------------------------------------------
+   Answer-option cards, per-question state, and the "jump to
+   question" nav strip. CSS-driven so the view's own JS only needs
+   to toggle a couple of state classes instead of writing inline
+   styles per interaction.
+   ================================================================ */
+.vw-option-card {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    padding: .85rem 1rem;
+    border: 1px solid var(--vw-border);
+    border-radius: var(--vw-radius);
+    cursor: pointer;
+    transition: background-color var(--vw-dur-base) ease, border-color var(--vw-dur-base) ease;
+}
+.vw-option-card:hover { background: var(--vw-surface-muted); border-color: var(--vw-border-strong); }
+.vw-option-card:has(input:checked) { background: var(--vw-accent-bg); border-color: var(--vw-accent); }
+.vw-option-card:has(input:focus-visible) { outline: 2px solid var(--vw-accent); outline-offset: 1px; }
+
+.vw-question-card { border-left: 4px solid transparent; transition: border-color var(--vw-dur-base) ease; }
+.vw-question-card.is-answered { border-left-color: var(--vw-accent); }
+
+.vw-qnav-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 9999px;
+    border: 1.5px solid var(--vw-border-strong);
+    font-size: var(--vw-text-sm);
+    font-weight: 600;
+    color: var(--vw-text);
+    text-decoration: none;
+    transition: background-color var(--vw-dur-base) ease, border-color var(--vw-dur-base) ease, color var(--vw-dur-base) ease;
+}
+.vw-qnav-btn:hover { background: var(--vw-surface-muted); text-decoration: none; }
+.vw-qnav-btn.is-answered { border-color: var(--vw-accent); background: var(--vw-accent-bg); color: var(--vw-accent-text); }
+.vw-qnav-btn.is-marked { border-color: var(--vw-warning); background: var(--vw-warning-bg); color: var(--vw-warning-text); }
+
+.accordion-item, .accordion-button { background-color: var(--vw-surface); color: var(--vw-text); }
+.accordion-item {
+    border-color: var(--vw-border) !important;
+    border-radius: var(--vw-radius-lg) !important;
+    /* overflow: hidden was removed here — it was only meant to keep the
+       item's own rounded corners clean, but it also clipped any child that
+       needs to visually overflow the box, like the Board/University and
+       Year of Passing search dropdown panels (.vw-combo-panel), which got
+       cut off/overlapped into the content below instead of floating above
+       it. Bootstrap's border-radius still rounds the item's own corners
+       fine without clipping; the very slight square-corner bleed this can
+       expose behind a rounded corner is not worth breaking dropdowns over. */
+    margin-bottom: .85rem;
+}
+.accordion-item:last-of-type, .accordion-item:first-of-type { border-radius: var(--vw-radius-lg) !important; }
+.accordion-button { padding: .9rem 1.1rem; font-weight: 500; box-shadow: none !important; }
+/* Highlight state now driven by "is-collapsed" (toggled by app.js's vanilla
+   vwInitAccordions helper) rather than Bootstrap's own ".collapsed" class,
+   since this component no longer depends on Bootstrap's JS collapse plugin
+   — see EducationLevelFieldset.cshtml and the accordion helper in app.js. */
+.accordion-button:not(.is-collapsed) { background-color: var(--vw-accent-bg); color: var(--vw-accent-text); }
+.accordion-button::after { flex-shrink: 0; }
+.accordion-body { padding: 1.1rem 1.1rem 1.25rem; }
+.dropdown-menu { background-color: var(--vw-surface); color: var(--vw-text); border-color: var(--vw-border); }
+.dropdown-item { color: var(--vw-text); }
+.dropdown-item:hover, .dropdown-item:focus { background-color: var(--vw-surface-muted); color: var(--vw-text); }
+
+/* Flat hero */
+.enterprise-hero {
+    align-items: center;
+    background: var(--vw-text);
+    border-radius: var(--vw-radius-lg);
+    color: #fff;
+    display: flex;
+    justify-content: space-between;
+    padding: 2rem;
+    position: relative;
+}
+.enterprise-hero-mark {
+    align-items: center;
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: var(--vw-radius);
+    display: flex;
+    height: 72px;
+    justify-content: center;
+    width: 72px;
+}
+.enterprise-hero-mark svg { width: 32px; height: 32px; }
+
+/* .metric-card / .module-card / .side-panel are the dashboard-specific
+   dressing (accent rail, icon chip, list styling) layered on the same
+   .card + .vw-stat-card / .vw-summary-card / .vw-info-card foundation
+   above, so they inherit that shared shadow + spacing + hover-lift
+   automatically instead of redefining it. */
+.metric-card, .module-card, .portal-table, .side-panel { border-radius: var(--vw-radius-lg); }
+.metric-card { border-left: 3px solid var(--vw-accent) !important; }
+.metric-card:hover { transform: translateY(-3px); box-shadow: var(--vw-shadow-lg) !important; }
+.metric-success { border-left-color: var(--vw-success) !important; }
+.metric-warning { border-left-color: var(--vw-warning) !important; }
+.metric-info    { border-left-color: var(--vw-accent) !important; }
+.metric-danger  { border-left-color: var(--vw-danger) !important; }
+
+.metric-icon, .module-icon {
+    align-items: center;
+    border-radius: var(--vw-radius);
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+}
+.metric-icon { background: var(--vw-surface-muted); height: 44px; width: 44px; }
+.metric-icon svg { width: 20px; height: 20px; }
+.module-icon { height: 42px; width: 42px; }
+.module-icon svg { width: 19px; height: 19px; }
+/* Mirrors .vw-stat-icon.is-* above exactly — same values, same naming
+   convention. Portal Module icons used to build their color via
+   "bg-@module.Color text-@module.Color" (Views/Shared/_PortalDashboard.cshtml),
+   interpolating a C# string straight into a Tailwind utility name.
+   Tailwind's content scanner reads raw source text looking for whole
+   class-name tokens, and "bg-" / "primary" are never adjacent as literal
+   text there (split by the Razor @ boundary), so bg-primary/text-primary/
+   bg-success/etc. were never generated — verified zero matches for any of
+   them in the compiled CSS. These hand-authored classes are exempt from
+   content-scanning the same way .vw-stat-icon.is-* already is. */
+.module-icon.is-primary { background: var(--vw-accent-bg); color: var(--vw-accent); }
+.module-icon.is-success { background: var(--vw-success-bg); color: var(--vw-success); }
+.module-icon.is-warning { background: var(--vw-warning-bg); color: var(--vw-warning); }
+.module-icon.is-danger  { background: var(--vw-danger-bg);  color: var(--vw-danger); }
+.module-icon.is-info    { background: var(--vw-info-bg);    color: var(--vw-info); }
+.module-card:hover { border-color: var(--vw-border-strong) !important; transform: translateY(-3px); box-shadow: var(--vw-shadow-lg) !important; }
+.module-card h6, .module-card .text-dark { color: var(--vw-text) !important; }
+
+.side-icon {
+    align-items: center;
+    background: var(--vw-surface-muted);
+    border-radius: var(--vw-radius);
+    display: flex;
+    flex-shrink: 0;
+    height: 34px;
+    justify-content: center;
+    width: 34px;
+}
+.side-icon svg { width: 16px; height: 16px; }
+
+.vw-mono { font-family: var(--vw-font-mono); }
+.vw-id-badge {
+    font-family: var(--vw-font-mono);
+    background: var(--vw-surface-muted);
+    border: 1px solid var(--vw-border);
+    border-radius: var(--vw-radius);
+    padding: .2rem .55rem;
+    font-size: var(--vw-text-sm);
+    color: var(--vw-text-secondary);
+}
+.vw-status-quiet { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--vw-text-sm); color: var(--vw-text-secondary); }
+.vw-status-quiet.is-warning { color: var(--vw-warning-text); }
+.vw-status-quiet.is-danger { color: var(--vw-danger-text); }
+.vw-status-quiet i { color: var(--vw-text-muted); }
+.vw-status-quiet [data-state="ok"] { color: var(--vw-text-secondary); }
+.vw-status-quiet [data-state="checking"] { color: var(--vw-text-muted); }
+.vw-status-quiet [data-state="danger"] { color: var(--vw-danger-text); font-weight: 500; }
+.vw-status-quiet [data-state="danger"] + span[aria-hidden] { color: var(--vw-danger-text); }
+
+.vw-pipeline-head { background: var(--vw-surface); border: 1px solid var(--vw-border); border-bottom: none; color: var(--vw-text); }
+.vw-pipeline-head.vw-phase-intake { border-top: 3px solid var(--vw-text-muted); }
+.vw-pipeline-head.vw-phase-evaluation { border-top: 3px solid var(--vw-accent); color: var(--vw-accent-text); }
+.vw-pipeline-head.vw-phase-closing { border-top: 3px solid var(--vw-success); color: var(--vw-success-text); }
+
+.vw-landing-nav { border-bottom: 1px solid var(--vw-border); background: var(--vw-surface); }
+.vw-landing-hero { background: var(--vw-surface); text-align: center; padding: 3.5rem 1.5rem 2.5rem; }
+.vw-landing-features { border-top: 1px solid var(--vw-border); }
+.vw-landing-features .vw-feature { padding: 1.75rem 1.5rem; border-right: 1px solid var(--vw-border); }
+.vw-landing-features .vw-feature:last-child { border-right: none; }
+
+/* ================================================================
+   Forms module — applies everywhere the legacy Bootstrap markup is
+   used (Admin/Recruiter/Hr/Exam/Account). Pure CSS/markup polish;
+   no field names, ids, or asp-for bindings are touched anywhere
+   this is used, so posted data and JS hooks are unaffected.
+   ================================================================ */
+
+/* Labels */
+.form-label, .vw-label {
+    font-weight: 600;
+    font-size: var(--vw-text-sm);
+    color: var(--vw-text);
+    margin-bottom: .35rem;
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+}
+.required-mark, .vw-required {
+    color: var(--vw-danger);
+    font-weight: 700;
+    font-size: .9em;
+    line-height: 1;
+    margin-left: .2rem;
+    vertical-align: text-top;
+}
+
+/* ================================================================
+   Text inputs (.vw-search-input) — base sizing/color/focus treatment
+   for the search/date fields used inside .vw-search-box (Recruiter/
+   Index.cshtml, _TableToolbar.cshtml). .vw-search-box then layers its
+   own pill shape and icon inset on top. Formerly named .form-control
+   from the pre-Tailwind days; renamed since no view uses Bootstrap
+   classes anymore (native selects use .ui-field). */
+.vw-search-input {
+    min-height: 2.55rem;
+    padding: .55rem .9rem;
+    font-size: var(--vw-text-md);
+    line-height: 1.4;
+    border-radius: var(--vw-radius);
+    border-width: 1.5px;
+    border-color: var(--vw-border);
+    background-color: var(--vw-surface);
+    color: var(--vw-text);
+    box-shadow: none;
+    transition: border-color var(--vw-dur-base) ease, box-shadow var(--vw-dur-base) ease, background-color var(--vw-dur-base) ease, color var(--vw-dur-base) ease;
+}
+.vw-search-input:hover:not(:disabled):not(:focus):not([readonly]) {
+    border-color: var(--vw-border-strong);
+}
+.vw-search-input:focus {
+    background-color: var(--vw-surface);
+    color: var(--vw-text);
+    border-color: var(--vw-accent);
+    box-shadow: 0 0 0 3.5px var(--vw-accent-bg);
+}
+.vw-search-input::placeholder { color: var(--vw-text-muted); opacity: 1; }
+.vw-search-input:disabled::placeholder, .vw-search-input[readonly]::placeholder { color: var(--vw-text-muted); opacity: .7; }
+
+/* ================================================================
+   Table search box — a small reusable wrapper for the search field
+   that sits above a data table/list (e.g. Recruiter candidate
+   search). Purely presentational: it wraps whatever <input> is
+   already there (same name/value/placeholder, same form and submit
+   behavior) and adds a search icon inset on the left plus a pill
+   shape so it reads as "search" at a glance instead of looking like
+   just another text filter field. An optional trailing clear (×)
+   button is shown/hidden by app.js based on whether the input has a
+   value — it only clears + resubmits the existing GET form, it
+   never changes what gets submitted or where.
+   Usage:
+   <div class="vw-search-box">
+       <i class="fas fa-search" aria-hidden="true"></i>
+       <input name="q" ... class="vw-search-input" />
+       <button type="button" class="vw-search-box-clear" aria-label="Clear search"><i data-lucide="x"></i></button>
+   </div>
+   ================================================================ */
+.vw-search-box { position: relative; display: flex; align-items: center; width: 100%; }
+.vw-search-box > input.vw-search-input {
+    width: 100%;
+    padding-left: 2.35rem;
+    padding-right: 2.35rem;
+    border-radius: 999px;
+    background-color: var(--vw-surface-muted);
+    border-color: transparent;
+    transition: background-color var(--vw-dur-base) ease, border-color var(--vw-dur-base) ease, box-shadow var(--vw-dur-base) ease;
+}
+.vw-search-box > input.vw-search-input:hover:not(:disabled):not(:focus) { border-color: var(--vw-border-strong); }
+.vw-search-box > input.vw-search-input:focus { background-color: var(--vw-surface); }
+/* Support both the legacy Font Awesome <i class="fas fa-..."> icons used
+   on not-yet-migrated pages and the new Lucide <i data-lucide="..."> ones,
+   so this one component works unchanged on either. */
+.vw-search-box > i:first-child, .vw-search-box > svg:first-child,
+.vw-search-box > i[data-lucide]:first-child {
+    position: absolute;
+    left: .8rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: var(--vw-text-sm);
+    width: 1rem;
+    height: 1rem;
+    color: var(--vw-text-muted);
+    pointer-events: none;
+    transition: color var(--vw-dur-base) ease;
+}
+.vw-search-box:hover > i:first-child, .vw-search-box:hover > svg:first-child { color: var(--vw-text-secondary); }
+.vw-search-box:focus-within > i:first-child, .vw-search-box:focus-within > svg:first-child { color: var(--vw-accent); }
+
+.vw-search-box-clear {
+    display: none;
+    position: absolute;
+    right: .5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    align-items: center;
+    justify-content: center;
+    height: 1.5rem;
+    width: 1.5rem;
+    border-radius: 999px;
+    border: none;
+    background: transparent;
+    color: var(--vw-text-muted);
+    cursor: pointer;
+    transition: background-color var(--vw-dur-fast) ease, color var(--vw-dur-fast) ease;
+}
+.vw-search-box-clear svg, .vw-search-box-clear i { height: .85rem; width: .85rem; pointer-events: none; }
+.vw-search-box-clear:hover { background-color: var(--vw-border); color: var(--vw-text); }
+.vw-search-box.has-value > .vw-search-box-clear { display: inline-flex; }
+/* Room for the clear button only appears once it's actually shown, so an
+   empty search box doesn't sit with odd-looking dead space on the right. */
+.vw-search-box.has-value > input.vw-search-input { padding-right: 2.35rem; }
+.vw-search-box:not(.has-value) > input.vw-search-input { padding-right: 1rem; }
+
+@media (max-width: 575.98px) {
+    .vw-search-box > input.vw-search-input { font-size: 1rem; } /* avoid iOS auto-zoom on focus */
+}
+
+/* ================================================================
+   Filter panel — header/reset/badges chrome that wraps a "get" filter
+   form (e.g. Recruiter candidate filters). Purely presentational: the
+   <form> inside keeps its own method/inputs/names untouched, this only
+   adds a heading, a reset affordance, and a summary of what's active.
+   ================================================================ */
+.vw-filter-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+.vw-filter-panel-title {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    font-weight: 700;
+    font-size: var(--vw-text-md);
+    color: var(--vw-text);
+}
+.vw-filter-panel-title i { color: var(--vw-accent); font-size: var(--vw-text-sm); }
+
+.vw-filter-reset {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: var(--vw-text-sm);
+    font-weight: 600;
+    padding: .4rem .85rem;
+    border-radius: 999px;
+    color: var(--vw-text-secondary);
+    border: 1px solid var(--vw-border);
+    background-color: var(--vw-surface-muted);
+    text-decoration: none;
+    transition: background-color var(--vw-dur-fast) ease, color var(--vw-dur-fast) ease, border-color var(--vw-dur-fast) ease;
+}
+.vw-filter-reset:hover {
+    background-color: var(--vw-danger-bg);
+    color: var(--vw-danger-text);
+    border-color: var(--vw-danger-bg);
+    text-decoration: none;
+}
+
+/* Paired date inputs for a from/to range, reusing .vw-search-box for
+   each half so they get the same icon/clear-button/focus treatment as
+   every other search-style field. */
+/* min-width: 0 (the flexbox default-shrink escape hatch) let these
+   inputs shrink well past what "dd/mm/yyyy" plus its own padding needs,
+   so at more viewport widths than expected the text was getting
+   silently clipped rather than the field just staying legible. A real
+   minimum plus flex-wrap means the worst case is now the second field
+   wrapping onto its own line — never invisible/cut-off text. */
+.vw-date-range { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.vw-date-range .vw-search-box { flex: 1 1 10rem; min-width: 10rem; }
+.vw-date-range-sep { flex-shrink: 0; color: var(--vw-text-muted); font-size: var(--vw-text-sm); }
+
+@media (max-width: 575.98px) {
+    .vw-date-range { flex-direction: column; align-items: stretch; }
+    .vw-date-range-sep { display: none; }
+}
+
+/* Native date-picker indicator sits at the far right of the field by
+   default and would otherwise collide with our clear (×) button once
+   one appears — nudge it left just enough to leave room. These fields
+   don't carry our usual left-side custom icon (the browser's own
+   calendar icon already does that job on the right; showing both was
+   redundant and the wasted left padding is exactly what left
+   "dd/mm/yyyy" too little room to render without clipping). */
+.vw-search-box > input[type="date"] { padding-left: .9rem; padding-right: 2.5rem; }
+.vw-search-box.has-value > input[type="date"] { padding-right: 3.5rem; }
+.vw-search-box.has-value > input[type="date"]::-webkit-calendar-picker-indicator { margin-right: 1.5rem; }
+
+/* Active filter chips summarizing the current query string. Each is a
+   plain link to the same GET request with just that one param dropped
+   (built server-side in the view) — clicking one is identical to
+   clearing that field and resubmitting the form by hand. */
+.vw-filter-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--vw-border);
+}
+.vw-filter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    max-width: 100%;
+    padding: .3rem .3rem .3rem .75rem;
+    border-radius: 999px;
+    background-color: var(--vw-accent-bg);
+    color: var(--vw-accent-text);
+    font-size: var(--vw-text-xs);
+    font-weight: 600;
+    text-decoration: none;
+    transition: background-color var(--vw-dur-fast) ease;
+}
+.vw-filter-badge:hover { background-color: var(--vw-accent); color: #fff; text-decoration: none; }
+.vw-filter-badge-label { opacity: .75; font-weight: 500; }
+.vw-filter-badge-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 12rem; }
+.vw-filter-badge-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 1.1rem;
+    width: 1.1rem;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, .35);
+    transition: background-color var(--vw-dur-fast) ease;
+}
+.vw-filter-badge:hover .vw-filter-badge-remove { background-color: rgba(255, 255, 255, .6); }
+.vw-filter-badge-remove svg, .vw-filter-badge-remove i { height: .65rem; width: .65rem; }
+
+/* Number inputs — keep the native spinner (don't change behavior),
+   just make sure it always renders crisp and clickable rather than
+   being dimmed until hover, as some browsers do by default. */
+/* Disabled / read-only */
+.vw-search-input:disabled, .vw-search-input[readonly] {
+    background-color: var(--vw-surface-muted);
+    color: var(--vw-text-muted);
+    border-color: var(--vw-border);
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+/* Autofill — override the browser's yellow/blue autofill background
+   so it matches the theme (incl. dark mode) instead of clashing. */
+.vw-search-input:-webkit-autofill,
+.vw-search-input:-webkit-autofill:hover,
+.vw-search-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--vw-text);
+    -webkit-box-shadow: 0 0 0 1000px var(--vw-surface) inset;
+    box-shadow: 0 0 0 1000px var(--vw-surface) inset;
+    caret-color: var(--vw-text);
+    transition: background-color 9999s ease-in-out 0s, color 9999s ease-in-out 0s;
+}
+
+/* Help / hint text */
+.form-text, .vw-help {
+    font-size: var(--vw-text-xs);
+    color: var(--vw-text-muted);
+    margin-top: .3rem;
+}
+
+/* Validation states — works with both asp-validation-for's default
+   ".field-validation-error" / ".text-danger" and Bootstrap's
+   ".is-invalid" pattern, so no view markup has to change to benefit.
+   jQuery Unobtrusive Validation (loaded in _Layout.cshtml, logic
+   untouched) is what actually adds/removes "input-validation-error"
+   on fields and "valid" on fields that pass — these rules only style
+   the classes the existing library already applies. */
+.field-validation-error, .text-danger.field-validation-error {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: var(--vw-text-sm);
+    font-weight: 500;
+    color: var(--vw-danger-text) !important;
+    margin-top: .4rem;
+    animation: vw-field-msg-in var(--vw-dur-base) ease-out;
+}
+.field-validation-error:empty, .text-danger.field-validation-error:empty { margin-top: 0; animation: none; }
+.field-validation-error:not(:empty)::before, .text-danger.field-validation-error:not(:empty)::before {
+    content: "!";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--vw-danger);
+    color: var(--vw-text-inverse);
+    font-size: var(--vw-text-xs);
+    font-weight: 700;
+    line-height: 1;
+}
+/* jQuery Validate marks a passed field's message span with this class
+   and hides it inline (style="display:none") — this is just a CSS
+   backup for that same intent, no behavior change. */
+.field-validation-valid { display: none; }
+
+/* Validation summary — boxed like the existing .alert-danger treatment
+   so a page-level asp-validation-summary reads as a clear, self-
+   contained error panel rather than a loose list of red text. */
+.validation-summary-errors {
+    display: block;
+    color: var(--vw-danger-text);
+    background-color: var(--vw-danger-bg);
+    border: 1px solid var(--vw-danger);
+    border-radius: var(--vw-radius-lg);
+    padding: .85rem 1rem;
+    margin-bottom: 1rem;
+    font-size: var(--vw-text-sm);
+    animation: vw-field-msg-in var(--vw-dur-base) ease-out;
+}
+.validation-summary-errors ul { margin-bottom: 0; padding-left: 1.1rem; }
+.validation-summary-errors li { margin-top: .15rem; }
+.validation-summary-errors li:first-child { margin-top: 0; }
+.validation-summary-valid { display: none; }
+
+/* Error highlighting — border + a soft background tint so an invalid
+   field reads clearly at a glance, not only when it happens to be
+   focused. Covers Bootstrap's manual ".is-invalid" and the
+   "input-validation-error" class the validation library applies. */
+.is-invalid, .vw-search-input.input-validation-error {
+    border-color: var(--vw-danger) !important;
+    background-color: var(--vw-danger-bg);
+}
+.is-invalid:hover:not(:focus), .input-validation-error:hover:not(:focus) { border-color: var(--vw-danger) !important; }
+.is-invalid:focus, .input-validation-error:focus {
+    background-color: var(--vw-surface);
+    border-color: var(--vw-danger) !important;
+    box-shadow: 0 0 0 3.5px var(--vw-danger-bg) !important;
+}
+.is-invalid::placeholder, .input-validation-error::placeholder { color: var(--vw-danger-text); opacity: .6; }
+
+/* Success states — a field the validation library has confirmed as
+   valid ("valid" class) gets the same clear treatment on the other
+   side of the palette, so a form filling out correctly gives positive
+   feedback rather than staying neutral until submit. */
+.is-valid, .vw-search-input.valid {
+    border-color: var(--vw-success) !important;
+    background-color: var(--vw-success-bg);
+}
+.is-valid:hover:not(:focus), .valid:hover:not(:focus) { border-color: var(--vw-success) !important; }
+.is-valid:focus, .valid:focus {
+    background-color: var(--vw-surface);
+    border-color: var(--vw-success) !important;
+    box-shadow: 0 0 0 3.5px var(--vw-success-bg) !important;
+}
+
+@keyframes vw-field-msg-in {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Fieldsets / legends used to group related controls */
+.vw-fieldset {
+    border: 1px solid var(--vw-border);
+    border-radius: var(--vw-radius-lg);
+    padding: 1.1rem 1.25rem 1.25rem;
+    margin: 0 0 1.25rem;
+}
+.vw-fieldset > legend, .vw-legend {
+    font-size: var(--vw-text-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: var(--vw-text-secondary);
+    padding: 0 .4rem;
+    margin: 0 0 .1rem -.4rem;
+    width: auto;
+    float: none;
+}
+
+/* Responsive field grid — wrap any set of fields in a row with this
+   class to get an evenly-spaced, mobile-first responsive layout
+   without hand-picking Bootstrap col-* breakpoints per field. */
+.vw-form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem 1.25rem;
+}
+.vw-form-row > .mb-3, .vw-form-row > .mb-4 { margin-bottom: 0 !important; }
+
+/* Form action bar — consistent alignment for submit/cancel buttons */
+.vw-form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--vw-border);
+}
+.vw-form-actions.is-end { justify-content: flex-end; }
+.vw-form-actions.is-between { justify-content: space-between; }
+@media (max-width: 575.98px) {
+    .vw-form-actions { flex-direction: column-reverse; align-items: stretch; }
+    .vw-form-actions .btn { width: 100%; }
+}
+
+/* Input groups (icon-prefixed fields) */
+.input-group-text {
+    background-color: var(--vw-surface-muted);
+    border-color: var(--vw-border-strong);
+    color: var(--vw-text-muted);
+}
+.input-group:focus-within .input-group-text { border-color: var(--vw-accent); }
+
+/* ================================================================
+   "ui-field" inputs — the Tailwind-based text/email/number/textarea
+   controls used by the newer app-shell screens (Views/Shared/_Layout,
+   Login, and the UI kit). The base look (padding, radius, border,
+   dark mode) comes from the .ui-field utility class defined inline
+   per-page via Tailwind's @layer components; the rules below layer
+   on top with a plain CSS file so all pages that define .ui-field
+   automatically pick up the same hover/focus/validation/autofill
+   polish as the legacy .vw-search-input system, without editing every
+   inline <style> block or any view markup.
+   ================================================================ */
+input.ui-field, textarea.ui-field, select.ui-field {
+    transition: border-color var(--vw-dur-base) ease, box-shadow var(--vw-dur-base) ease, background-color var(--vw-dur-base) ease;
+}
+input.ui-field:hover:not(:disabled):not(:focus):not([readonly]),
+textarea.ui-field:hover:not(:disabled):not(:focus),
+select.ui-field:hover:not(:disabled):not(:focus) {
+    border-color: var(--vw-border-strong);
+}
+input.ui-field:focus, textarea.ui-field:focus, select.ui-field:focus {
+    box-shadow: 0 0 0 3.5px var(--vw-accent-bg);
+}
+textarea.ui-field { line-height: 1.55; resize: vertical; }
+input.ui-field:disabled, textarea.ui-field:disabled, select.ui-field:disabled { cursor: not-allowed; }
+
+input[type="number"].ui-field { -moz-appearance: textfield; }
+input[type="number"].ui-field::-webkit-inner-spin-button,
+input[type="number"].ui-field::-webkit-outer-spin-button {
+    opacity: 1;
+    cursor: pointer;
+}
+
+.ui-field:-webkit-autofill,
+.ui-field:-webkit-autofill:hover,
+.ui-field:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--vw-text);
+    -webkit-box-shadow: 0 0 0 1000px var(--vw-surface) inset;
+    box-shadow: 0 0 0 1000px var(--vw-surface) inset;
+    caret-color: var(--vw-text);
+    transition: background-color 9999s ease-in-out 0s, color 9999s ease-in-out 0s;
+}
+
+/* Validation — ASP.NET's InputTagHelper adds "input-validation-error"
+   to the rendered <input>/<textarea> whenever ModelState has an error
+   for that field, and jQuery Unobtrusive Validation does the same
+   live in the browser (adding "valid" once a field passes), so this
+   applies automatically with no markup or logic changes. */
+.ui-field.input-validation-error {
+    border-color: var(--vw-danger) !important;
+    background-color: var(--vw-danger-bg);
+}
+.ui-field.input-validation-error:focus {
+    background-color: var(--vw-surface);
+    box-shadow: 0 0 0 3.5px var(--vw-danger-bg) !important;
+}
+.ui-field.input-validation-error::placeholder { color: var(--vw-danger-text); opacity: .6; }
+
+.ui-field.valid {
+    border-color: var(--vw-success) !important;
+    background-color: var(--vw-success-bg);
+}
+.ui-field.valid:focus {
+    background-color: var(--vw-surface);
+    box-shadow: 0 0 0 3.5px var(--vw-success-bg) !important;
+}
+
+.ui-field-error:not(:empty) {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    animation: vw-field-msg-in var(--vw-dur-base) ease-out;
+}
+.ui-field-error:not(:empty)::before {
+    content: "!";
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--vw-danger);
+    color: var(--vw-text-inverse);
+    font-size: var(--vw-text-badge);
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* ================================================================
+   Password fields — visibility toggle, strength meter, confirm-match
+   hint. Plain CSS (no Tailwind/Bootstrap-specific selectors) so the
+   same markup pattern works on both the legacy Bootstrap input-group
+   screens (Register, ResetPassword, AssessmentAuth) and the newer
+   Tailwind .ui-field screens (Login, Admin dashboard). Wiring lives in
+   app.js's initPasswordEnhancements(), driven by data-pw-* attributes
+   — no page-specific inline <script> needed.
+   ================================================================ */
+
+/* Toggle button — Bootstrap variant, appended as the last segment of
+   an .input-group (sits flush next to the field, matching the
+   prepended icon on the other side). */
+.pw-toggle-btn {
+    background-color: var(--vw-surface-muted);
+    border: 1.5px solid var(--vw-border-strong);
+    color: var(--vw-text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color var(--vw-dur-base) ease, border-color var(--vw-dur-base) ease;
+}
+.pw-toggle-btn:hover { color: var(--vw-text); }
+.pw-toggle-btn:focus-visible { outline: 2px solid var(--vw-accent); outline-offset: 1px; }
+.input-group:focus-within .pw-toggle-btn { border-color: var(--vw-accent); }
+
+/* Toggle button — Tailwind variant, absolutely positioned inside a
+   `.relative` (or `.position-relative`) wrapper around the field. */
+.pw-toggle-inline {
+    position: absolute;
+    right: .65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 0;
+    display: inline-flex;
+    color: var(--vw-text-muted);
+    cursor: pointer;
+    transition: color var(--vw-dur-base) ease;
+}
+.pw-toggle-inline:hover { color: var(--vw-text); }
+.pw-toggle-inline:focus-visible { outline: 2px solid var(--vw-accent); outline-offset: 2px; border-radius: 4px; }
+
+/* ================================================================
+   Input icon wrapper — a leading icon (mail, lock, id-card, etc.)
+   sits inside the field via this positioning wrapper. The <label>
+   itself is NOT part of this wrapper: it's a normal `.ui-label`
+   rendered above the field, same as every other field in the app.
+
+   This replaced the old "floating label" pattern, where the label
+   lived inside the input box (as an overlapping placeholder-like
+   element) and animated up on focus. That pattern rendered as a
+   label stuck inside the input rather than a caption above it, so
+   every field that used it has been converted to the standard
+   label-above-input markup below.
+
+   Markup contract:
+
+       <label asp-for="Email" class="ui-label">Email<span class="ui-required">*</span></label>
+       <div class="ui-input-icon-wrap">
+           <i data-lucide="mail" class="ui-input-icon" aria-hidden="true"></i>
+           <input asp-for="Email" class="ui-field" ... />
+       </div>
+
+   Omit the wrapper (render the `.ui-field` input on its own, right
+   under the `.ui-label`) for fields with no leading icon.
+   ================================================================ */
+.ui-input-icon-wrap { position: relative; }
+.ui-input-icon {
+    position: absolute;
+    left: .75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--vw-text-muted);
+    pointer-events: none;
+    transition: color var(--vw-dur-base) ease;
+}
+.ui-input-icon-wrap .ui-field { padding-left: 2.25rem; }
+.ui-input-icon-wrap:focus-within .ui-input-icon { color: var(--vw-accent); }
+/* Password fields also carry a right-side toggle button (.pw-toggle-inline);
+   its own right/top positioning is untouched — it only needs the
+   wrapper to stay `position: relative`, same as before. */
+/* Suppress Edge/IE's built-in password reveal-eye and clear-x controls —
+   the app already renders its own .pw-toggle-inline eye button, so without
+   this, Edge shows BOTH icons stacked in the same field once text is typed. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear { display: none; }
+
+/* Strength meter — 4 segments that fill left-to-right as the password
+   gets stronger, plus a text label. UI-only signal (no client-side
+   policy is enforced by it); purely to guide the user while typing. */
+.pw-strength { margin-top: .55rem; }
+.pw-strength-track { display: flex; gap: 4px; }
+.pw-strength-seg {
+    height: 4px;
+    flex: 1;
+    border-radius: 4px;
+    background: var(--vw-surface-muted);
+    transition: background-color var(--vw-dur-base) ease;
+}
+.pw-strength-label {
+    display: block;
+    margin-top: .3rem;
+    font-size: var(--vw-text-xs);
+    font-weight: 600;
+    color: var(--vw-text-muted);
+}
+.pw-strength[data-level="weak"] .pw-strength-seg.is-filled { background: var(--vw-danger); }
+.pw-strength[data-level="weak"] .pw-strength-label { color: var(--vw-danger-text); }
+.pw-strength[data-level="fair"] .pw-strength-seg.is-filled { background: var(--vw-warning); }
+.pw-strength[data-level="fair"] .pw-strength-label { color: var(--vw-warning-text); }
+.pw-strength[data-level="good"] .pw-strength-seg.is-filled { background: var(--vw-info); }
+.pw-strength[data-level="good"] .pw-strength-label { color: var(--vw-info-text); }
+.pw-strength[data-level="strong"] .pw-strength-seg.is-filled { background: var(--vw-success); }
+.pw-strength[data-level="strong"] .pw-strength-label { color: var(--vw-success-text); }
+
+/* Confirm-password live match hint. */
+.pw-match-hint {
+    display: none;
+    align-items: center;
+    gap: .35rem;
+    margin-top: .35rem;
+    font-size: var(--vw-text-xs);
+    font-weight: 500;
+}
+.pw-match-hint.is-visible { display: inline-flex; }
+.pw-match-hint.is-match { color: var(--vw-success-text); }
+.pw-match-hint.is-mismatch { color: var(--vw-danger-text); }
+
+/* ================================================================
+   Dropdowns & select controls
+   ----------------------------------------------------------------
+   Covers three layers, all built on the same tokens so they stay
+   visually consistent and automatically follow dark mode:
+     1) Native <select> — ".ui-field", given a custom chevron,
+        consistent sizing, and a real disabled state (in place of
+        each browser's own default arrow and greyed-out look).
+     2) ".vw-combo" — a searchable-combobox progressive enhancement.
+        Wraps a real <select data-searchable> which is hidden (not
+        disabled, so it still posts) while a filterable text input +
+        listbox panel drives it. See app.js initSearchableSelects().
+     3) ".vw-msel" — a multi-select chip control, used where several
+        values need to collapse into one field (e.g. a comma-joined
+        hidden input) without changing what gets posted. See app.js
+        initMultiSelectChips().
+   ================================================================ */
+
+/* --- 1) Native <select> chevron, sizing, disabled state ---------- */
+select.ui-field {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-repeat: no-repeat;
+    background-position: right .8rem center;
+    background-size: 15px 15px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B6169' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    padding-right: 2.35rem !important;
+}
+[data-theme="dark"] select.ui-field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23AEB4BD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+select.ui-field:disabled {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238B9097' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+/* Truncate long option text instead of overflowing the control */
+select.ui-field { text-overflow: ellipsis; }
+
+/* Native multi-select ([multiple]) fallback — kept usable and on-theme
+   for any select that doesn't get the ".vw-msel" chip enhancement
+   (e.g. JS-disabled, or a plain <select multiple> dropped in later). */
+select.ui-field[multiple] {
+    background-image: none;
+    padding: .35rem;
+    min-height: 8.5rem;
+}
+select.ui-field[multiple] option {
+    padding: .45rem .6rem;
+    border-radius: 6px;
+    margin-bottom: 2px;
+}
+select.ui-field[multiple] option:checked {
+    background: linear-gradient(0deg, var(--vw-accent-bg), var(--vw-accent-bg));
+    color: var(--vw-accent-text);
+}
+
+/* --- 2) Searchable combobox (".vw-combo") ------------------------- */
+/* The enhanced select itself stays in the DOM (posts normally) but is
+   visually hidden; everything below is the visual replacement. */
+select[data-searchable].vw-combo-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+.vw-combo { position: relative; }
+.vw-combo-control {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    width: 100%;
+    min-height: 2.55rem;
+    padding: .55rem .7rem .55rem .9rem;
+    font-size: var(--vw-text-md);
+    line-height: 1.4;
+    border-radius: var(--vw-radius);
+    border: 1.5px solid var(--vw-border);
+    background-color: var(--vw-surface);
+    color: var(--vw-text);
+    cursor: pointer;
+    transition: border-color var(--vw-dur-base) ease, box-shadow var(--vw-dur-base) ease, background-color var(--vw-dur-base) ease;
+}
+.vw-combo-control:hover:not(.is-disabled) { border-color: var(--vw-border-strong); }
+.vw-combo.is-open .vw-combo-control,
+.vw-combo-control:focus-visible {
+    border-color: var(--vw-accent);
+    box-shadow: 0 0 0 3.5px var(--vw-accent-bg);
+    outline: none;
+}
+.vw-combo-value { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.vw-combo-value.is-placeholder { color: var(--vw-text-muted); }
+.vw-combo-chevron { flex-shrink: 0; width: 16px; height: 16px; color: var(--vw-text-muted); transition: transform var(--vw-dur-base) ease; }
+.vw-combo.is-open .vw-combo-chevron { transform: rotate(180deg); }
+.vw-combo-clear {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vw-text-muted);
+    background: none;
+    border: none;
+    padding: 2px;
+    border-radius: 50%;
+    cursor: pointer;
+}
+.vw-combo-clear:hover { color: var(--vw-text); background: var(--vw-surface-muted); }
+.vw-combo-clear svg { width: 14px; height: 14px; }
+
+.vw-combo-control.is-disabled {
+    background-color: var(--vw-surface-muted);
+    color: var(--vw-text-muted);
+    border-color: var(--vw-border);
+    cursor: not-allowed;
+}
+.vw-combo-control.is-disabled .vw-combo-chevron { opacity: .6; }
+
+.vw-combo-panel {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    background-color: var(--vw-surface);
+    border: 1px solid var(--vw-border);
+    border-radius: var(--vw-radius-lg);
+    box-shadow: 0 12px 28px -8px rgba(15, 18, 22, .22);
+    padding: .5rem;
+    animation: vw-menu-in var(--vw-dur-fast) ease-out;
+}
+.vw-combo-search-wrap { position: relative; margin-bottom: .35rem; }
+.vw-combo-search-wrap svg {
+    position: absolute;
+    left: .65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 15px;
+    height: 15px;
+    color: var(--vw-text-muted);
+    pointer-events: none;
+}
+.vw-combo-search {
+    width: 100%;
+    min-height: 2.2rem;
+    padding: .4rem .6rem .4rem 2rem;
+    font-size: var(--vw-text-sm);
+    border-radius: var(--vw-radius);
+    border: 1.5px solid var(--vw-border);
+    background-color: var(--vw-surface-muted);
+    color: var(--vw-text);
+}
+.vw-combo-search:focus {
+    outline: none;
+    border-color: var(--vw-accent);
+    background-color: var(--vw-surface);
+    box-shadow: 0 0 0 3px var(--vw-accent-bg);
+}
+.vw-combo-options { list-style: none; margin: 0; padding: 0; max-height: 15rem; overflow-y: auto; }
+.vw-combo-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: .5rem .65rem;
+    font-size: var(--vw-text-sm);
+    color: var(--vw-text);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.vw-combo-option:hover, .vw-combo-option.is-active { background-color: var(--vw-surface-muted); }
+.vw-combo-option.is-selected { color: var(--vw-accent-text); font-weight: 600; background-color: var(--vw-accent-bg); }
+.vw-combo-option svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--vw-accent); }
+.vw-combo-empty { padding: .65rem; font-size: var(--vw-text-sm); color: var(--vw-text-muted); text-align: center; }
+
+/* --- 3) Multi-select chip control (".vw-msel") -------------------- */
+.vw-msel { position: relative; }
+.vw-msel-control {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    width: 100%;
+    min-height: 2.55rem;
+    padding: .4rem .7rem .4rem .55rem;
+    border-radius: var(--vw-radius);
+    border: 1.5px solid var(--vw-border);
+    background-color: var(--vw-surface);
+    cursor: pointer;
+    transition: border-color var(--vw-dur-base) ease, box-shadow var(--vw-dur-base) ease, background-color var(--vw-dur-base) ease;
+}
+.vw-msel-control:hover:not(.is-disabled) { border-color: var(--vw-border-strong); }
+.vw-msel.is-open .vw-msel-control,
+.vw-msel-control:focus-visible {
+    border-color: var(--vw-accent);
+    box-shadow: 0 0 0 3.5px var(--vw-accent-bg);
+    outline: none;
+}
+.vw-msel-chips { flex: 1; display: flex; flex-wrap: wrap; gap: .3rem; align-items: center; min-height: 1.6rem; }
+.vw-msel-placeholder { color: var(--vw-text-muted); font-size: var(--vw-text-md); padding-left: .2rem; }
+.vw-msel-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    background: var(--vw-accent-bg);
+    color: var(--vw-accent-text);
+    border-radius: 999px;
+    padding: .18rem .3rem .18rem .6rem;
+    font-size: var(--vw-text-sm);
+    font-weight: 500;
+    line-height: 1.5;
+}
+.vw-msel-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, .08);
+    color: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.vw-msel-chip-remove:hover { background: rgba(0, 0, 0, .16); }
+.vw-msel-chip-remove svg { width: 10px; height: 10px; }
+.vw-msel-chevron { flex-shrink: 0; width: 16px; height: 16px; color: var(--vw-text-muted); transition: transform var(--vw-dur-base) ease; }
+.vw-msel.is-open .vw-msel-chevron { transform: rotate(180deg); }
+
+.vw-msel-control.is-disabled {
+    background-color: var(--vw-surface-muted);
+    cursor: not-allowed;
+}
+.vw-msel-control.is-disabled .vw-msel-chip { opacity: .75; }
+.vw-msel-control.is-disabled .vw-msel-chevron { opacity: .6; }
+
+.vw-msel-panel {
+    position: absolute;
+    z-index: 30;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    background-color: var(--vw-surface);
+    border: 1px solid var(--vw-border);
+    border-radius: var(--vw-radius-lg);
+    box-shadow: 0 12px 28px -8px rgba(15, 18, 22, .22);
+    padding: .5rem;
+    animation: vw-menu-in var(--vw-dur-fast) ease-out;
+}
+.vw-msel-search-wrap { position: relative; margin-bottom: .35rem; }
+.vw-msel-search-wrap svg {
+    position: absolute;
+    left: .65rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 15px;
+    height: 15px;
+    color: var(--vw-text-muted);
+    pointer-events: none;
+}
+.vw-msel-search {
+    width: 100%;
+    min-height: 2.2rem;
+    padding: .4rem .6rem .4rem 2rem;
+    font-size: var(--vw-text-sm);
+    border-radius: var(--vw-radius);
+    border: 1.5px solid var(--vw-border);
+    background-color: var(--vw-surface-muted);
+    color: var(--vw-text);
+}
+.vw-msel-search:focus {
+    outline: none;
+    border-color: var(--vw-accent);
+    background-color: var(--vw-surface);
+    box-shadow: 0 0 0 3px var(--vw-accent-bg);
+}
+.vw-msel-options { list-style: none; margin: 0; padding: 0; max-height: 15rem; overflow-y: auto; }
+.vw-msel-option {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    padding: .5rem .65rem;
+    font-size: var(--vw-text-sm);
+    color: var(--vw-text);
+    border-radius: 6px;
+    cursor: pointer;
+}
+.vw-msel-option:hover, .vw-msel-option.is-active { background-color: var(--vw-surface-muted); }
+.vw-msel-option-check {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--vw-border-strong);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    transition: background-color var(--vw-dur-fast) ease, border-color var(--vw-dur-fast) ease;
+}
+.vw-msel-option-check svg { width: 11px; height: 11px; }
+.vw-msel-option.is-checked .vw-msel-option-check {
+    background-color: var(--vw-accent);
+    border-color: var(--vw-accent);
+    color: #fff;
+}
+.vw-msel-option.is-disabled { color: var(--vw-text-muted); cursor: not-allowed; }
+.vw-msel-empty { padding: .65rem; font-size: var(--vw-text-sm); color: var(--vw-text-muted); text-align: center; }
+
+@media (max-width: 575.98px) {
+    .vw-combo-panel, .vw-msel-panel { left: 0; right: 0; }
+}

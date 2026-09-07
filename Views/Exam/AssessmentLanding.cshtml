@@ -1,0 +1,35 @@
+@{
+    ViewBag.Title = "Starting Assessment…";
+    Layout = "_Layout";
+}
+
+<div class="flex items-center justify-center min-h-[60vh]">
+    <div class="ui-card w-full max-w-[420px] text-center animate-fade-in">
+        <div class="ui-card-body py-6">
+            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--vw-accent-bg)]">
+                <span class="ui-loader-lg text-[var(--vw-accent)]" role="status" aria-label="Loading"></span>
+            </div>
+            <h1 class="text-base font-bold mb-1">Starting your assessment…</h1>
+            <p class="text-sm text-[var(--vw-text-secondary)] mb-2">@ViewBag.ExamTitle</p>
+            <p class="text-sm text-[var(--vw-text-muted)]">You will be redirected automatically. If nothing happens within a few seconds, click the button below.</p>
+
+            @* Hidden form — auto-submitted by JS; works even if JS is disabled via the button *@
+            <form id="startForm" asp-controller="Exam" asp-action="Start" method="post" class="mt-3">
+                <input type="hidden" name="id" value="@ViewBag.ExamId" />
+                @Html.AntiForgeryToken()
+                <button type="submit" class="ui-btn-primary">
+                    <i data-lucide="play" class="h-4 w-4"></i>Begin Assessment
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-submit after a brief pause so the spinner is visible.
+    window.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+            document.getElementById('startForm').submit();
+        }, 800);
+    });
+</script>
