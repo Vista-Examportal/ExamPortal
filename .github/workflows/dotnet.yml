@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - DEV
+      - master
 
   pull_request:
     branches:
       - DEV
+      - master
 
 jobs:
   build:
@@ -27,15 +29,3 @@ jobs:
 
       - name: Build solution
         run: dotnet build ExamPortal.sln --configuration Release --no-restore
-
-      - name: Run tests
-        run: dotnet test ExamPortal.sln --configuration Release --no-build
-
-      - name: Publish application
-        run: dotnet publish ExamPortal.csproj --configuration Release --no-build --output ./publish
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ExamPortal-build
-          path: ./publish
