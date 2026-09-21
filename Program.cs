@@ -84,7 +84,33 @@ var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefault
     .AddCookie(opt => {
         opt.LoginPath = "/Account/Login";
         opt.AccessDeniedPath = "/Account/Login";
-        opt.ExpireTimeSpan = TimeSpan.FromHours(4);
+        // 30-minute inactivity auto-logout for Candidate/Admin/Recruiter/HR portal
+        // sessions. SlidingExpiration renews this window on every authenticated
+        // request, so an actively-used session is never logged out mid-use — only
+        // genuine inactivity (no authenticated request for 30 minutes) expires the
+        // ticket. This governs the *default* (non-Remember-Me) case only: it's the
+        // fallback used when AuthenticationProperties.ExpiresUtc is left null (see
+        // SignInUserAsync below) — a real 30-minute value now, instead of null just
+        // meaning "whatever ExpireTimeSpan happens to be" as before.
+        //
+        // Remember Me is unaffected: SignInUserAsync sets an explicit ExpiresUtc
+        // (+30 days) and IsPersistent = true when rememberMe is true, and the cookie
+        // handler's sliding renewal re-issues each ticket using its own
+        // (ExpiresUtc - IssuedUtc) span rather than this global ExpireTimeSpan — so a
+        // Remember Me session keeps renewing itself in ~30-day increments, it never
+        // collapses to 30 minutes.
+        //
+        // This is also independent of the assessment's own timer: ExamController's
+        // IsAttemptExpired() is driven purely by Exam.DurationMinutes and
+        // AssessmentAttempt.StartedAt (wall-clock), never by anything on this
+        // cookie/ticket, so sliding this auth window can't extend — or shrink — an
+        // assessment's configured end time. In practice a candidate actively on the
+        // Take Exam page won't hit this timeout anyway: the existing proctoring
+        // heartbeat (ProctorHeartbeat every 15s, AutoSave every 30s — see
+        // Views/Exam/Take.cshtml) already fires authenticated requests well inside
+        // this 30-minute window, renewing it on its own.
+        opt.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+        opt.SlidingExpiration = true;
         opt.Cookie.HttpOnly = true;
         opt.Cookie.SameSite = SameSiteMode.Lax;
         opt.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
