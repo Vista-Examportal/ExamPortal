@@ -60,7 +60,10 @@
             <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label asp-for="DateOfBirth" class="ui-label">Date of Birth<span class="ui-required" aria-hidden="true">*</span></label>
-                    <input asp-for="DateOfBirth" class="ui-field" type="date" aria-required="true" aria-describedby="err-Dob" />
+                    <input asp-for="DateOfBirth" class="ui-field" type="date"
+                           min="@DateTime.Today.AddYears(-100).ToString("yyyy-MM-dd")"
+                           max="@DateTime.Today.AddYears(-16).ToString("yyyy-MM-dd")"
+                           aria-required="true" aria-describedby="err-Dob" />
                     <span asp-validation-for="DateOfBirth" id="err-Dob" class="ui-field-error"></span>
                 </div>
                 <div>

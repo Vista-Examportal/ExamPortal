@@ -150,6 +150,15 @@ namespace ExamPortal.Controllers
                 return RedirectToAction("Index");
             }
 
+            // Extension alone is just a string the client controls — this checks the
+            // file's actual leading bytes match a real PDF/JPEG/PNG, same reasoning as
+            // the resume/profile-photo uploads in AccountController.Registration.cs.
+            if (!await FileSignatureValidator.MatchesExtensionAsync(file, ext))
+            {
+                TempData["Error"] = "This file doesn't appear to be a valid PDF, JPG, or PNG.";
+                return RedirectToAction("Index");
+            }
+
             // Find (rather than replace outright) the existing record for this type first,
             // so its current VerificationStatus can gate whether this upload is even
             // allowed — a Verified document is locked, and (by design) so is a Pending one

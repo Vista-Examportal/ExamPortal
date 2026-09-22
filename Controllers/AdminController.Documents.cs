@@ -53,6 +53,18 @@ namespace ExamPortal.Controllers
             status = Clamp(status, 50);
             notes  = Clamp(notes, 1000);
 
+            // status is client-supplied and must be validated explicitly: the UI's two
+            // buttons only ever send "Verified" or "Rejected", but nothing previously
+            // stopped a manually crafted POST from writing an arbitrary string straight
+            // into VerificationStatus — which DocumentVerificationHelper's
+            // AreAllRequiredDocumentsVerified check (below) wouldn't recognize as either
+            // verified or pending, silently corrupting this candidate's document-gate state.
+            if (status != "Verified" && status != "Rejected")
+            {
+                TempData["Error"] = "Invalid document status.";
+                return RedirectToAction("CandidateDetail", new { id = doc.UserId });
+            }
+
             doc.VerificationStatus = status; // Verified | Rejected
             doc.AdminNotes         = notes;
             doc.VerifiedAt         = DateTime.UtcNow;

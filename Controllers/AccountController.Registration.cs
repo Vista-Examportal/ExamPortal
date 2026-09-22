@@ -295,6 +295,16 @@ namespace ExamPortal.Controllers
                 return "";
             }
 
+            // Extension and Content-Type are both client-supplied and easily spoofed in a
+            // manually crafted request — this checks the file's actual leading bytes match
+            // a real PDF ("%PDF-"), catching a renamed/mislabeled or corrupt file that
+            // passed both checks above.
+            if (!await FileSignatureValidator.MatchesExtensionAsync(file, extension))
+            {
+                ModelState.AddModelError(nameof(ResumeSkillStepViewModel.ResumeUpload), "This file doesn't appear to be a valid PDF.");
+                return "";
+            }
+
             return await SaveUploadAsync(file, "resumes", ".pdf");
         }
 
@@ -312,6 +322,14 @@ namespace ExamPortal.Controllers
             if (file.Length > 2 * 1024 * 1024)
             {
                 ModelState.AddModelError(nameof(ResumeSkillStepViewModel.ProfilePhoto), "Profile photo must be 2 MB or smaller.");
+                return "";
+            }
+
+            // Same reasoning as SaveResumeAsync above — extension/Content-Type are
+            // client-supplied and spoofable, so this checks the actual image signature.
+            if (!await FileSignatureValidator.MatchesExtensionAsync(file, extension))
+            {
+                ModelState.AddModelError(nameof(ResumeSkillStepViewModel.ProfilePhoto), "This file doesn't appear to be a valid image.");
                 return "";
             }
 

@@ -67,6 +67,16 @@ namespace ExamPortal.Controllers
             // against DateTime.UtcNow — the "upcoming interviews" dashboard filter — and
             // .ToLocalTime() displays are correct regardless of which time zone was selected.
             var scheduledAtUtc = SchedulingHelper.ConvertWallClockToUtc(scheduledAt, timeZone);
+            if (scheduledAtUtc <= DateTime.UtcNow)
+            {
+                // Nothing previously stopped a past date/time here — durationMinutes gets
+                // the same defensive clamp just below for the same reason: this action
+                // takes loose params, not a bound ViewModel, so a direct POST (or simply
+                // picking a past date before the picker's own min= kicks in) reached the
+                // database unchecked.
+                TempData["Error"] = "Interview date/time must be in the future.";
+                return RedirectToAction("CandidateDetail", new { id = userId });
+            }
 
             _db.InterviewRecords.Add(new InterviewRecord
             {
@@ -316,7 +326,13 @@ namespace ExamPortal.Controllers
             interview.Status           = "Scheduled";
             // Store the true UTC instant (see ConvertWallClockToUtc) — same reasoning as
             // ScheduleInterview above.
-            interview.ScheduledAt      = SchedulingHelper.ConvertWallClockToUtc(scheduledAt, timeZone);
+            var rescheduledAtUtc = SchedulingHelper.ConvertWallClockToUtc(scheduledAt, timeZone);
+            if (rescheduledAtUtc <= DateTime.UtcNow)
+            {
+                TempData["Error"] = "Interview date/time must be in the future.";
+                return RedirectToAction("CandidateDetail", new { id = interview.UserId });
+            }
+            interview.ScheduledAt      = rescheduledAtUtc;
             interview.TimeZone         = timeZone;
             interview.DurationMinutes  = durationMinutes;
             interview.Format           = format;
