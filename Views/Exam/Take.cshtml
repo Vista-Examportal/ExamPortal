@@ -1,5 +1,7 @@
 @model ExamTakeViewModel
-@{ ViewData["Title"] = "Taking: " + Model.Exam.Title; }
+@{
+    ViewData["Title"] = "Taking: " + Model.Exam.Title;
+}
 
 @* ================================================================
    Sticky exam header — title, countdown timer, proctoring/connection
@@ -194,254 +196,279 @@
 </div>
 
 @section Scripts {
-<script>
-    // Prevent browser back button during exam
-    history.pushState(null, '', window.location.href);
-    window.addEventListener('popstate', function () {
+    <script>
+        // Prevent browser back button during exam
         history.pushState(null, '', window.location.href);
-        if (!submitted) {
-            logViolation('Back Button', 'Candidate attempted to navigate back during assessment.', 3);
-        }
-    });
-
-    const totalSecs = @ViewBag.RemainingSeconds;
-    const attemptId = @Model.AttemptId;
-    const proctoringSessionId = '@(ViewBag.ProctoringSessionId ?? "")';
-    const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
-    let secs = totalSecs;
-    const timerEl = document.getElementById('timer');
-    const countEl = document.getElementById('answeredCount');
-    const total = @Model.Exam.Questions.Count;
-    let answered = new Set();
-    let submitted = false;
-    let focusLossCount = 0;
-    let tabSwitchCount = 0;
-    const browserInfo = `${navigator.userAgent}; platform=${navigator.platform}; lang=${navigator.language}`;
-
-    const timerAnnouncerEl = document.getElementById('timerAnnouncer');
-    function announceTimeRemaining(totalSecs) {
-        if (!timerAnnouncerEl) return;
-        // Only announce at a few key milestones so screen reader users get a
-        // heads-up without the countdown being read out loud every second.
-        if (totalSecs === 300) timerAnnouncerEl.textContent = '5 minutes remaining.';
-        else if (totalSecs === 60) timerAnnouncerEl.textContent = '1 minute remaining.';
-        else if (totalSecs === 30) timerAnnouncerEl.textContent = '30 seconds remaining.';
-    }
-    function updateTimer() {
-        if (secs <= 0) { autoSubmit('Session Timeout', 'Assessment timer expired.'); return; }
-        const m = Math.floor(secs / 60), s = secs % 60;
-        timerEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
-        timerEl.style.color = secs <= 300 ? 'var(--vw-danger)' : 'var(--vw-accent)';
-        announceTimeRemaining(secs);
-        secs--;
-    }
-    updateTimer();
-    setInterval(updateTimer, 1000);
-    setInterval(sendHeartbeat, 15000);
-    setInterval(autoSaveAllTextAnswers, 30000);
-    document.addEventListener('DOMContentLoaded', initializeProctoring);
-
-    // Updates the "jump to question" nav button state (answered / marked
-    // for review) so the strip doubles as a progress-at-a-glance map —
-    // purely visual, driven off the same events that already save answers.
-    function updateNavState(qid) {
-        const btn = document.getElementById('qNavBtn_' + qid);
-        if (!btn) return;
-        btn.classList.toggle('is-answered', answered.has(String(qid)));
-        const reviewBox = document.querySelector(`.review-box[data-qid="${qid}"]`);
-        btn.classList.toggle('is-marked', !!reviewBox && reviewBox.checked);
-    }
-
-    document.querySelectorAll('.option-radio').forEach(r => {
-        if (r.checked) answered.add(r.dataset.qid);
-        r.addEventListener('change', function() {
-            answered.add(this.dataset.qid);
-            countEl.textContent = answered.size + ' / ' + total + ' answered';
-            document.getElementById('qCard_' + this.dataset.qid)?.classList.add('is-answered');
-            updateNavState(this.dataset.qid);
-            const values = Array.from(document.querySelectorAll(`[name="q_${this.dataset.qid}"]:checked`)).map(x => x.value).join(',');
-            autoSave(this.dataset.qid, values || this.value, '', false);
-        });
-    });
-
-    document.querySelectorAll('.auto-save-text').forEach(t => {
-        if (t.value.trim()) answered.add(t.dataset.qid);
-        t.addEventListener('change', function() {
-            if (this.value.trim()) {
-                answered.add(this.dataset.qid);
-                document.getElementById('qCard_' + this.dataset.qid)?.classList.add('is-answered');
-                countEl.textContent = answered.size + ' / ' + total + ' answered';
-                updateNavState(this.dataset.qid);
+        window.addEventListener('popstate', function () {
+            history.pushState(null, '', window.location.href);
+            if (!submitted) {
+                logViolation('Back Button', 'Candidate attempted to navigate back during assessment.', 3);
             }
-            autoSave(this.dataset.qid, '', this.value, false);
         });
-    });
-    countEl.textContent = answered.size + ' / ' + total + ' answered';
-    document.querySelectorAll('.review-box').forEach(t => {
-        t.addEventListener('change', function() {
-            updateNavState(this.dataset.qid);
-            autoSave(this.dataset.qid, '', '', this.checked);
-        });
-    });
-    // Paint initial nav state for anything pre-filled from a resumed attempt.
-    answered.forEach(qid => updateNavState(qid));
 
-    function confirmSubmit() {
-        const unanswered = total - answered.size;
-        const modal = document.getElementById('submitConfirmModal');
-        document.getElementById('submitConfirmMessage').textContent = unanswered > 0
-            ? `You have ${unanswered} unanswered question(s). Submit anyway?`
-            : 'This will finalize your responses. Submit the assessment?';
-        modal.classList.remove('hidden');
-        document.documentElement.classList.add('overflow-hidden');
+        const totalSecs = @ViewBag.RemainingSeconds;
+        const attemptId = @Model.AttemptId;
+        const proctoringSessionId = '@(ViewBag.ProctoringSessionId ?? "")';
+        const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+        let secs = totalSecs;
+        const timerEl = document.getElementById('timer');
+        const countEl = document.getElementById('answeredCount');
+        const total = @Model.Exam.Questions.Count;
+        let answered = new Set();
+        let submitted = false;
+        let focusLossCount = 0;
+        let tabSwitchCount = 0;
+        const browserInfo = `${navigator.userAgent}; platform=${navigator.platform}; lang=${navigator.language}`;
 
-        function close() { modal.classList.add('hidden'); document.documentElement.classList.remove('overflow-hidden'); cleanup(); }
-        function confirmOk() { close(); submitAssessment(); }
-        function cleanup() {
-            modal.querySelectorAll('[data-submit-cancel]').forEach(c => c.removeEventListener('click', close));
-            document.getElementById('submitConfirmOk').removeEventListener('click', confirmOk);
+        const timerAnnouncerEl = document.getElementById('timerAnnouncer');
+        function announceTimeRemaining(totalSecs) {
+            if (!timerAnnouncerEl) return;
+            // Only announce at a few key milestones so screen reader users get a
+            // heads-up without the countdown being read out loud every second.
+            if (totalSecs === 300) timerAnnouncerEl.textContent = '5 minutes remaining.';
+            else if (totalSecs === 60) timerAnnouncerEl.textContent = '1 minute remaining.';
+            else if (totalSecs === 30) timerAnnouncerEl.textContent = '30 seconds remaining.';
         }
-        modal.querySelectorAll('[data-submit-cancel]').forEach(c => c.addEventListener('click', close));
-        document.getElementById('submitConfirmOk').addEventListener('click', confirmOk);
-    }
-
-    function submitAssessment() {
-        if (submitted) return;
-        submitted = true;
-        if (window.vwShowOverlay) window.vwShowOverlay('Submitting your assessment…');
-        document.getElementById('examForm').submit();
-    }
-
-    function autoSubmit(eventType, details) {
-        logViolation(eventType, details, 5);
-        setTimeout(submitAssessment, 350);
-    }
-
-    function autoSave(questionId, answer, textAnswer, markedForReview) {
-        const body = new URLSearchParams({ attemptId, questionId, answer: answer || '', textAnswer: textAnswer || '', markedForReview: markedForReview || false, __RequestVerificationToken: csrfToken });
-        fetch('/Exam/AutoSave', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-    }
-
-    function logViolation(eventType, details, severity = 1) {
-        const body = new URLSearchParams({ attemptId, eventType, details, severity, __RequestVerificationToken: csrfToken });
-        fetch('/Exam/LogViolation', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-    }
-
-    function sendHeartbeat() {
-        const body = new URLSearchParams({
-            attemptId,
-            sessionId: proctoringSessionId,
-            browserInfo,
-            online: navigator.onLine,
-            fullScreen: !!document.fullscreenElement,
-            __RequestVerificationToken: csrfToken
-        });
-        fetch('/Exam/ProctorHeartbeat', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-    }
-
-    function autoSaveAllTextAnswers() {
-        document.querySelectorAll('.auto-save-text').forEach(t => {
-            autoSave(t.dataset.qid, '', t.value, false);
-        });
-    }
-
-    function runCode(questionId) {
-        const code = document.querySelector(`[name="code_${questionId}"]`).value;
-        const language = document.querySelector(`[name="language_${questionId}"]`).value;
-        const body = new URLSearchParams({ attemptId, questionId, language, sourceCode: code, __RequestVerificationToken: csrfToken });
-        fetch('/Exam/RunCode', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
-            .then(r => r.json()).then(d => document.getElementById(`codeOutput_${questionId}`).textContent = d.output);
-    }
-
-    function enterFullScreen() {
-        document.documentElement.requestFullscreen?.()
-            .then(() => logViolation('Fullscreen Entered', 'Candidate entered browser fullscreen mode.', 1))
-            .catch(() => logViolation('Fullscreen Denied', 'Browser refused fullscreen request.', 3));
-    }
-
-    function initializeProctoring() {
-        checkBrowserCompatibility();
-        requestMediaPermissions();
-        sendHeartbeat();
-        if (!document.fullscreenElement) logViolation('Fullscreen Not Active', 'Assessment loaded outside fullscreen mode.', 2);
-    }
-
-    function checkBrowserCompatibility() {
-        const ua = navigator.userAgent;
-        const supported = /Chrome|Edg|Firefox/.test(ua) && !!window.fetch && !!navigator.mediaDevices;
-        if (!supported) logViolation('Browser Compatibility', `Potentially unsupported browser: ${ua}`, 4);
-    }
-
-    function requestMediaPermissions() {
-        const status = document.getElementById('mediaStatus');
-        if (!navigator.mediaDevices?.getUserMedia) {
-            status.textContent = 'Camera/mic unsupported';
-            status.dataset.state = 'danger';
-            logViolation('Media Unsupported', 'Camera/microphone permission API is unavailable.', 4);
-            return;
+        function updateTimer() {
+            if (secs <= 0) { autoSubmit('Session Timeout', 'Assessment timer expired.'); return; }
+            const m = Math.floor(secs / 60), s = secs % 60;
+            timerEl.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+            timerEl.style.color = secs <= 300 ? 'var(--vw-danger)' : 'var(--vw-accent)';
+            announceTimeRemaining(secs);
+            secs--;
         }
-        navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-            .then(stream => {
-                stream.getTracks().forEach(track => track.stop());
-                status.textContent = 'Camera and mic ready';
-                status.dataset.state = 'ok';
-                logViolation('Media Permission Granted', 'Camera and microphone permissions granted.', 1);
-            })
-            .catch(error => {
-                status.textContent = 'Camera/mic blocked';
-                status.dataset.state = 'danger';
-                logViolation('Media Permission Denied', error.message || 'Camera/microphone permission denied.', 5);
+        updateTimer();
+        setInterval(updateTimer, 1000);
+        setInterval(sendHeartbeat, 15000);
+        setInterval(autoSaveAllTextAnswers, 30000);
+        document.addEventListener('DOMContentLoaded', initializeProctoring);
+
+        // Updates the "jump to question" nav button state (answered / marked
+        // for review) so the strip doubles as a progress-at-a-glance map —
+        // purely visual, driven off the same events that already save answers.
+        function updateNavState(qid) {
+            const btn = document.getElementById('qNavBtn_' + qid);
+            if (!btn) return;
+            btn.classList.toggle('is-answered', answered.has(String(qid)));
+            const reviewBox = document.querySelector(`.review-box[data-qid="${qid}"]`);
+            btn.classList.toggle('is-marked', !!reviewBox && reviewBox.checked);
+        }
+
+        document.querySelectorAll('.option-radio').forEach(r => {
+            if (r.checked) answered.add(r.dataset.qid);
+            r.addEventListener('change', function() {
+                answered.add(this.dataset.qid);
+                countEl.textContent = answered.size + ' / ' + total + ' answered';
+                document.getElementById('qCard_' + this.dataset.qid)?.classList.add('is-answered');
+                updateNavState(this.dataset.qid);
+                const values = Array.from(document.querySelectorAll(`[name="q_${this.dataset.qid}"]:checked`)).map(x => x.value).join(',');
+                autoSave(this.dataset.qid, values || this.value, '', false);
             });
-    }
+        });
 
-    document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-            tabSwitchCount++;
-            logViolation('Tab Switch', `Candidate left the assessment tab. Count=${tabSwitchCount}`, 4);
-            if (tabSwitchCount >= 3) autoSubmit('Repeated Tab Switching', 'Assessment auto-submitted after repeated tab switching.');
+        document.querySelectorAll('.auto-save-text').forEach(t => {
+            if (t.value.trim()) answered.add(t.dataset.qid);
+            t.addEventListener('change', function() {
+                if (this.value.trim()) {
+                    answered.add(this.dataset.qid);
+                    document.getElementById('qCard_' + this.dataset.qid)?.classList.add('is-answered');
+                    countEl.textContent = answered.size + ' / ' + total + ' answered';
+                    updateNavState(this.dataset.qid);
+                }
+                autoSave(this.dataset.qid, '', this.value, false);
+            });
+        });
+        countEl.textContent = answered.size + ' / ' + total + ' answered';
+        document.querySelectorAll('.review-box').forEach(t => {
+            t.addEventListener('change', function() {
+                updateNavState(this.dataset.qid);
+                autoSave(this.dataset.qid, '', '', this.checked);
+            });
+        });
+        // Paint initial nav state for anything pre-filled from a resumed attempt.
+        answered.forEach(qid => updateNavState(qid));
+
+        function confirmSubmit() {
+            const unanswered = total - answered.size;
+            const modal = document.getElementById('submitConfirmModal');
+            document.getElementById('submitConfirmMessage').textContent = unanswered > 0
+                ? `You have ${unanswered} unanswered question(s). Submit anyway?`
+                : 'This will finalize your responses. Submit the assessment?';
+            modal.classList.remove('hidden');
+            document.documentElement.classList.add('overflow-hidden');
+
+            function close() { modal.classList.add('hidden'); document.documentElement.classList.remove('overflow-hidden'); cleanup(); }
+            function confirmOk() { close(); submitAssessment(); }
+            function cleanup() {
+                modal.querySelectorAll('[data-submit-cancel]').forEach(c => c.removeEventListener('click', close));
+                document.getElementById('submitConfirmOk').removeEventListener('click', confirmOk);
+            }
+            modal.querySelectorAll('[data-submit-cancel]').forEach(c => c.addEventListener('click', close));
+            document.getElementById('submitConfirmOk').addEventListener('click', confirmOk);
         }
-    });
-    let blurTimer = null;
-    window.addEventListener('blur', () => {
-        // Only count as violation if focus is lost for more than 800ms (ignores OS dialogs, tooltips)
-        blurTimer = setTimeout(() => {
-            focusLossCount++;
-            document.getElementById('focusStatus').textContent = 'Focus lost';
-            document.getElementById('focusStatus').dataset.state = 'danger';
-            logViolation('Window Focus Lost', `Assessment window lost focus. Count=${focusLossCount}`, 4);
-            if (focusLossCount >= 5) autoSubmit('Repeated Focus Loss', 'Assessment auto-submitted after repeated window focus loss.');
-        }, 800);
-    });
-    window.addEventListener('focus', () => {
-        if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
-        document.getElementById('focusStatus').textContent = 'Focused';
-        document.getElementById('focusStatus').dataset.state = 'ok';
-    });
-    document.addEventListener('fullscreenchange', () => {
-        if (!document.fullscreenElement) logViolation('Fullscreen Exit', 'Candidate exited fullscreen mode.', 4);
-    });
-    document.addEventListener('copy', e => { e.preventDefault(); logViolation('Copy Blocked', 'Copy attempted.', 3); });
-    document.addEventListener('cut', e => { e.preventDefault(); logViolation('Cut Blocked', 'Cut attempted.', 3); });
-    document.addEventListener('paste', e => { e.preventDefault(); logViolation('Paste Blocked', 'Paste attempted.', 3); });
-    document.addEventListener('contextmenu', e => { e.preventDefault(); logViolation('Right Click Blocked', 'Right click/context menu attempted.', 2); });
-    document.addEventListener('keydown', e => {
-        const blocked = (e.ctrlKey || e.metaKey) && ['c', 'v', 'x', 'a', 'p', 's', 'u'].includes(e.key.toLowerCase());
-        if (blocked) {
-            e.preventDefault();
-            logViolation('Keyboard Shortcut Blocked', `Blocked shortcut: ${e.key}`, 3);
+
+        function submitAssessment() {
+            if (submitted) return;
+            submitted = true;
+            if (window.vwShowOverlay) window.vwShowOverlay('Submitting your assessment…');
+            document.getElementById('examForm').submit();
         }
-    });
-    window.addEventListener('offline', () => {
-        document.getElementById('networkStatus').textContent = 'Offline';
-        document.getElementById('networkStatus').dataset.state = 'danger';
-        logViolation('Connectivity', 'Internet connection lost.', 2);
-    });
-    window.addEventListener('online', () => {
-        document.getElementById('networkStatus').textContent = 'Online';
-        document.getElementById('networkStatus').dataset.state = 'ok';
-    });
-    window.addEventListener('beforeunload', () => {
-        navigator.sendBeacon?.('/Exam/LogViolation', new URLSearchParams({ attemptId, eventType: 'Page Unload', details: 'Candidate attempted to leave or refresh assessment page.', severity: 4, __RequestVerificationToken: csrfToken }));
-    });
-</script>
+
+        function autoSubmit(eventType, details) {
+            logViolation(eventType, details, 5);
+            setTimeout(submitAssessment, 350);
+        }
+
+        function autoSave(questionId, answer, textAnswer, markedForReview) {
+            const body = new URLSearchParams({ attemptId, questionId, answer: answer || '', textAnswer: textAnswer || '', markedForReview: markedForReview || false, __RequestVerificationToken: csrfToken });
+            fetch('/Exam/AutoSave', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        }
+
+        function logViolation(eventType, details, severity = 1) {
+            const body = new URLSearchParams({ attemptId, eventType, details, severity, __RequestVerificationToken: csrfToken });
+            fetch('/Exam/LogViolation', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        }
+
+        function sendHeartbeat() {
+            const body = new URLSearchParams({
+                attemptId,
+                sessionId: proctoringSessionId,
+                browserInfo,
+                online: navigator.onLine,
+                fullScreen: hasFullscreenElement(),
+                __RequestVerificationToken: csrfToken
+            });
+            fetch('/Exam/ProctorHeartbeat', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+        }
+
+        function autoSaveAllTextAnswers() {
+            document.querySelectorAll('.auto-save-text').forEach(t => {
+                autoSave(t.dataset.qid, '', t.value, false);
+            });
+        }
+
+        function runCode(questionId) {
+            const code = document.querySelector(`[name="code_${questionId}"]`).value;
+            const language = document.querySelector(`[name="language_${questionId}"]`).value;
+            const body = new URLSearchParams({ attemptId, questionId, language, sourceCode: code, __RequestVerificationToken: csrfToken });
+            fetch('/Exam/RunCode', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
+                .then(r => r.json()).then(d => document.getElementById(`codeOutput_${questionId}`).textContent = d.output);
+        }
+
+        function enterFullScreen() {
+            const request = (document.documentElement.requestFullscreen ?? document.documentElement.webkitRequestFullscreen)
+                ?.bind(document.documentElement);
+            if (!request) {
+                // No fullscreen API at all (e.g. iOS Safari doesn't support fullscreen on
+                // arbitrary elements) — nothing to request, just record it.
+                logViolation('Fullscreen Denied', 'Fullscreen API is not available in this browser.', 3);
+                return;
+            }
+            // Promise.resolve(...) normalizes this: modern requestFullscreen() returns a
+            // Promise, but the older webkitRequestFullscreen() doesn't return anything at
+            // all, so calling .then/.catch directly on its result would throw.
+            Promise.resolve(request())
+                .then(() => logViolation('Fullscreen Entered', 'Candidate entered browser fullscreen mode.', 1))
+                .catch(() => logViolation('Fullscreen Denied', 'Browser refused fullscreen request.', 3));
+        }
+
+        // Standard fullscreenElement, with the older WebKit-prefixed fallback for Safari
+        // versions that predate the unprefixed API. Note: iOS Safari does not support
+        // fullscreen on arbitrary elements at all (only <video>), by OS-level design —
+        // no JS/vendor-prefix workaround exists for that, so a "Fullscreen Not Active"
+        // violation on iOS is expected platform behavior, not a bug.
+        const hasFullscreenElement = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+
+        function initializeProctoring() {
+            checkBrowserCompatibility();
+            requestMediaPermissions();
+            sendHeartbeat();
+            if (!hasFullscreenElement()) logViolation('Fullscreen Not Active', 'Assessment loaded outside fullscreen mode.', 2);
+        }
+
+        function checkBrowserCompatibility() {
+            // Feature-detect rather than allow-list specific browser names: this checks
+            // for the actual capabilities the proctoring flow depends on (fetch,
+            // getUserMedia), so any modern browser that genuinely supports them —
+            // Safari included — is treated as supported. A name-based allow-list
+            // previously flagged Safari as "unsupported" even though it has both APIs.
+            const supported = !!window.fetch && !!navigator.mediaDevices?.getUserMedia;
+            if (!supported) logViolation('Browser Compatibility', `Potentially unsupported browser: ${navigator.userAgent}`, 4);
+        }
+
+        function requestMediaPermissions() {
+            const status = document.getElementById('mediaStatus');
+            if (!navigator.mediaDevices?.getUserMedia) {
+                status.textContent = 'Camera/mic unsupported';
+                status.dataset.state = 'danger';
+                logViolation('Media Unsupported', 'Camera/microphone permission API is unavailable.', 4);
+                return;
+            }
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    stream.getTracks().forEach(track => track.stop());
+                    status.textContent = 'Camera and mic ready';
+                    status.dataset.state = 'ok';
+                    logViolation('Media Permission Granted', 'Camera and microphone permissions granted.', 1);
+                })
+                .catch(error => {
+                    status.textContent = 'Camera/mic blocked';
+                    status.dataset.state = 'danger';
+                    logViolation('Media Permission Denied', error.message || 'Camera/microphone permission denied.', 5);
+                });
+        }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                tabSwitchCount++;
+                logViolation('Tab Switch', `Candidate left the assessment tab. Count=${tabSwitchCount}`, 4);
+                if (tabSwitchCount >= 3) autoSubmit('Repeated Tab Switching', 'Assessment auto-submitted after repeated tab switching.');
+            }
+        });
+        let blurTimer = null;
+        window.addEventListener('blur', () => {
+            // Only count as violation if focus is lost for more than 800ms (ignores OS dialogs, tooltips)
+            blurTimer = setTimeout(() => {
+                focusLossCount++;
+                document.getElementById('focusStatus').textContent = 'Focus lost';
+                document.getElementById('focusStatus').dataset.state = 'danger';
+                logViolation('Window Focus Lost', `Assessment window lost focus. Count=${focusLossCount}`, 4);
+                if (focusLossCount >= 5) autoSubmit('Repeated Focus Loss', 'Assessment auto-submitted after repeated window focus loss.');
+            }, 800);
+        });
+        window.addEventListener('focus', () => {
+            if (blurTimer) { clearTimeout(blurTimer); blurTimer = null; }
+            document.getElementById('focusStatus').textContent = 'Focused';
+            document.getElementById('focusStatus').dataset.state = 'ok';
+        });
+        document.addEventListener('fullscreenchange', () => {
+            if (!hasFullscreenElement()) logViolation('Fullscreen Exit', 'Candidate exited fullscreen mode.', 4);
+        });
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (!hasFullscreenElement()) logViolation('Fullscreen Exit', 'Candidate exited fullscreen mode.', 4);
+        });
+        document.addEventListener('copy', e => { e.preventDefault(); logViolation('Copy Blocked', 'Copy attempted.', 3); });
+        document.addEventListener('cut', e => { e.preventDefault(); logViolation('Cut Blocked', 'Cut attempted.', 3); });
+        document.addEventListener('paste', e => { e.preventDefault(); logViolation('Paste Blocked', 'Paste attempted.', 3); });
+        document.addEventListener('contextmenu', e => { e.preventDefault(); logViolation('Right Click Blocked', 'Right click/context menu attempted.', 2); });
+        document.addEventListener('keydown', e => {
+            const blocked = (e.ctrlKey || e.metaKey) && ['c', 'v', 'x', 'a', 'p', 's', 'u'].includes(e.key.toLowerCase());
+            if (blocked) {
+                e.preventDefault();
+                logViolation('Keyboard Shortcut Blocked', `Blocked shortcut: ${e.key}`, 3);
+            }
+        });
+        window.addEventListener('offline', () => {
+            document.getElementById('networkStatus').textContent = 'Offline';
+            document.getElementById('networkStatus').dataset.state = 'danger';
+            logViolation('Connectivity', 'Internet connection lost.', 2);
+        });
+        window.addEventListener('online', () => {
+            document.getElementById('networkStatus').textContent = 'Online';
+            document.getElementById('networkStatus').dataset.state = 'ok';
+        });
+        window.addEventListener('beforeunload', () => {
+            navigator.sendBeacon?.('/Exam/LogViolation', new URLSearchParams({ attemptId, eventType: 'Page Unload', details: 'Candidate attempted to leave or refresh assessment page.', severity: 4, __RequestVerificationToken: csrfToken }));
+        });
+    </script>
 }
