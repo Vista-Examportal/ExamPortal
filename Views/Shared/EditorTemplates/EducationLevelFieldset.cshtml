@@ -184,14 +184,14 @@
                 <label class="ui-label">
                     Marks<span class="ui-required" aria-hidden="true">*</span>
                 </label>
-                <input asp-for="MarksValue" class="ui-field" inputmode="decimal" aria-describedby="hint-MarksValue" />
-                <div id="hint-MarksValue" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">e.g. 85 or 8.5</div>
+                <input asp-for="MarksValue" class="ui-field js-marks-value" inputmode="decimal" aria-describedby="hint-MarksValue" />
+                <div id="hint-MarksValue" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400 js-marks-hint">e.g. 85 or 8.5</div>
                 <span asp-validation-for="MarksValue" class="ui-field-error"></span>
             </div>
 
             <div class="md:col-span-4">
                 <label class="ui-label">Marks Type</label>
-                <select asp-for="MarksType" class="ui-field">
+                <select asp-for="MarksType" class="ui-field js-marks-type">
                     <option value="Percentage">Percentage</option>
                     <option value="CGPA">CGPA</option>
                 </select>

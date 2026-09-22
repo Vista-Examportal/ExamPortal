@@ -1944,6 +1944,49 @@
     window.vwInitSmartTables = initSmartTables;
 
     /* ---------------------------------------------------------------- */
+    /* Marks/CGPA scale sync (UX only — server enforces the real limit)  */
+    /* ---------------------------------------------------------------- */
+    function initMarksTypeSync() {
+        var selects = document.querySelectorAll(".js-marks-type");
+        if (!selects.length) return;
+        var apply = function (select) {
+            var container = select.closest(".edu-detail-fields");
+            if (!container) return;
+            var input = container.querySelector(".js-marks-value");
+            var hint = container.querySelector(".js-marks-hint");
+            if (!input) return;
+            if (select.value === "CGPA") {
+                input.max = "10";
+                if (hint) hint.textContent = "e.g. 8.5 (CGPA is out of 10)";
+            } else {
+                input.max = "100";
+                if (hint) hint.textContent = "e.g. 85 (Percentage is out of 100)";
+            }
+        };
+        selects.forEach(function (select) {
+            apply(select);
+            select.addEventListener("change", function () { apply(select); });
+        });
+    }
+
+    /* ---------------------------------------------------------------- */
+    /* Future-only datetime pickers (UX only — server re-validates)      */
+    /* ---------------------------------------------------------------- */
+    function initFutureDatetimeInputs() {
+        var inputs = document.querySelectorAll(".js-future-datetime");
+        if (!inputs.length) return;
+        // datetime-local's min/value need "YYYY-MM-DDTHH:mm" in *local* time —
+        // toISOString() is UTC, so build it from the local field getters instead.
+        var now = new Date();
+        var pad = function (n) { return String(n).padStart(2, "0"); };
+        var nowLocal = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()) +
+            "T" + pad(now.getHours()) + ":" + pad(now.getMinutes());
+        inputs.forEach(function (input) {
+            input.min = nowLocal;
+        });
+    }
+
+    /* ---------------------------------------------------------------- */
     /* Boot                                                               */
     /* ---------------------------------------------------------------- */
     document.addEventListener("DOMContentLoaded", function () {
@@ -1967,6 +2010,8 @@
         initSearchBoxes();
         initSmartTables();
         initSkeletons();
+        initMarksTypeSync();
+        initFutureDatetimeInputs();
         renderIcons();
 
         document.querySelectorAll("[data-flash-message]").forEach(function (el) {

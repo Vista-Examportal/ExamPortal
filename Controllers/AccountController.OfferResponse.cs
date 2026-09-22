@@ -27,6 +27,14 @@ namespace ExamPortal.Controllers
                 return RedirectToAction("Login");
             }
 
+            if (offer.OfferValidUntil.HasValue && DateTime.UtcNow > offer.OfferValidUntil.Value)
+            {
+                offer.Status = "Expired";
+                _db.SaveChanges();
+                TempData["Error"] = "This offer link has expired. Please contact the recruitment team.";
+                return RedirectToAction("Login");
+            }
+
             var candidate = _db.Users.Find(offer.UserId);
             if (candidate == null) return NotFound();
 
@@ -41,8 +49,28 @@ namespace ExamPortal.Controllers
             var offer = _db.OfferLetters.Include(o => o.History).FirstOrDefault(o => o.AcceptanceToken == token && o.Status == "Issued");
             if (offer == null) return BadRequest("Invalid token.");
 
+            if (offer.OfferValidUntil.HasValue && DateTime.UtcNow > offer.OfferValidUntil.Value)
+            {
+                offer.Status = "Expired";
+                _db.SaveChanges();
+                TempData["Error"] = "This offer link has expired. Please contact the recruitment team.";
+                return RedirectToAction("Login");
+            }
+
             var candidate = _db.Users.Find(offer.UserId);
             if (candidate == null) return NotFound();
+
+            // action is client-supplied and must be validated explicitly: the two "accept"/
+            // "decline" hidden-field forms in AcceptOffer.cshtml are the only legitimate
+            // senders, but a manually crafted POST with any other value previously fell
+            // through to the same code path as a real decline (see git history) — silently
+            // and irreversibly declining a real job offer for a typo, an empty string, or a
+            // malformed request. Anything other than exactly "accept" or "decline" is now
+            // rejected outright instead of being treated as a decline.
+            if (action != "accept" && action != "decline")
+            {
+                return BadRequest("Invalid action.");
+            }
 
             if (action == "accept")
             {

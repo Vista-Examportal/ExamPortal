@@ -560,11 +560,30 @@ namespace ExamPortal.Models
         [System.ComponentModel.DataAnnotations.StringLength(30)]
         public string GapInEducation { get; set; } = "None";
 
+        // Adjust these two bounds if the actual minimum hiring age or a different
+        // maximum-plausible-age policy applies — no such rule existed in the codebase
+        // before this check, so 16/100 are reasonable, clearly-adjustable defaults
+        // rather than a value read from anywhere else in the system.
+        private const int MinCandidateAgeYears = 16;
+        private const int MaxCandidateAgeYears = 100;
+
         public IEnumerable<System.ComponentModel.DataAnnotations.ValidationResult> Validate(System.ComponentModel.DataAnnotations.ValidationContext validationContext)
         {
             if (DateOfBirth.HasValue && DateOfBirth.Value.Date >= DateTime.Today)
             {
                 yield return new System.ComponentModel.DataAnnotations.ValidationResult("Date of birth must be in the past.", new[] { nameof(DateOfBirth) });
+            }
+            else if (DateOfBirth.HasValue)
+            {
+                var today = DateTime.Today;
+                var age = today.Year - DateOfBirth.Value.Year;
+                if (DateOfBirth.Value.Date > today.AddYears(-age)) age--; // hasn't had this year's birthday yet
+                if (age < MinCandidateAgeYears || age > MaxCandidateAgeYears)
+                {
+                    yield return new System.ComponentModel.DataAnnotations.ValidationResult(
+                        $"Date of birth must correspond to an age between {MinCandidateAgeYears} and {MaxCandidateAgeYears} years.",
+                        new[] { nameof(DateOfBirth) });
+                }
             }
 
             // Undergraduate, Intermediate, and Secondary are mandatory for every fresher.
@@ -637,8 +656,18 @@ namespace ExamPortal.Models
                 yield return new System.ComponentModel.DataAnnotations.ValidationResult(
                     $"{levelName}: year of passing is required.", new[] { $"{levelName}.{nameof(entry.YearOfPassing)}" });
             if (!entry.MarksValue.HasValue)
+            {
                 yield return new System.ComponentModel.DataAnnotations.ValidationResult(
                     $"{levelName}: marks/CGPA is required.", new[] { $"{levelName}.{nameof(entry.MarksValue)}" });
+            }
+            else if (entry.MarksType == "CGPA" && entry.MarksValue.Value > 10)
+            {
+                // EducationLevelEntry.MarksValue only has a blanket [Range(0, 100)] —
+                // adequate for Percentage, but that alone lets a "CGPA" of e.g. 87 through,
+                // which is nonsensical on the standard 10-point CGPA scale used here.
+                yield return new System.ComponentModel.DataAnnotations.ValidationResult(
+                    $"{levelName}: CGPA must be between 0 and 10.", new[] { $"{levelName}.{nameof(entry.MarksValue)}" });
+            }
         }
     }
 

@@ -106,7 +106,7 @@
                             <input type="hidden" name="round" value="Technical" />
 
                             <label class="ui-label text-xs">Date &amp; Time</label>
-                            <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+                            <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2 js-future-datetime" required />
 
                             @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel())
 
@@ -226,7 +226,7 @@
                             <form asp-action="RescheduleInterview" method="post">
                                 <input type="hidden" name="interviewId" value="@ir.Id" />
                                 <label class="ui-label text-xs">New Date &amp; Time</label>
-                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2 js-future-datetime" required />
 
                                 @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel { MeetingLink = ir.MeetingLink, MeetingId = ir.MeetingId, InterviewerNames = ir.InterviewerNames, PanelMembers = ir.PanelMembers })
 
@@ -246,7 +246,7 @@
                                 <input type="hidden" name="round" value="@progress.NextRoundToSchedule" />
 
                                 <label class="ui-label text-xs">Date &amp; Time</label>
-                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2 js-future-datetime" required />
 
                                 @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel())
 
@@ -270,7 +270,7 @@
                                 <input type="hidden" name="round" value="Final" />
 
                                 <label class="ui-label text-xs">Date &amp; Time</label>
-                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2" required />
+                                <input type="datetime-local" name="scheduledAt" class="ui-field !py-1.5 text-sm mb-2 js-future-datetime" required />
 
                                 @await Html.PartialAsync("_InterviewScheduleFields", new InterviewScheduleFieldsViewModel())
 
