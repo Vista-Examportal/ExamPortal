@@ -1,0 +1,54 @@
+name: ExamPortal CD - QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      ci_run_id:
+        description: 'Successful ExamPortal CI workflow run ID'
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
+
+env:
+  AZURE_WEBAPP_NAME: Vistaexamportal
+
+jobs:
+  deploy:
+    name: Deploy ExamPortal to QA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download CI artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ExamPortal-build
+          path: ./publish
+          run-id: ${{ inputs.ci_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show downloaded files
+        run: |
+          echo "Downloaded ExamPortal build:"
+          ls -la ./publish
+
+      - name: Login to Azure using OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: ./publish
+
+      - name: Deployment completed
+        run: |
+          echo "ExamPortal has been deployed to Azure QA."
+          echo "App Service: ${{ env.AZURE_WEBAPP_NAME }}"
