@@ -76,8 +76,9 @@ namespace ExamPortal.Controllers
         }
 
         /// <param name="rememberMe">When true, issues a persistent cookie that survives
-        /// browser close and lasts 30 days instead of the default 4-hour session (see
-        /// opt.ExpireTimeSpan in Program.cs). Defaults to false so every other caller
+        /// browser close and lasts 30 days instead of the default 30-minute
+        /// inactivity-timeout session (see opt.ExpireTimeSpan in Program.cs). Defaults
+        /// to false so every other caller
         /// (Google sign-in, AssessmentAuth magic links) keeps existing
         /// behavior unchanged.</param>
         private async Task SignInUserAsync(User user, bool rememberMe = false)

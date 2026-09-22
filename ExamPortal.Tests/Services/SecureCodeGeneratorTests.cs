@@ -75,14 +75,14 @@ namespace ExamPortal.Tests.Services
         [Fact]
         public void HashToken_EmptyString_MatchesKnownSha256Vector()
         {
-            // Canonical, widely-published SHA-256 hash of the empty string — verifies
-            // HashToken is really doing SHA-256 (Convert.ToHexString is uppercase, hence
-            // the case-insensitive comparison rather than assuming casing).
+            // Canonical, widely-published SHA-256 hash of the empty string. HashToken
+            // returns uppercase hex (Convert.ToHexString), so actual is normalized to
+            // lowercase before comparing against this lowercase literal.
             const string expected = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
             var actual = SecureCodeGenerator.HashToken("");
 
-            Assert.Equal(expected, actual, ignoreCase: true);
+            Assert.Equal(expected, actual.ToLowerInvariant());
         }
 
         [Fact]
