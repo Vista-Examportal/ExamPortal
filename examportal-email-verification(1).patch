@@ -1,0 +1,467 @@
+diff --git a/ExamPortal.Tests/Middleware/CandidateEmailVerificationMiddlewareTests.cs b/ExamPortal.Tests/Middleware/CandidateEmailVerificationMiddlewareTests.cs
+new file mode 100644
+index 0000000..022fdac
+--- /dev/null
++++ b/ExamPortal.Tests/Middleware/CandidateEmailVerificationMiddlewareTests.cs
+@@ -0,0 +1,217 @@
++using System;
++using System.Security.Claims;
++using System.Threading.Tasks;
++using ExamPortal.Data;
++using ExamPortal.Middleware;
++using ExamPortal.Models;
++using Microsoft.AspNetCore.Http;
++using Microsoft.EntityFrameworkCore;
++using Microsoft.Extensions.Logging.Abstractions;
++using Xunit;
++
++namespace ExamPortal.Tests.Middleware
++{
++    // CandidateEmailVerificationMiddleware is the gate that stops a signed-in-but-not-
++    // yet-OTP-verified candidate from reaching the dashboard or any other candidate
++    // portal page (see the class's own doc comment for the full rationale). These tests
++    // build it against a real EF Core in-memory AppDbContext — the same pattern used
++    // throughout ExamPortal.Tests.Services — rather than mocking IsEmailVerified lookups,
++    // since the whole point of reading fresh from the database (instead of trusting a
++    // claim on the auth cookie) is what's under test here.
++    public class CandidateEmailVerificationMiddlewareTests
++    {
++        private static AppDbContext BuildContext()
++        {
++            var options = new DbContextOptionsBuilder<AppDbContext>()
++                .UseInMemoryDatabase(Guid.NewGuid().ToString())
++                .Options;
++            return new AppDbContext(options);
++        }
++
++        private static User SeedCandidate(AppDbContext db, bool isEmailVerified)
++        {
++            var user = new User
++            {
++                Username = "VWT202600001",
++                Email = "candidate@example.com",
++                PasswordHash = "not-a-real-hash",
++                FullName = "Test Candidate",
++                Role = PortalRoles.Candidate,
++                IsEmailVerified = isEmailVerified,
++            };
++            db.Users.Add(user);
++            db.SaveChanges();
++            return user;
++        }
++
++        private static (CandidateEmailVerificationMiddleware Middleware, DefaultHttpContext Context, Func<bool> WasNextCalled) Build(
++            string path, ClaimsPrincipal? user = null)
++        {
++            var nextCalled = false;
++            RequestDelegate next = _ =>
++            {
++                nextCalled = true;
++                return Task.CompletedTask;
++            };
++
++            var middleware = new CandidateEmailVerificationMiddleware(next, NullLogger<CandidateEmailVerificationMiddleware>.Instance);
++
++            var context = new DefaultHttpContext();
++            context.Request.Path = path;
++            if (user != null) context.User = user;
++
++            return (middleware, context, () => nextCalled);
++        }
++
++        private static ClaimsPrincipal CandidatePrincipal(int userId)
++        {
++            var identity = new ClaimsIdentity(new[]
++            {
++                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
++                new Claim(ClaimTypes.Role, PortalRoles.Candidate),
++            }, authenticationType: "TestAuth");
++            return new ClaimsPrincipal(identity);
++        }
++
++        private static ClaimsPrincipal StaffPrincipal(int userId, string role)
++        {
++            var identity = new ClaimsIdentity(new[]
++            {
++                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
++                new Claim(ClaimTypes.Role, role),
++            }, authenticationType: "TestAuth");
++            return new ClaimsPrincipal(identity);
++        }
++
++        [Fact]
++        public async Task UnverifiedCandidate_RequestingDashboard_IsBlockedAndRedirectedToVerify()
++        {
++            using var db = BuildContext();
++            var candidate = SeedCandidate(db, isEmailVerified: false);
++            var (middleware, context, wasNextCalled) = Build("/Home/Index", CandidatePrincipal(candidate.Id));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.False(wasNextCalled());
++            Assert.Equal("/Account/VerifyEmailOtp", context.Response.Headers.Location.ToString());
++        }
++
++        [Fact]
++        public async Task UnverifiedCandidate_RequestingExamPage_IsBlocked()
++        {
++            using var db = BuildContext();
++            var candidate = SeedCandidate(db, isEmailVerified: false);
++            var (middleware, context, wasNextCalled) = Build("/Exam/Take", CandidatePrincipal(candidate.Id));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.False(wasNextCalled());
++        }
++
++        [Theory]
++        [InlineData("/Account/VerifyEmailOtp")]
++        [InlineData("/Account/ResendEmailOtp")]
++        [InlineData("/Account/Logout")]
++        public async Task UnverifiedCandidate_RequestingAllowedPath_IsNotBlocked(string path)
++        {
++            using var db = BuildContext();
++            var candidate = SeedCandidate(db, isEmailVerified: false);
++            var (middleware, context, wasNextCalled) = Build(path, CandidatePrincipal(candidate.Id));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.True(wasNextCalled());
++        }
++
++        [Fact]
++        public async Task UnverifiedCandidate_AllowedPathMatchIsCaseInsensitive()
++        {
++            using var db = BuildContext();
++            var candidate = SeedCandidate(db, isEmailVerified: false);
++            var (middleware, context, wasNextCalled) = Build("/account/verifyemailotp", CandidatePrincipal(candidate.Id));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.True(wasNextCalled());
++        }
++
++        [Fact]
++        public async Task VerifiedCandidate_RequestingDashboard_IsNotBlocked()
++        {
++            using var db = BuildContext();
++            var candidate = SeedCandidate(db, isEmailVerified: true);
++            var (middleware, context, wasNextCalled) = Build("/Home/Index", CandidatePrincipal(candidate.Id));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.True(wasNextCalled());
++        }
++
++        [Fact]
++        public async Task UnauthenticatedRequest_IsNotBlocked()
++        {
++            using var db = BuildContext();
++            var (middleware, context, wasNextCalled) = Build("/Home/Index", user: null);
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.True(wasNextCalled());
++        }
++
++        [Theory]
++        [InlineData(PortalRoles.Admin)]
++        [InlineData(PortalRoles.Recruiter)]
++        [InlineData(PortalRoles.Hr)]
++        public async Task NonCandidateRole_IsNeverBlocked_EvenIfUnverifiedInDatabase(string role)
++        {
++            using var db = BuildContext();
++            // Same user row an unverified candidate would have — but signed in under a
++            // staff role, which this gate must never touch.
++            var staffUser = new User
++            {
++                Username = "staff1",
++                Email = "staff@example.com",
++                PasswordHash = "not-a-real-hash",
++                FullName = "Staff Member",
++                Role = role,
++                IsEmailVerified = false,
++            };
++            db.Users.Add(staffUser);
++            db.SaveChanges();
++            var (middleware, context, wasNextCalled) = Build("/Admin/Index", StaffPrincipal(staffUser.Id, role));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.True(wasNextCalled());
++        }
++
++        [Fact]
++        public async Task VerifiedCandidate_WithStaleSessionPredatingThisMiddleware_IsNotBlocked()
++        {
++            // Regression coverage: the gate must read IsEmailVerified from the database on
++            // every request rather than trusting a claim on the auth cookie, precisely so an
++            // already-verified candidate's pre-existing session (issued before this
++            // middleware existed, and so carrying no such claim) is never wrongly blocked.
++            using var db = BuildContext();
++            var candidate = SeedCandidate(db, isEmailVerified: true);
++            // A minimal principal with only NameIdentifier + Role — no extra claims —
++            // standing in for an old auth cookie issued by pre-fix code.
++            var (middleware, context, wasNextCalled) = Build("/Home/Index", CandidatePrincipal(candidate.Id));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.True(wasNextCalled());
++        }
++
++        [Fact]
++        public async Task UnknownOrDeletedUserId_FailsClosed()
++        {
++            using var db = BuildContext();
++            var (middleware, context, wasNextCalled) = Build("/Home/Index", CandidatePrincipal(userId: 999));
++
++            await middleware.InvokeAsync(context, db);
++
++            Assert.False(wasNextCalled());
++        }
++    }
++}
+diff --git a/ExamPortal.Tests/Services/CandidateWorkflowServiceTests.cs b/ExamPortal.Tests/Services/CandidateWorkflowServiceTests.cs
+index 4f37360..6408f40 100644
+--- a/ExamPortal.Tests/Services/CandidateWorkflowServiceTests.cs
++++ b/ExamPortal.Tests/Services/CandidateWorkflowServiceTests.cs
+@@ -1,4 +1,5 @@
+ using System;
++using System.Linq;
+ using ExamPortal.Configuration;
+ using ExamPortal.Data;
+ using ExamPortal.Models;
+@@ -141,6 +142,58 @@ namespace ExamPortal.Tests.Services
+             Assert.False(service.IsOtpLocked(candidate));
+         }
+ 
++        [Fact]
++        public void QueueEmailOtp_QueuesExactlyOneNotification_OnTheEmailChannel()
++        {
++            // Regression coverage for the InApp-OTP-leak bug: QueueEmailOtp must call
++            // NotificationService.QueueChannel(..., "Email", ...) directly rather than
++            // Queue(...), which would also fan out a second, "InApp" notification with the
++            // same OTP-bearing body — a plaintext, dashboard-visible copy of the secret.
++            using var db = BuildContext();
++            using var cache = new MemoryCache(new MemoryCacheOptions());
++            var service = BuildService(db, cache);
++            var candidate = MakeCandidate();
++
++            service.QueueEmailOtp(candidate);
++
++            var queued = db.Notifications.Where(n => n.UserId == candidate.Id).ToList();
++            var notification = Assert.Single(queued);
++            Assert.Equal("Email", notification.Channel);
++            Assert.Equal(candidate.Email, notification.Recipient);
++        }
++
++        [Fact]
++        public void QueueEmailOtp_NeverQueuesAnInAppNotification()
++        {
++            using var db = BuildContext();
++            using var cache = new MemoryCache(new MemoryCacheOptions());
++            var service = BuildService(db, cache);
++            var candidate = MakeCandidate();
++
++            service.QueueEmailOtp(candidate);
++
++            Assert.Empty(db.Notifications.Where(n => n.UserId == candidate.Id && n.Channel == "InApp"));
++        }
++
++        [Fact]
++        public void ResendEmailOtp_ViaQueueEmailOtp_StillNeverQueuesAnInAppNotification()
++        {
++            // ResendEmailOtp (AccountController.Registration.cs) is just a second call to
++            // QueueEmailOtp on an already-registered candidate — confirm the fix holds for
++            // that call too, not only the very first OTP sent at registration.
++            using var db = BuildContext();
++            using var cache = new MemoryCache(new MemoryCacheOptions());
++            var service = BuildService(db, cache);
++            var candidate = MakeCandidate();
++
++            service.QueueEmailOtp(candidate);
++            service.QueueEmailOtp(candidate);
++
++            var queued = db.Notifications.Where(n => n.UserId == candidate.Id).ToList();
++            Assert.Equal(2, queued.Count);
++            Assert.All(queued, n => Assert.Equal("Email", n.Channel));
++        }
++
+         // ── IsOtpLocked / VerifyEmailOtp ──────────────────────────────────────
+ 
+         [Fact]
+diff --git a/Middleware/CandidateEmailVerificationMiddleware.cs b/Middleware/CandidateEmailVerificationMiddleware.cs
+new file mode 100644
+index 0000000..52de3a3
+--- /dev/null
++++ b/Middleware/CandidateEmailVerificationMiddleware.cs
+@@ -0,0 +1,128 @@
++using System.Security.Claims;
++using ExamPortal.Data;
++using ExamPortal.Models;
++using Microsoft.EntityFrameworkCore;
++
++namespace ExamPortal.Middleware
++{
++    /// <summary>
++    /// Blocks a signed-in-but-not-yet-email-verified candidate from reaching the
++    /// dashboard or any other candidate portal page.
++    ///
++    /// Registration signs the candidate in immediately (AccountController.Registration.cs
++    /// Register() calls SignInUserAsync right after QueueEmailOtp), before they've entered
++    /// their OTP, and an existing unverified account behaves the same way after a normal
++    /// Login. [Authorize(Roles = PortalRoles.Candidate)] on HomeController/ExamController/etc.
++    /// only proves "this is a signed-in candidate" — it says nothing about
++    /// User.IsEmailVerified — so without this gate, a candidate who never opens the OTP
++    /// email can navigate straight to e.g. /Home/Index or /Exam/Take and skip verification
++    /// entirely. Checked against the existing routing/middleware before adding this: no
++    /// existing middleware or filter enforces verification, and RedirectToPortal
++    /// (Controllers/AccountController.cs) only steers a candidate towards VerifyEmailOtp at
++    /// the moment they log in — it can't stop a later direct navigation within the same
++    /// session.
++    ///
++    /// Reads User.IsEmailVerified fresh from the database on every gated request rather
++    /// than trusting a claim on the auth cookie. That keeps this correct for sessions that
++    /// were signed in before this middleware existed (an already-verified candidate with an
++    /// old cookie is never wrongly blocked) and for the moment verification itself succeeds
++    /// (VerifyEmailOtp re-signs the candidate in immediately after, but even a request that
++    /// raced ahead of that would see the up-to-date database value here). The cost is one
++    /// indexed lookup by primary key, and only for authenticated candidates on paths outside
++    /// the allow-list below — not on every request.
++    ///
++    /// Registered in Program.cs via app.UseCandidateEmailVerificationGate(), after
++    /// UseAuthentication() (needs HttpContext.User populated) and before UseAuthorization(),
++    /// so an unverified candidate is redirected before the request ever reaches an
++    /// [Authorize]-protected action. Matches on the raw request path — the same approach
++    /// IpAllowListMiddleware already uses — rather than endpoint metadata, so protection
++    /// doesn't depend on routing/attribute details of whichever controller handles the
++    /// request.
++    ///
++    /// Static assets (css/js/images under wwwroot) never reach this middleware at all:
++    /// app.UseStaticFiles() runs earlier in the pipeline and short-circuits those requests
++    /// before authentication (and this gate) ever runs.
++    /// </summary>
++    public class CandidateEmailVerificationMiddleware
++    {
++        private readonly RequestDelegate _next;
++        private readonly ILogger<CandidateEmailVerificationMiddleware> _logger;
++
++        /// <summary>
++        /// Exact-path allow-list of what an unverified-but-signed-in candidate may still
++        /// reach: the OTP verification page itself, the resend action, and logout. Everything
++        /// else in the candidate portal is blocked until IsEmailVerified flips to true. Kept
++        /// as an exact match (not a prefix) so this can't accidentally be widened by adding a
++        /// new /Account/... action later.
++        /// </summary>
++        private static readonly string[] AllowedPaths =
++        {
++            "/Account/VerifyEmailOtp",
++            "/Account/ResendEmailOtp",
++            "/Account/Logout",
++        };
++
++        public CandidateEmailVerificationMiddleware(RequestDelegate next, ILogger<CandidateEmailVerificationMiddleware> logger)
++        {
++            _next = next;
++            _logger = logger;
++        }
++
++        public async Task InvokeAsync(HttpContext context, AppDbContext db)
++        {
++            var user = context.User;
++
++            // Anonymous requests and every non-candidate role (Admin/Recruiter/HR, or
++            // whatever [Authorize] itself will reject) are none of this gate's business.
++            if (user.Identity?.IsAuthenticated != true || !user.IsInRole(PortalRoles.Candidate))
++            {
++                await _next(context);
++                return;
++            }
++
++            var path = context.Request.Path.Value ?? "";
++            if (AllowedPaths.Any(p => path.Equals(p, StringComparison.OrdinalIgnoreCase)))
++            {
++                await _next(context);
++                return;
++            }
++
++            var userIdClaim = user.FindFirstValue(ClaimTypes.NameIdentifier);
++            if (!int.TryParse(userIdClaim, out var userId))
++            {
++                // No parseable identity claim — nothing this gate can act on; let
++                // downstream auth handle it (it will reject an incomplete principal anyway).
++                await _next(context);
++                return;
++            }
++
++            var isVerified = await db.Users.AsNoTracking()
++                .Where(u => u.Id == userId)
++                .Select(u => (bool?)u.IsEmailVerified)
++                .FirstOrDefaultAsync();
++
++            // isVerified is null only if the Id from the cookie no longer matches any user
++            // (deleted account) — fail closed, same as an unverified candidate, rather than
++            // let a stale/invalid identity through.
++            if (isVerified == true)
++            {
++                await _next(context);
++                return;
++            }
++
++            _logger.LogInformation(
++                "Blocked unverified candidate {UserId} from {Path}; redirecting to email verification.",
++                userId, path);
++
++            context.Response.Redirect("/Account/VerifyEmailOtp");
++        }
++    }
++
++    public static class CandidateEmailVerificationMiddlewareExtensions
++    {
++        public static IApplicationBuilder UseCandidateEmailVerificationGate(this IApplicationBuilder app)
++        {
++            return app.UseMiddleware<CandidateEmailVerificationMiddleware>();
++        }
++    }
++}
+diff --git a/Program.cs b/Program.cs
+index f885270..f746b31 100644
+--- a/Program.cs
++++ b/Program.cs
+@@ -264,6 +264,16 @@ app.UseStaticFiles();
+ app.UseRouting();
+ app.UseRateLimiter();
+ app.UseAuthentication();
++
++// Blocks a signed-in-but-not-yet-email-verified candidate from reaching the dashboard
++// or any other candidate portal page — registration (and login, for existing
++// unverified accounts) signs candidates in before OTP verification, and
++// [Authorize(Roles = PortalRoles.Candidate)] alone doesn't check verification status.
++// Must run after UseAuthentication (needs HttpContext.User) and before UseAuthorization
++// (so an unverified candidate never reaches an [Authorize]-protected action at all).
++// See Middleware/CandidateEmailVerificationMiddleware.cs.
++app.UseCandidateEmailVerificationGate();
++
+ app.UseAuthorization();
+ app.MapHealthChecks("/health");
+ app.MapControllerRoute(name: "default", pattern: "{controller=Site}/{action=Index}/{id?}");
+diff --git a/Services/CandidateWorkflowService.cs b/Services/CandidateWorkflowService.cs
+index 36535e1..2905111 100644
+--- a/Services/CandidateWorkflowService.cs
++++ b/Services/CandidateWorkflowService.cs
+@@ -49,7 +49,14 @@ namespace ExamPortal.Services
+             // A fresh OTP also resets the attempt counter — a new code deserves a new set of tries.
+             _cache.Remove(OtpAttemptCacheKey(candidate.Id));
+ 
+-            _notifications.Queue(candidate, null, "Email Verification OTP",
++            // Email channel ONLY — deliberately QueueChannel(..., "Email", ...) rather than
++            // Queue(...), which would also create an InApp notification carrying the same
++            // body. The InApp channel is stored as plaintext and immediately marked "Sent"
++            // (see NotificationService.QueueChannel), i.e. visible in the candidate's own
++            // dashboard notification list and in the DB with no extra protection — exactly
++            // where a verification secret must never be echoed back. The OTP must only ever
++            // reach the candidate through the one channel it was sent to.
++            _notifications.QueueChannel(candidate, null, "Email Verification OTP", "Email", candidate.Email,
+                 "Verify your VISTAWAYS TECH email",
+                 $"Dear {candidate.FullName},\n\nYour Candidate ID is {candidate.CandidateId}.\n\nYour email verification OTP is {otp}.\n\nThis OTP expires in 15 minutes.\n\nUse your Candidate ID with your password for portal login, assessment access, and future recruitment communication.\n\nVISTAWAYS TECH Recruitment Team");
+ 
