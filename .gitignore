@@ -11,6 +11,8 @@
 .env
 appsettings.Development.json
 appsettings.*.local.json
+secrets.json
+**/secrets.json
 
 # Node (only used to build wwwroot/css from tailwind-input.css / site.css)
 node_modules/
