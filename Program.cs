@@ -13,6 +13,10 @@ using ExamPortal.Services;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddJsonFile(
+    "secrets.json",
+    optional: true,
+    reloadOnChange: true);
 
 builder.Services.AddControllersWithViews(options =>
 {
