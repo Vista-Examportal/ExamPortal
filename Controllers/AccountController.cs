@@ -101,6 +101,22 @@ namespace ExamPortal.Controllers
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity), properties);
         }
 
+        /// <summary>
+        /// Issues the short-lived, non-authenticating pending-email-verification cookie
+        /// (AuthSchemes.PendingEmailVerification) instead of the real login cookie — used
+        /// by Register (a brand-new signup) and Login (an existing candidate who hasn't
+        /// verified yet) so VerifyEmailOtp/ResendEmailOtp can recover which candidate is
+        /// verifying without granting [Authorize]-level access. Carries only the
+        /// candidate's id — no Role claim, no other identity data — and is cleared as soon
+        /// as VerifyEmailOtp succeeds (see AccountController.Registration.cs).
+        /// </summary>
+        private async Task SignInPendingVerificationAsync(User candidate)
+        {
+            var claims = new List<Claim> { new(ClaimTypes.NameIdentifier, candidate.Id.ToString()) };
+            var identity = new ClaimsIdentity(claims, AuthSchemes.PendingEmailVerification);
+            await HttpContext.SignInAsync(AuthSchemes.PendingEmailVerification, new ClaimsPrincipal(identity));
+        }
+
         private IActionResult RedirectSignedInUser()
         {
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);

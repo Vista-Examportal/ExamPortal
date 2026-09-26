@@ -134,6 +134,31 @@ var authBuilder = builder.Services.AddAuthentication(CookieAuthenticationDefault
         opt.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
             ? CookieSecurePolicy.SameAsRequest
             : CookieSecurePolicy.Always;
+    })
+    // Short-lived, non-authenticating cookie carrying only "which candidate is mid-
+    // registration" between Register/Login and VerifyEmailOtp/ResendEmailOtp, before
+    // email verification succeeds — see AuthSchemes.PendingEmailVerification. Deliberately
+    // its own scheme, separate from the main login cookie above: it's never the
+    // DefaultAuthenticateScheme, so ASP.NET Core's authentication middleware never
+    // populates HttpContext.User/[Authorize] from it — only an explicit
+    // HttpContext.AuthenticateAsync(AuthSchemes.PendingEmailVerification) call (in
+    // AccountController.Registration.cs's GetPendingVerificationCandidateAsync) can read
+    // it. A candidate holding only this cookie therefore cannot reach the dashboard or
+    // any other [Authorize]-protected page.
+    .AddCookie(AuthSchemes.PendingEmailVerification, opt =>
+    {
+        opt.Cookie.Name = "VWT.PendingVerification";
+        // Matches the OTP's own 15-minute expiry (CandidateWorkflowService.QueueEmailOtp /
+        // MobileOtpExpiresAt) and is NOT sliding, so this cookie can never silently outlive
+        // the OTP it exists to let the candidate redeem. ResendEmailOtp re-issues both the
+        // OTP and (when applicable) this cookie together, refreshing both windows in step.
+        opt.ExpireTimeSpan = TimeSpan.FromMinutes(15);
+        opt.SlidingExpiration = false;
+        opt.Cookie.HttpOnly = true;
+        opt.Cookie.SameSite = SameSiteMode.Lax;
+        opt.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+            ? CookieSecurePolicy.SameAsRequest
+            : CookieSecurePolicy.Always;
     });
 
 if (googleSignInConfigured)
@@ -268,6 +293,16 @@ app.UseStaticFiles();
 app.UseRouting();
 app.UseRateLimiter();
 app.UseAuthentication();
+
+// Blocks a signed-in-but-not-yet-email-verified candidate from reaching the dashboard
+// or any other candidate portal page — registration (and login, for existing
+// unverified accounts) signs candidates in before OTP verification, and
+// [Authorize(Roles = PortalRoles.Candidate)] alone doesn't check verification status.
+// Must run after UseAuthentication (needs HttpContext.User) and before UseAuthorization
+// (so an unverified candidate never reaches an [Authorize]-protected action at all).
+// See Middleware/CandidateEmailVerificationMiddleware.cs.
+app.UseCandidateEmailVerificationGate();
+
 app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapControllerRoute(name: "default", pattern: "{controller=Site}/{action=Index}/{id?}");

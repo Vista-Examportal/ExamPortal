@@ -61,6 +61,22 @@ namespace ExamPortal.Controllers
                 return View(model);
             }
 
+            // An existing candidate who registered but never completed OTP verification
+            // must not get the real login cookie either — Register no longer grants it
+            // up front (see AccountController.Registration.cs), and Login re-authenticating
+            // them with correct credentials doesn't change that they still haven't proven
+            // they control this email address. Route them the same way a fresh
+            // registration is: the short-lived pending-verification cookie, then
+            // VerifyEmailOtp. Credential validation above, Remember Me, staff roles
+            // (Admin/Recruiter/HR), and an already-verified candidate's login are all
+            // unaffected — RememberMe is simply irrelevant for a cookie this short-lived.
+            if (user.Role == PortalRoles.Candidate && !user.IsEmailVerified)
+            {
+                await SignInPendingVerificationAsync(user);
+                TempData["Success"] = "Please verify your email to continue. Enter the OTP sent to your email, or request a new one.";
+                return RedirectToAction("VerifyEmailOtp");
+            }
+
             await SignInUserAsync(user, model.RememberMe);
             return RedirectToPortal(user);
         }

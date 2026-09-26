@@ -16,10 +16,21 @@ namespace ExamPortal.Models
     /// handler signs into transiently — AccountController.ExternalAuth.cs reads it once
     /// in GoogleCallback, then signs the person into the app's real cookie via the
     /// existing SignInUserAsync, and clears it. Candidates never end up signed in on
-    /// the GoogleExternal scheme alone.</summary>
+    /// the GoogleExternal scheme alone.
+    ///
+    /// PendingEmailVerification is likewise a separate, short-lived cookie — issued by
+    /// Register (a brand-new signup) or Login (an existing candidate who hasn't verified
+    /// yet) instead of the real login cookie, carrying only the candidate's id and no
+    /// Role claim. [Authorize] never accepts it, so a candidate holding only this cookie
+    /// cannot reach the dashboard or any other protected page — only
+    /// AccountController.Registration.cs's VerifyEmailOtp/ResendEmailOtp explicitly read
+    /// it (via GetPendingVerificationCandidateAsync) to recover who's verifying. It's
+    /// cleared as soon as VerifyEmailOtp succeeds and the candidate is signed into the
+    /// real cookie via SignInUserAsync instead.</summary>
     public static class AuthSchemes
     {
         public const string GoogleExternal = "ExternalGoogleCookie";
+        public const string PendingEmailVerification = "PendingEmailVerificationCookie";
     }
 
     public static class AuthProviders

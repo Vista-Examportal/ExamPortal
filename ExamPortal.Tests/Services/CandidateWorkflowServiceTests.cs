@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using ExamPortal.Configuration;
 using ExamPortal.Data;
 using ExamPortal.Models;
@@ -139,6 +140,60 @@ namespace ExamPortal.Tests.Services
             service.QueueEmailOtp(candidate);
 
             Assert.False(service.IsOtpLocked(candidate));
+        }
+
+        [Fact]
+        public void QueueEmailOtp_QueuesExactlyOneNotification_OnTheEmailChannel()
+        {
+            // Regression coverage for the InApp-OTP-leak bug: QueueEmailOtp must call
+            // NotificationService.QueueChannel(..., "Email", ...) directly rather than
+            // Queue(...), which would also fan out a second, "InApp" notification with the
+            // same OTP-bearing body — a plaintext, dashboard-visible copy of the secret.
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            var candidate = MakeCandidate();
+
+            service.QueueEmailOtp(candidate);
+            db.SaveChanges();
+
+            var queued = db.Notifications.Where(n => n.UserId == candidate.Id).ToList();
+            var notification = Assert.Single(queued);
+            Assert.Equal("Email", notification.Channel);
+            Assert.Equal(candidate.Email, notification.Recipient);
+        }
+
+        [Fact]
+        public void QueueEmailOtp_NeverQueuesAnInAppNotification()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            var candidate = MakeCandidate();
+
+            service.QueueEmailOtp(candidate);
+
+            Assert.Empty(db.Notifications.Where(n => n.UserId == candidate.Id && n.Channel == "InApp"));
+        }
+
+        [Fact]
+        public void ResendEmailOtp_ViaQueueEmailOtp_StillNeverQueuesAnInAppNotification()
+        {
+            // ResendEmailOtp (AccountController.Registration.cs) is just a second call to
+            // QueueEmailOtp on an already-registered candidate — confirm the fix holds for
+            // that call too, not only the very first OTP sent at registration.
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            var candidate = MakeCandidate();
+
+            service.QueueEmailOtp(candidate);
+            service.QueueEmailOtp(candidate);
+            db.SaveChanges();
+
+            var queued = db.Notifications.Where(n => n.UserId == candidate.Id).ToList();
+            Assert.Equal(2, queued.Count);
+            Assert.All(queued, n => Assert.Equal("Email", n.Channel));
         }
 
         // ── IsOtpLocked / VerifyEmailOtp ──────────────────────────────────────

@@ -72,16 +72,33 @@ namespace ExamPortal.Controllers
 
             _candidateWorkflow.QueueEmailOtp(user);
             await _db.SaveChangesAsync();
-            await SignInUserAsync(user);
+
+            // Deliberately NOT SignInUserAsync here — that would grant the normal,
+            // [Authorize]-recognized login cookie before the candidate has proven they
+            // control this email address. Issue only the short-lived pending-verification
+            // cookie instead; SignInUserAsync happens once VerifyEmailOtp succeeds below.
+            await SignInPendingVerificationAsync(user);
 
             TempData["Success"] = $"Registration successful. Your Candidate ID is {user.CandidateId}. We sent a 6-digit OTP to your email.";
             return RedirectToAction("VerifyEmailOtp");
         }
 
+        // GetSignedInCandidate covers a candidate who already holds the real login cookie
+        // (an already-verified candidate revisiting this page, or an existing session
+        // issued before this pending-cookie mechanism existed — CandidateEmailVerificationMiddleware
+        // is what actually redirects that second case here from elsewhere in the portal).
+        // GetPendingVerificationCandidateAsync covers the normal, fresh case: a brand-new
+        // registration or an existing-but-unverified Login, neither of which ever received
+        // the real login cookie. Checking the real cookie first costs nothing extra (no
+        // pending-cookie lookup needed once it's found) and preserves exactly who could
+        // already reach this page before this change.
+        private async Task<User?> GetSignedInOrPendingVerificationCandidateAsync() =>
+            GetSignedInCandidate() ?? await GetPendingVerificationCandidateAsync();
+
         [HttpGet]
-        public IActionResult VerifyEmailOtp()
+        public async Task<IActionResult> VerifyEmailOtp()
         {
-            var candidate = GetSignedInCandidate();
+            var candidate = await GetSignedInOrPendingVerificationCandidateAsync();
             if (candidate == null) return RedirectToAction("Login");
             return View(new EmailOtpViewModel { Email = candidate.Email });
         }
@@ -90,7 +107,7 @@ namespace ExamPortal.Controllers
         [EnableRateLimiting("AuthSensitive")]
         public async Task<IActionResult> VerifyEmailOtp(EmailOtpViewModel model)
         {
-            var candidate = GetSignedInCandidate();
+            var candidate = await GetSignedInOrPendingVerificationCandidateAsync();
             if (candidate == null) return RedirectToAction("Login");
             model.Email = candidate.Email;
 
@@ -107,7 +124,12 @@ namespace ExamPortal.Controllers
             }
 
             _db.SaveChanges();
+            // Real login cookie now that email is verified — and immediately clear the
+            // short-lived pending-verification cookie (if any) rather than leaving it to
+            // expire on its own; a candidate who arrived here via GetSignedInCandidate
+            // instead never had one, and clearing an absent cookie is a harmless no-op.
             await SignInUserAsync(candidate);
+            await HttpContext.SignOutAsync(AuthSchemes.PendingEmailVerification);
             if (candidate.ProfileCompletion != null)
             {
                 TempData["Success"] = $"Email verified. Your Candidate ID is {candidate.CandidateId}. Recruiters can now review your profile.";
@@ -120,13 +142,21 @@ namespace ExamPortal.Controllers
 
         [HttpPost]
         [EnableRateLimiting("AuthSensitive")]
-        public IActionResult ResendEmailOtp()
+        public async Task<IActionResult> ResendEmailOtp()
         {
-            var candidate = GetSignedInCandidate();
+            var candidate = await GetSignedInOrPendingVerificationCandidateAsync();
             if (candidate == null) return RedirectToAction("Login");
 
             _candidateWorkflow.QueueEmailOtp(candidate);
             _db.SaveChanges();
+
+            // A candidate here on the pending-verification cookie (not the real login
+            // cookie) gets that cookie re-issued too, so its 15-minute expiry moves in
+            // step with the fresh OTP's — otherwise the cookie could expire before a
+            // just-resent OTP does, stranding them on this page with no way back.
+            if (User.Identity?.IsAuthenticated != true)
+                await SignInPendingVerificationAsync(candidate);
+
             TempData["Success"] = "A new OTP was sent to your email.";
             return RedirectToAction("VerifyEmailOtp");
         }
@@ -251,27 +281,52 @@ namespace ExamPortal.Controllers
             };
         }
 
-        private User? GetSignedInCandidate()
-        {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdClaim, out var userId)) return null;
-            // Address/ProfessionalProfile/JobPreference must be included here (not just
-            // CandidateProfile/ProfileCompletion/Languages): CompleteProfile and
-            // CompleteResumeAndSkills both do `candidate.X ??= new CandidateX(...)` to
-            // create-or-update these one-to-one rows. Without eager-loading them first, EF
-            // sees a null navigation on every request and creates a brand new row each time,
-            // which both throws a unique-constraint error on the second save and starves
-            // RecalculateProfileCompletion of the data it needs to compute an accurate
-            // percentage.
-            return _db.Users
+        // Address/ProfessionalProfile/JobPreference must be included here (not just
+        // CandidateProfile/ProfileCompletion/Languages): CompleteProfile and
+        // CompleteResumeAndSkills both do `candidate.X ??= new CandidateX(...)` to
+        // create-or-update these one-to-one rows. Without eager-loading them first, EF
+        // sees a null navigation on every request and creates a brand new row each time,
+        // which both throws a unique-constraint error on the second save and starves
+        // RecalculateProfileCompletion of the data it needs to compute an accurate
+        // percentage. Shared by GetSignedInCandidate (reads the real login cookie) and
+        // GetPendingVerificationCandidateAsync (reads the short-lived pre-verification
+        // cookie instead) so both return an identically-shaped candidate.
+        private IQueryable<User> CandidateQueryWithProfileIncludes() =>
+            _db.Users
                 .Include(u => u.CandidateProfile)
                 .Include(u => u.ProfileCompletion)
                 .Include(u => u.Languages)
                 .Include(u => u.Address)
                 .Include(u => u.ProfessionalProfile)
                 .Include(u => u.JobPreference)
-                .Include(u => u.EducationRecords)
-                .FirstOrDefault(u => u.Id == userId && u.Role == PortalRoles.Candidate);
+                .Include(u => u.EducationRecords);
+
+        private User? GetSignedInCandidate()
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdClaim, out var userId)) return null;
+            return CandidateQueryWithProfileIncludes().FirstOrDefault(u => u.Id == userId && u.Role == PortalRoles.Candidate);
+        }
+
+        /// <summary>
+        /// Reads the candidate id off the short-lived pending-verification cookie (see
+        /// AuthSchemes.PendingEmailVerification / AccountController.SignInPendingVerificationAsync)
+        /// rather than the real login cookie GetSignedInCandidate reads. This is the
+        /// identity carrier used between Register/Login and VerifyEmailOtp/ResendEmailOtp
+        /// before a candidate has verified their email and received the normal login
+        /// cookie. Deliberately a separate, explicit AuthenticateAsync call — this scheme
+        /// is never the app's DefaultAuthenticateScheme, so it's never reflected in the
+        /// ambient `User`/HttpContext.User the way GetSignedInCandidate's check is. Returns
+        /// null if the cookie is missing, expired (matches the OTP's own 15-minute expiry),
+        /// or doesn't resolve to a real candidate.
+        /// </summary>
+        private async Task<User?> GetPendingVerificationCandidateAsync()
+        {
+            var result = await HttpContext.AuthenticateAsync(AuthSchemes.PendingEmailVerification);
+            if (!result.Succeeded || result.Principal == null) return null;
+            var userIdClaim = result.Principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdClaim, out var userId)) return null;
+            return await CandidateQueryWithProfileIncludes().FirstOrDefaultAsync(u => u.Id == userId && u.Role == PortalRoles.Candidate);
         }
 
         private async Task<string> SaveResumeAsync(IFormFile? file)

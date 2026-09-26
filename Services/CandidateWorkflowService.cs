@@ -49,7 +49,14 @@ namespace ExamPortal.Services
             // A fresh OTP also resets the attempt counter — a new code deserves a new set of tries.
             _cache.Remove(OtpAttemptCacheKey(candidate.Id));
 
-            _notifications.Queue(candidate, null, "Email Verification OTP",
+            // Email channel ONLY — deliberately QueueChannel(..., "Email", ...) rather than
+            // Queue(...), which would also create an InApp notification carrying the same
+            // body. The InApp channel is stored as plaintext and immediately marked "Sent"
+            // (see NotificationService.QueueChannel), i.e. visible in the candidate's own
+            // dashboard notification list and in the DB with no extra protection — exactly
+            // where a verification secret must never be echoed back. The OTP must only ever
+            // reach the candidate through the one channel it was sent to.
+            _notifications.QueueChannel(candidate, null, "Email Verification OTP", "Email", candidate.Email,
                 "Verify your VISTAWAYS TECH email",
                 $"Dear {candidate.FullName},\n\nYour Candidate ID is {candidate.CandidateId}.\n\nYour email verification OTP is {otp}.\n\nThis OTP expires in 15 minutes.\n\nUse your Candidate ID with your password for portal login, assessment access, and future recruitment communication.\n\nVISTAWAYS TECH Recruitment Team");
 
