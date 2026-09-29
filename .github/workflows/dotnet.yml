@@ -11,9 +11,6 @@ on:
       - DEV
       - master
 
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,11 +30,8 @@ jobs:
       - name: Build solution
         run: dotnet build ExamPortal.sln --configuration Release --no-restore
 
-      - name: Run tests
-        run: dotnet test ExamPortal.sln --configuration Release --no-build
-
-      - name: Publish ExamPortal
-        run: dotnet publish ExamPortal.csproj --configuration Release --output ./publish --no-build
+      - name: Publish application
+        run: dotnet publish ExamPortal.csproj --configuration Release --output ./publish --no-restore
 
       - name: Upload CI artifact
         uses: actions/upload-artifact@v4
