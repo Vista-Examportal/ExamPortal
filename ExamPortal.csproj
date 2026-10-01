@@ -34,12 +34,6 @@
     </PackageReference>
     <PackageReference Include="QuestPDF" Version="2024.3.4" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="8.0.0" />
-    <!-- Added for Google Identity Services (GIS) ID-token verification
-         (GoogleJsonWebSignature.ValidateAsync) — see AccountController.ExternalAuth.cs
-         GoogleLogin(string credential). NOTE: this sandbox has no NuGet access, so this
-         version could not be restore-checked here; verify/adjust before building
-         (e.g. `dotnet add package Google.Apis.Auth` to pick up the current release). -->
-    <PackageReference Include="Google.Apis.Auth" Version="1.68.0" />
   </ItemGroup>
 
 </Project>

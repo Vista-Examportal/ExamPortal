@@ -15,8 +15,8 @@ namespace ExamPortal.Middleware
                 context.Response.Headers["X-Frame-Options"] = "DENY";
                 context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
                 context.Response.Headers["Content-Security-Policy"] =
-                "script-src 'self' https://accounts.google.com https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com 'unsafe-inline'; " +
                     "default-src 'self'; " +
+                    "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com 'unsafe-inline'; " +
                     "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com 'unsafe-inline'; " +
                     "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; " +
                     // 'self' + data: for locally-uploaded/generated images; lh3.googleusercontent.com

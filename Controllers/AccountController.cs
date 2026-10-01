@@ -1,14 +1,12 @@
 using ExamPortal.Data;
 using ExamPortal.Models;
 using ExamPortal.Services;
-using ExamPortal.Configuration;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using System.Security.Claims;
 
 namespace ExamPortal.Controllers
@@ -30,12 +28,6 @@ namespace ExamPortal.Controllers
         private readonly ILogger<AccountController> _logger;
         private readonly AuditService _audit;
         private readonly GoogleSignInStatus _googleSignIn;
-        // Only .ClientId is ever read from this (see GoogleLogin(string credential) in
-        // AccountController.ExternalAuth.cs, for GoogleJsonWebSignature audience
-        // validation) — .ClientSecret stays untouched by the new GIS flow, exactly as
-        // before it's only used by the pre-existing redirect-flow Google OAuth handler
-        // configured in Program.cs.
-        private readonly GoogleAuthOptions _googleAuthOptions;
 
         public AccountController(
             AppDbContext db,
@@ -47,8 +39,7 @@ namespace ExamPortal.Controllers
             DisposableEmailService disposableEmail,
             ILogger<AccountController> logger,
             AuditService audit,
-            GoogleSignInStatus googleSignIn,
-            IOptions<GoogleAuthOptions> googleAuthOptions)
+            GoogleSignInStatus googleSignIn)
         {
             _db = db;
             _fileStorage = fileStorage;
@@ -60,7 +51,6 @@ namespace ExamPortal.Controllers
             _logger = logger;
             _audit = audit;
             _googleSignIn = googleSignIn;
-            _googleAuthOptions = googleAuthOptions.Value;
         }
 
         // Read-only account summary for staff roles (Recruiter/HR/Admin), who —
