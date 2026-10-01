@@ -1,25 +1,74 @@
 @model string
+@inject ExamPortal.Models.GoogleSignInStatus GoogleSignInStatus
+@inject Microsoft.Extensions.Options.IOptions<ExamPortal.Configuration.GoogleAuthOptions> GoogleAuthOptionsAccessor
 @{
     // Model is the button label: "Continue with Google" (Login) or "Sign up with Google"
-    // (Register). Both point at the same GoogleLogin challenge — whether the Google
+    // (Register). Both use Google Identity Services (GIS) — see
+    // AccountController.ExternalAuth.cs GoogleLogin(string credential) for what happens
+    // server-side once GIS hands this page a signed Google ID token; whether the Google
     // account turns out to be a new signup or an existing candidate logging back in is
-    // resolved server-side in AccountController.ExternalAuth.cs, not by which page the
-    // button was clicked from.
+    // resolved server-side there, not by which page the button was clicked from.
     var label = Model ?? "Continue with Google";
+    // ClientId is a public identifier (it's meant to be embedded in client-side code —
+    // that's how every Google Identity Services integration works) — never the secret.
+    // GoogleAuthOptions.ClientSecret is never read here or sent to the browser.
+    var clientId = GoogleAuthOptionsAccessor.Value.ClientId;
+    var buttonText = string.Equals(Model, "Sign up with Google", StringComparison.Ordinal) ? "signup_with" : "signin_with";
 }
-<div class="my-5 flex items-center gap-3" role="separator" aria-label="or">
-    <div class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
-    <span class="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Or</span>
-    <div class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
-</div>
+@if (GoogleSignInStatus.IsConfigured)
+{
+    <div class="my-5 flex items-center gap-3" role="separator" aria-label="or">
+        <div class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
+        <span class="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Or</span>
+        <div class="h-px flex-1 bg-slate-200 dark:bg-slate-700"></div>
+    </div>
 
-<a asp-action="GoogleLogin" asp-controller="Account"
-   class="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--vw-accent)] dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
-    <svg class="h-[18px] w-[18px] shrink-0" width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.874 2.684-6.616z"/>
-        <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
-        <path fill="#FBBC05" d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A9.001 9.001 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z"/>
-        <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 7.294C4.672 5.167 6.656 3.58 9 3.58z"/>
-    </svg>
-    <span>@label</span>
-</a>
+    @* GIS renders its own official Google button into this element — see the script
+       below. aria-label keeps a sensible accessible name before GIS finishes loading. *@
+    <div id="googleSignInButton" class="flex w-full justify-center" aria-label="@label"></div>
+
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+        (function () {
+            // GIS's client-side callback: receives the signed Google ID token ("credential")
+            // and POSTs it to the existing GoogleLogin(string credential) action, reusing the
+            // same antiforgery-token pattern Views/Exam/Take.cshtml's AJAX calls already use
+            // (Program.cs applies AutoValidateAntiforgeryTokenAttribute globally to every
+            // POST, so this token is required, not optional). A normal, full browser
+            // navigation to whatever URL the server redirects to afterward — success
+            // (dashboard/next onboarding step) and failure (back to Login with a TempData
+            // error) both flow through the exact same redirects GoogleCallback always used.
+            function handleCredentialResponse(response) {
+                var csrfToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                var body = new URLSearchParams({ credential: response.credential, __RequestVerificationToken: csrfToken });
+                fetch('/Account/GoogleLogin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body
+                }).then(function (res) {
+                    window.location.href = res.url;
+                }).catch(function () {
+                    window.location.href = '/Account/Login';
+                });
+            }
+
+            function initGoogleButton() {
+                if (!window.google || !google.accounts || !google.accounts.id) return;
+                google.accounts.id.initialize({
+                    client_id: '@clientId',
+                    callback: handleCredentialResponse
+                });
+                google.accounts.id.renderButton(
+                    document.getElementById('googleSignInButton'),
+                    { theme: 'outline', size: 'large', width: 320, text: '@buttonText' }
+                );
+            }
+
+            if (document.readyState === 'complete') {
+                initGoogleButton();
+            } else {
+                window.addEventListener('load', initGoogleButton);
+            }
+        })();
+    </script>
+}
