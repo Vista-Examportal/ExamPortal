@@ -173,11 +173,13 @@ namespace ExamPortal.Controllers
             }
 
             var passwordValid = user != null && !string.IsNullOrWhiteSpace(password) && AppDbContext.VerifyPassword(user, password);
+            // The one-time code is stored only as a hash (AssessmentInvitationService.Issue).
+            // Binding: the invitation was resolved from the link token above, must belong to this
+            // candidate, is Pending/Accepted and unexpired (ResolveAssessmentInvitation), and the
+            // code must be unused and match that invitation's own hash.
             var tokenValid = user != null &&
                 invitation.UserId == user.Id &&
-                invitation.TokenUsedAt == null &&
-                !string.IsNullOrWhiteSpace(invitation.OneTimeLoginToken) &&
-                invitation.OneTimeLoginToken == otp;
+                AssessmentInvitationService.IsOneTimeCodeValid(invitation, otp);
 
             if (user == null || user.Id != invitation.UserId || (!passwordValid && !tokenValid))
             {

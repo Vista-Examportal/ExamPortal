@@ -71,18 +71,43 @@ namespace ExamPortal.Services
             var previous = previousInvitations ?? _db.AssessmentInvitations
                 .Where(i => i.UserId == candidate.Id && i.ExamId == exam.Id && statusesToRevoke.Contains(i.Status))
                 .ToList();
-            previous.ForEach(i => i.Status = "Revoked");
+            // A replacement invitation invalidates the old link AND its one-time code: the status
+            // flip blocks the link (ResolveAssessmentInvitation), and blanking the stored hash
+            // means the old code can never match again even if a status check were ever relaxed.
+            previous.ForEach(i =>
+            {
+                i.Status = "Revoked";
+                i.OneTimeLoginToken = "";
+            });
+
+            // Single-candidate callers (AdminController.SendInvitation revokes only "Pending") can
+            // leave an older live invitation, e.g. "Accepted", in place. Its link behaviour is
+            // deliberately unchanged, but its one-time code must not survive a replacement.
+            // Bulk callers pass previousInvitations and already revoke every live status.
+            if (previousInvitations == null)
+            {
+                foreach (var live in _db.AssessmentInvitations.Where(i =>
+                             i.UserId == candidate.Id && i.ExamId == exam.Id &&
+                             (i.Status == "Pending" || i.Status == "Accepted")))
+                {
+                    live.OneTimeLoginToken = "";
+                }
+            }
 
             expiryHours = Math.Clamp(expiryHours, 1, 24 * 14);
             var resolvedDuration = Math.Clamp(durationMinutes <= 0 ? exam.DurationMinutes : durationMinutes, 5, 300);
             var resolvedPassingMarks = Math.Clamp(passingMarks <= 0 ? exam.PassingMarks : passingMarks, 1, Math.Max(1, exam.TotalMarks));
+
+            // The raw code exists only in this method's local variable: it goes into the email
+            // body below and nowhere else. The database keeps only its SHA-256 hash.
+            var oneTimeCode = SecureCodeGenerator.GenerateNumericCode();
 
             var invitation = new AssessmentInvitation
             {
                 UserId = candidate.Id,
                 ExamId = exam.Id,
                 Token = secureToken,
-                OneTimeLoginToken = SecureCodeGenerator.GenerateNumericCode(),
+                OneTimeLoginToken = SecureCodeGenerator.HashToken(oneTimeCode),
                 Status = "Pending",
                 AssessmentDate = assessmentDateUtc,
                 DurationMinutes = resolvedDuration,
@@ -95,10 +120,50 @@ namespace ExamPortal.Services
 
             _notifications.Queue(candidate, exam, "Assessment Invitation",
                 $"Assessment Invitation – {ResolveRole(exam)} | {_emailOptions.SenderName}",
-                BuildInvitationEmailHtml(candidate, exam, invitation, link),
+                BuildInvitationEmailHtml(candidate, exam, invitation, link, oneTimeCode),
                 BuildInvitationInAppSummary(exam, invitation));
 
             return invitation;
+        }
+
+        /// <summary>True only when <paramref name="submittedCode"/> matches this invitation's
+        /// stored one-time code hash and the code hasn't been used yet. The caller must already
+        /// have resolved the invitation from its link token and confirmed the invitation belongs
+        /// to the signing-in candidate and is still Pending/Accepted and unexpired (see
+        /// AccountController.AssessmentAuth). Legacy values that aren't a SHA-256 hash (older
+        /// invitations stored the code in plaintext, and it was never emailed) never match.</summary>
+        public static bool IsOneTimeCodeValid(AssessmentInvitation invitation, string? submittedCode)
+        {
+            var code = (submittedCode ?? "").Trim();
+            if (code.Length == 0 || invitation.TokenUsedAt != null) return false;
+
+            var stored = invitation.OneTimeLoginToken ?? "";
+            if (stored.Length != HashedCodeLength) return false;
+
+            var submittedHash = SecureCodeGenerator.HashToken(code);
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Text.Encoding.ASCII.GetBytes(submittedHash),
+                System.Text.Encoding.ASCII.GetBytes(stored.ToUpperInvariant()));
+        }
+
+        /// <summary>SHA-256 hex length — what HashToken returns.</summary>
+        private const int HashedCodeLength = 64;
+
+        private const string CodeStartMarker = "<!--otp-->";
+        private const string CodeEndMarker = "<!--/otp-->";
+
+        /// <summary>Removes the raw one-time code from a stored invitation email body. Called by
+        /// NotificationService once the email has been handed to the mail server, so the code
+        /// doesn't stay readable in dbo.Notifications after delivery.</summary>
+        public static string ScrubOneTimeCode(string body)
+        {
+            if (string.IsNullOrEmpty(body)) return body;
+            return System.Text.RegularExpressions.Regex.Replace(
+                body,
+                System.Text.RegularExpressions.Regex.Escape(CodeStartMarker) + ".*?" +
+                System.Text.RegularExpressions.Regex.Escape(CodeEndMarker),
+                "(hidden after delivery)",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
         }
 
         /// <summary>Generates a cryptographically random link token. Call this first, build the
@@ -126,16 +191,13 @@ namespace ExamPortal.Services
         ///
         /// Deliberately excludes all internal evaluation/scoring information — Total Marks,
         /// Passing Marks, Passing Percentage, Negative Marking, cutoff, or any other
-        /// evaluation criteria. It also does not include the one-time login token: that value
-        /// is functionally a password substitute (see AccountController.Auth.cs
-        /// AssessmentAuth, where it's accepted in place of the candidate's password), and the
-        /// "no credentials in the invitation email" requirement covers it the same as a
-        /// password. The candidate signs in with their normal Candidate ID/email + password;
-        /// the one-time token remains fully valid as a login credential (unchanged
-        /// authentication logic) for any other channel that might one day surface it — it's
-        /// simply no longer printed in this email.
+        /// evaluation criteria. It does include the one-time login code, because the sign-in
+        /// page tells candidates it is sent by email (AccountController.AssessmentAuth accepts
+        /// it in place of the password). The code appears only in this Email-channel body —
+        /// never in the InApp summary below — and is stripped from the stored body after
+        /// delivery (see <see cref="ScrubOneTimeCode"/>).
         /// </summary>
-        private string BuildInvitationEmailHtml(User user, Exam exam, AssessmentInvitation invitation, string link)
+        private string BuildInvitationEmailHtml(User user, Exam exam, AssessmentInvitation invitation, string link, string oneTimeCode)
         {
             var companyName = string.IsNullOrWhiteSpace(_emailOptions.SenderName) ? "VISTAWAYS TECH" : _emailOptions.SenderName;
             var contactEmail = string.IsNullOrWhiteSpace(_emailOptions.ContactInboxEmail) ? _emailOptions.SenderEmail : _emailOptions.ContactInboxEmail;
@@ -223,7 +285,16 @@ namespace ExamPortal.Services
           <a href=""{Enc(link)}"" style=""color:#4a4ad0;"">{Enc(link)}</a>
         </p>
 
-        <p style=""margin:0 0 8px;"">You will log in using your Candidate ID (<strong>{Enc(user.CandidateId)}</strong>) or registered email, together with your account password.</p>
+        <!-- One-time login code -->
+        <table role=""presentation"" width=""100%"" cellpadding=""0"" cellspacing=""0"" style=""border:1px dashed #1a1a2e;border-radius:6px;margin:0 0 24px;"">
+          <tr><td align=""center"" style=""padding:16px 20px;"">
+            <p style=""margin:0 0 6px;font-size:12px;letter-spacing:0.5px;font-weight:bold;color:#1a1a2e;"">ONE-TIME LOGIN CODE</p>
+            <p style=""margin:0 0 10px;font-size:28px;letter-spacing:6px;font-weight:bold;color:#1a1a2e;"">{CodeStartMarker}{Enc(oneTimeCode)}{CodeEndMarker}</p>
+            <p style=""margin:0;font-size:12px;color:#666;"">On the assessment sign-in page, enter your Candidate ID or registered email and this code in the <strong>One-Time Login Token</strong> field instead of your password. The code works once, only with this invitation, and stops working when the link expires or a newer invitation is sent. Do not share it with anyone.</p>
+          </td></tr>
+        </table>
+
+        <p style=""margin:0 0 8px;"">You will log in using your Candidate ID (<strong>{Enc(user.CandidateId)}</strong>) or registered email, together with your account password, or with the one-time code above.</p>
         <p style=""margin:0;"">If you have any questions regarding the assessment or the recruitment process, please contact our recruitment team at <a href=""mailto:{Enc(contactEmail)}"" style=""color:#4a4ad0;"">{Enc(contactEmail)}</a>.</p>
       </div>
 

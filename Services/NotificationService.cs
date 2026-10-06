@@ -156,6 +156,9 @@ namespace ExamPortal.Services
                         // Services/AssessmentInvitationService.cs), so it's sent as-is.
                         var isPrebuiltHtml = message.Type == "Assessment Invitation";
                         SendGmail(message.Recipient, message.Subject, message.Body, message.AttachmentBytes, message.AttachmentFileName, rawHtmlBody: isPrebuiltHtml);
+                        // The invitation email carries the raw one-time login code; now that the
+                        // mail server has accepted it, don't keep it readable in the queue table.
+                        if (isPrebuiltHtml) message.Body = AssessmentInvitationService.ScrubOneTimeCode(message.Body);
                         break;
                     case "SMS":
                         await SendProviderWebhookAsync("Sms", message, cancellationToken);
