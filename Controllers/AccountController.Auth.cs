@@ -48,6 +48,17 @@ namespace ExamPortal.Controllers
                     u.CandidateId.ToUpper() == normalized);
             }
 
+            // Per-account lockout: refuse even a correct password while locked, and don't
+            // count/extend on attempts made during the lockout. Unknown identifiers never
+            // reach this branch and get the same generic failure as a wrong password.
+            if (user != null && LoginLockout.IsLockedOut(user, DateTime.UtcNow, out var remaining))
+            {
+                _audit.Record(id, "LockedLogin", nameof(User), user.Id, "Login attempt rejected: account locked");
+                _db.SaveChanges();
+                ModelState.AddModelError("", LoginLockout.Message(remaining));
+                return View(model);
+            }
+
             if (user == null || !AppDbContext.VerifyPassword(user, model.Password))
             {
                 // Recorded for the Admin dashboard's security alerts (see
@@ -56,10 +67,22 @@ namespace ExamPortal.Controllers
                 // shown to the person attempting to log in, so it doesn't reveal
                 // account existence to them; it's the same "id" they just typed.
                 _audit.Record(id, "FailedLogin", nameof(User), user?.Id, "Invalid credentials at Login");
+                if (user != null && LoginLockout.RegisterFailure(user, DateTime.UtcNow))
+                {
+                    _audit.Record(id, "AccountLocked", nameof(User), user.Id,
+                        $"Locked for {(int)LoginLockout.LockoutDuration.TotalMinutes} minutes after {LoginLockout.MaxFailedAttempts} consecutive failed logins");
+                }
                 _db.SaveChanges();
+                if (user != null && LoginLockout.IsLockedOut(user, DateTime.UtcNow, out var nowLocked))
+                {
+                    ModelState.AddModelError("", LoginLockout.Message(nowLocked));
+                    return View(model);
+                }
                 ModelState.AddModelError("", "Invalid Candidate ID or password.");
                 return View(model);
             }
+
+            if (LoginLockout.Reset(user)) _db.SaveChanges();
 
             // An existing candidate who registered but never completed OTP verification
             // must not get the real login cookie either — Register no longer grants it
@@ -172,6 +195,21 @@ namespace ExamPortal.Controllers
                     u.Role == PortalRoles.Candidate && u.CandidateId.ToUpper() == normalized);
             }
 
+            // Per-account assessment-auth lockout (separate from normal Login's). Only applies
+            // when the typed identity is the owner of this invitation link: the lock message is
+            // then shown only to someone holding that candidate's own link, and presenting
+            // someone else's link can neither lock nor probe an unrelated account.
+            var linkOwner = user != null && user.Id == invitation.UserId ? user : null;
+            if (linkOwner != null && LoginLockout.IsAssessmentLockedOut(linkOwner, DateTime.UtcNow, out var assessmentRemaining))
+            {
+                _audit.Record(id, "AssessmentAuthLocked", nameof(User), linkOwner.Id, "AssessmentAuth attempt rejected: locked");
+                _db.SaveChanges();
+                ViewBag.Token = token;
+                ViewBag.ExamId = invitation.ExamId;
+                ModelState.AddModelError("", LoginLockout.AssessmentMessage(assessmentRemaining));
+                return View();
+            }
+
             var passwordValid = user != null && !string.IsNullOrWhiteSpace(password) && AppDbContext.VerifyPassword(user, password);
             // The one-time code is stored only as a hash (AssessmentInvitationService.Issue).
             // Binding: the invitation was resolved from the link token above, must belong to this
@@ -184,13 +222,25 @@ namespace ExamPortal.Controllers
             if (user == null || user.Id != invitation.UserId || (!passwordValid && !tokenValid))
             {
                 _audit.Record(id, "FailedLogin", nameof(User), user?.Id, "Invalid credentials at AssessmentAuth");
+                var lockedNow = linkOwner != null && LoginLockout.RegisterAssessmentFailure(linkOwner, DateTime.UtcNow);
+                if (lockedNow)
+                {
+                    _audit.Record(id, "AssessmentAuthLockout", nameof(User), linkOwner!.Id,
+                        $"Assessment auth locked for {(int)LoginLockout.LockoutDuration.TotalMinutes} minutes after {LoginLockout.MaxFailedAttempts} consecutive failures");
+                }
                 _db.SaveChanges();
                 ViewBag.Token = token;
                 ViewBag.ExamId = invitation.ExamId;
+                if (lockedNow && LoginLockout.IsAssessmentLockedOut(linkOwner!, DateTime.UtcNow, out var justLocked))
+                {
+                    ModelState.AddModelError("", LoginLockout.AssessmentMessage(justLocked));
+                    return View();
+                }
                 ModelState.AddModelError("", "Invalid Candidate ID, password, one-time token, or this invitation is not for you.");
                 return View();
             }
 
+            LoginLockout.ResetAssessment(user);
             invitation.Status = "Accepted";
             invitation.AcceptedAt ??= DateTime.UtcNow;
             if (tokenValid) invitation.TokenUsedAt = DateTime.UtcNow;

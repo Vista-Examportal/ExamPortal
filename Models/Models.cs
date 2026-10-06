@@ -68,6 +68,18 @@ namespace ExamPortal.Models
         /// reading back correctly. Same shape as GoogleId above.</summary>
         public string LinkedInId { get; set; } = "";
 
+        /// <summary>Consecutive wrong passwords at Login since the last success/lockout.
+        /// See Services/LoginLockout.cs.</summary>
+        public int FailedLoginCount { get; set; }
+
+        /// <summary>UTC time until which password login is refused for this account; null when not locked.</summary>
+        public DateTime? LockoutEndUtc { get; set; }
+
+        /// <summary>Same as FailedLoginCount/LockoutEndUtc but for AssessmentAuth
+        /// (invitation-link sign-in), tracked separately.</summary>
+        public int AssessmentFailedCount { get; set; }
+        public DateTime? AssessmentLockoutEndUtc { get; set; }
+
         public string EmailVerificationToken { get; set; } = "";
         public DateTime? MobileOtpExpiresAt { get; set; }
         /// <summary>SHA-256 hash of the current password-reset token. Never store the raw token —

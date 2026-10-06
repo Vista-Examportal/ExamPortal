@@ -127,6 +127,47 @@ namespace ExamPortal.Data
         END
     ");
 
+    // ── Per-account login lockout (see Services/LoginLockout.cs) ──
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'FailedLoginCount'
+        )
+        BEGIN
+            ALTER TABLE [dbo].[Users]
+                ADD [FailedLoginCount] int NOT NULL
+                CONSTRAINT [DF_Users_FailedLoginCount] DEFAULT (0);
+        END
+
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'LockoutEndUtc'
+        )
+        BEGIN
+            ALTER TABLE [dbo].[Users]
+                ADD [LockoutEndUtc] datetime2 NULL;
+        END
+
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'AssessmentFailedCount'
+        )
+        BEGIN
+            ALTER TABLE [dbo].[Users]
+                ADD [AssessmentFailedCount] int NOT NULL
+                CONSTRAINT [DF_Users_AssessmentFailedCount] DEFAULT (0);
+        END
+
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'AssessmentLockoutEndUtc'
+        )
+        BEGIN
+            ALTER TABLE [dbo].[Users]
+                ADD [AssessmentLockoutEndUtc] datetime2 NULL;
+        END
+    ");
+
     // Filtered (WHERE GoogleId <> '') so the many local-auth accounts with an empty
     // GoogleId don't collide on uniqueness — same pattern as IX_Users_CandidateId above.
     db.Database.ExecuteSqlRaw(@"
