@@ -10,15 +10,16 @@ namespace ExamPortal.Tests.Services
 {
     public class LoginLockoutTests
     {
+        private const int Max = LoginLockout.MaxFailedAttempts;
         private static readonly DateTime Now = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
         private static User NewUser() => new() { Id = 1, Username = "u", Email = "u@example.com", PasswordHash = "x" };
 
         [Fact]
-        public void NineFailures_DoNotLock_TenthLocksForFifteenMinutes()
+        public void FailuresBelowThreshold_DoNotLock_ThresholdLocksForFifteenMinutes()
         {
             var user = NewUser();
-            for (var i = 0; i < 9; i++)
+            for (var i = 0; i < Max - 1; i++)
                 Assert.False(LoginLockout.RegisterFailure(user, Now));
             Assert.False(LoginLockout.IsLockedOut(user, Now, out _));
 
@@ -31,13 +32,13 @@ namespace ExamPortal.Tests.Services
         public void LockoutExpires_AndCountStartsOver()
         {
             var user = NewUser();
-            for (var i = 0; i < 10; i++) LoginLockout.RegisterFailure(user, Now);
+            for (var i = 0; i < Max; i++) LoginLockout.RegisterFailure(user, Now);
 
             var later = Now.AddMinutes(15).AddSeconds(1);
             Assert.False(LoginLockout.IsLockedOut(user, later, out _));
 
-            // After expiry a full 10 fresh failures are required to lock again.
-            for (var i = 0; i < 9; i++) Assert.False(LoginLockout.RegisterFailure(user, later));
+            // After expiry a full threshold of fresh failures are required to lock again.
+            for (var i = 0; i < Max - 1; i++) Assert.False(LoginLockout.RegisterFailure(user, later));
             Assert.True(LoginLockout.RegisterFailure(user, later));
         }
 
@@ -45,13 +46,13 @@ namespace ExamPortal.Tests.Services
         public void Reset_ClearsCountSoStreakIsConsecutiveOnly()
         {
             var user = NewUser();
-            for (var i = 0; i < 9; i++) LoginLockout.RegisterFailure(user, Now);
+            for (var i = 0; i < Max - 1; i++) LoginLockout.RegisterFailure(user, Now);
 
             Assert.True(LoginLockout.Reset(user));
             Assert.Equal(0, user.FailedLoginCount);
             Assert.False(LoginLockout.Reset(user)); // nothing left to change
 
-            for (var i = 0; i < 9; i++) Assert.False(LoginLockout.RegisterFailure(user, Now));
+            for (var i = 0; i < Max - 1; i++) Assert.False(LoginLockout.RegisterFailure(user, Now));
         }
 
         [Fact]
@@ -72,7 +73,7 @@ namespace ExamPortal.Tests.Services
             {
                 var user = NewUser();
                 db.Users.Add(user);
-                for (var i = 0; i < 10; i++) LoginLockout.RegisterFailure(user, Now);
+                for (var i = 0; i < Max; i++) LoginLockout.RegisterFailure(user, Now);
                 db.SaveChanges();
             }
 
@@ -87,10 +88,10 @@ namespace ExamPortal.Tests.Services
         // ── AssessmentAuth counter (tracked separately from normal login) ──
 
         [Fact]
-        public void Assessment_TenthFailureLocksForFifteenMinutes_NinthDoesNot()
+        public void Assessment_ThresholdFailureLocksForFifteenMinutes_OneBelowDoesNot()
         {
             var user = NewUser();
-            for (var i = 0; i < 9; i++)
+            for (var i = 0; i < Max - 1; i++)
                 Assert.False(LoginLockout.RegisterAssessmentFailure(user, Now));
             Assert.False(LoginLockout.IsAssessmentLockedOut(user, Now, out _));
 
@@ -104,7 +105,7 @@ namespace ExamPortal.Tests.Services
         public void Assessment_AndLoginCounters_AreIndependent()
         {
             var user = NewUser();
-            for (var i = 0; i < 10; i++) LoginLockout.RegisterAssessmentFailure(user, Now);
+            for (var i = 0; i < Max; i++) LoginLockout.RegisterAssessmentFailure(user, Now);
 
             // Assessment lockout does not lock normal login, and its failures don't count toward it.
             Assert.False(LoginLockout.IsLockedOut(user, Now, out _));
@@ -135,7 +136,7 @@ namespace ExamPortal.Tests.Services
             {
                 var user = NewUser();
                 db.Users.Add(user);
-                for (var i = 0; i < 10; i++) LoginLockout.RegisterAssessmentFailure(user, Now);
+                for (var i = 0; i < Max; i++) LoginLockout.RegisterAssessmentFailure(user, Now);
                 db.SaveChanges();
             }
 

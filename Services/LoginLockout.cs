@@ -12,7 +12,7 @@ namespace ExamPortal.Services
     /// </summary>
     public static class LoginLockout
     {
-        public const int MaxFailedAttempts = 10;
+        public const int MaxFailedAttempts = 6;
         public static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
         // ── Normal password login ──

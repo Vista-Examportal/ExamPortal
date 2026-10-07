@@ -51,11 +51,19 @@ namespace ExamPortal.Controllers
             // Per-account lockout: refuse even a correct password while locked, and don't
             // count/extend on attempts made during the lockout. Unknown identifiers never
             // reach this branch and get the same generic failure as a wrong password.
+            //if (user != null && LoginLockout.IsLockedOut(user, DateTime.UtcNow, out var remaining))
+            //{
+            //    _audit.Record(id, "LockedLogin", nameof(User), user.Id, "Login attempt rejected: account locked");
+            //    _db.SaveChanges();
+            //    ModelState.AddModelError("", LoginLockout.Message(remaining));
+            //    return View(model);
+            //}
             if (user != null && LoginLockout.IsLockedOut(user, DateTime.UtcNow, out var remaining))
             {
                 _audit.Record(id, "LockedLogin", nameof(User), user.Id, "Login attempt rejected: account locked");
                 _db.SaveChanges();
                 ModelState.AddModelError("", LoginLockout.Message(remaining));
+                Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 return View(model);
             }
 
@@ -73,11 +81,18 @@ namespace ExamPortal.Controllers
                         $"Locked for {(int)LoginLockout.LockoutDuration.TotalMinutes} minutes after {LoginLockout.MaxFailedAttempts} consecutive failed logins");
                 }
                 _db.SaveChanges();
+                //if (user != null && LoginLockout.IsLockedOut(user, DateTime.UtcNow, out var nowLocked))
+                //{
+                //    ModelState.AddModelError("", LoginLockout.Message(nowLocked));
+                //    return View(model);
+                //}
                 if (user != null && LoginLockout.IsLockedOut(user, DateTime.UtcNow, out var nowLocked))
                 {
                     ModelState.AddModelError("", LoginLockout.Message(nowLocked));
+                    Response.StatusCode = StatusCodes.Status429TooManyRequests;
                     return View(model);
                 }
+
                 ModelState.AddModelError("", "Invalid Candidate ID or password.");
                 return View(model);
             }
