@@ -249,6 +249,18 @@ namespace ExamPortal.Data
         END
     ");
 
+    // ── Step 4d: add EmailOtpLastSentAt column (OTP resend cooldown) if missing ──
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'EmailOtpLastSentAt'
+        )
+        BEGIN
+            ALTER TABLE [dbo].[Users]
+                ADD [EmailOtpLastSentAt] datetime2 NULL;
+        END
+    ");
+
     // ── Step 5: add new InterviewRecord columns if missing ───────────────────
     // Columns added in this update: TimeZone, DurationMinutes, Format,
     // MeetingLink, MeetingId, InterviewerNames, CandidateActionItems,

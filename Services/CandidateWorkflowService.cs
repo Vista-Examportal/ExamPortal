@@ -33,6 +33,17 @@ namespace ExamPortal.Services
             _cache = cache;
         }
 
+        /// <summary>Minimum gap between two OTP emails to the same candidate.</summary>
+        public const int OtpResendCooldownSeconds = 60;
+
+        /// <summary>Whole seconds left in the candidate's OTP resend cooldown; 0 when a send is allowed.</summary>
+        public static int GetOtpResendWaitSeconds(User candidate, DateTime nowUtc)
+        {
+            if (candidate.EmailOtpLastSentAt is not { } lastSent) return 0;
+            var remaining = (lastSent.AddSeconds(OtpResendCooldownSeconds) - nowUtc).TotalSeconds;
+            return remaining > 0 ? (int)Math.Ceiling(remaining) : 0;
+        }
+
         private static string OtpAttemptCacheKey(int candidateId) => $"otp-attempts:{candidateId}";
 
         public string QueueEmailOtp(User candidate)
@@ -44,6 +55,7 @@ namespace ExamPortal.Services
             // database leak alone then can't be used to complete email verification.
             candidate.EmailVerificationToken = SecureCodeGenerator.HashToken(otp);
             candidate.MobileOtpExpiresAt = DateTime.UtcNow.AddMinutes(15);
+            candidate.EmailOtpLastSentAt = DateTime.UtcNow;
             candidate.RecruitmentStage = RecruitmentStages.EmailVerificationPending;
 
             // A fresh OTP also resets the attempt counter — a new code deserves a new set of tries.

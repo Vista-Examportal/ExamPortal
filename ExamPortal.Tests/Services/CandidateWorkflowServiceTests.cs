@@ -651,5 +651,43 @@ namespace ExamPortal.Tests.Services
 
             Assert.Equal(existingStage, candidate.RecruitmentStage);
         }
+
+        // ── OTP resend cooldown ────────────────────────────────────────────────
+
+        [Fact]
+        public void QueueEmailOtp_RecordsLastSentTime()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            var candidate = MakeCandidate();
+            var before = DateTime.UtcNow;
+
+            service.QueueEmailOtp(candidate);
+
+            Assert.NotNull(candidate.EmailOtpLastSentAt);
+            Assert.InRange(candidate.EmailOtpLastSentAt!.Value, before, DateTime.UtcNow);
+        }
+
+        [Fact]
+        public void GetOtpResendWaitSeconds_NeverSent_IsZero()
+        {
+            Assert.Equal(0, CandidateWorkflowService.GetOtpResendWaitSeconds(MakeCandidate(), DateTime.UtcNow));
+        }
+
+        [Theory]
+        [InlineData(0, 60)]
+        [InlineData(1, 59)]
+        [InlineData(59, 1)]
+        [InlineData(60, 0)]
+        [InlineData(300, 0)]
+        public void GetOtpResendWaitSeconds_CountsDownFromSixtySeconds(int secondsSinceSend, int expectedWait)
+        {
+            var now = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+            var candidate = MakeCandidate();
+            candidate.EmailOtpLastSentAt = now.AddSeconds(-secondsSinceSend);
+
+            Assert.Equal(expectedWait, CandidateWorkflowService.GetOtpResendWaitSeconds(candidate, now));
+        }
     }
 }
