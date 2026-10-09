@@ -155,6 +155,21 @@ namespace ExamPortal.Controllers
             // POSTs can't each trigger an OTP. Rejected requests generate and email nothing.
             var now = DateTime.UtcNow;
             var wait = CandidateWorkflowService.GetOtpResendWaitSeconds(candidate, now);
+
+            // Rolling-hour limit (5 per candidate, registration OTP included), checked before the
+            // cooldown claim below so a blocked request doesn't move EmailOtpLastSentAt, and before
+            // any code is generated or emailed.
+            string? hourlyMessage = null;
+            if (wait == 0)
+            {
+                var hourly = _candidateWorkflow.CheckEmailOtpHourlyLimit(candidate);
+                if (hourly != null)
+                {
+                    wait = Math.Max(1, (int)Math.Ceiling(hourly.RetryAfter.TotalSeconds));
+                    hourlyMessage = hourly.Message;
+                }
+            }
+
             if (wait == 0)
             {
                 var cutoff = now.AddSeconds(-CandidateWorkflowService.OtpResendCooldownSeconds);
@@ -171,7 +186,7 @@ namespace ExamPortal.Controllers
             {
                 Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 Response.Headers.RetryAfter = wait.ToString();
-                ModelState.AddModelError("", $"Please wait {wait} second{(wait == 1 ? "" : "s")} before requesting another OTP.");
+                ModelState.AddModelError("", hourlyMessage ?? $"Please wait {wait} second{(wait == 1 ? "" : "s")} before requesting another OTP.");
                 ViewData["ResendWaitSeconds"] = wait;
                 return View("VerifyEmailOtp", new EmailOtpViewModel { Email = candidate.Email });
             }
