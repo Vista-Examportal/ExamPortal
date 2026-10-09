@@ -249,6 +249,43 @@ namespace ExamPortal.Data
         END
     ");
 
+    // ── Step 4d: add EmailOtpLastSentAt column (OTP resend cooldown) if missing ──
+    db.Database.ExecuteSqlRaw(@"
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.columns
+            WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = N'EmailOtpLastSentAt'
+        )
+        BEGIN
+            ALTER TABLE [dbo].[Users]
+                ADD [EmailOtpLastSentAt] datetime2 NULL;
+        END
+    ");
+
+    // ── Step 4e: per-candidate email OTP send log (five-per-hour limit) ──────────────
+    // A table rather than columns on Users so the one-hour window is a true rolling window.
+    // See CandidateWorkflowService.CheckEmailOtpHourlyLimit.
+    db.Database.ExecuteSqlRaw(@"
+        IF OBJECT_ID(N'[dbo].[EmailOtpSends]', N'U') IS NULL
+        BEGIN
+            CREATE TABLE [dbo].[EmailOtpSends] (
+                [Id] int IDENTITY(1,1) NOT NULL CONSTRAINT [PK_EmailOtpSends] PRIMARY KEY,
+                [UserId] int NOT NULL,
+                [SentAt] datetime2 NOT NULL CONSTRAINT [DF_EmailOtpSends_SentAt] DEFAULT (SYSUTCDATETIME()),
+                CONSTRAINT [FK_EmailOtpSends_Users_UserId] FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users] ([Id]) ON DELETE CASCADE
+            );
+        END
+
+        IF NOT EXISTS (
+            SELECT 1 FROM sys.indexes
+            WHERE object_id = OBJECT_ID(N'[dbo].[EmailOtpSends]')
+              AND name = N'IX_EmailOtpSends_UserId_SentAt'
+        )
+        BEGIN
+            CREATE INDEX [IX_EmailOtpSends_UserId_SentAt]
+                ON [dbo].[EmailOtpSends] ([UserId], [SentAt]);
+        END
+    ");
+
     // ── Step 5: add new InterviewRecord columns if missing ───────────────────
     // Columns added in this update: TimeZone, DurationMinutes, Format,
     // MeetingLink, MeetingId, InterviewerNames, CandidateActionItems,
