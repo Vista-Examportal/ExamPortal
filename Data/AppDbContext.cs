@@ -36,6 +36,7 @@ namespace ExamPortal.Data
         public DbSet<CandidateSocialProfile> CandidateSocialProfiles => Set<CandidateSocialProfile>();
         public DbSet<CandidateJobPreference> CandidateJobPreferences => Set<CandidateJobPreference>();
         public DbSet<CandidateLanguage> CandidateLanguages => Set<CandidateLanguage>();
+        public DbSet<EmailOtpSend> EmailOtpSends => Set<EmailOtpSend>();
         public DbSet<CandidateProfileCompletion> CandidateProfileCompletions => Set<CandidateProfileCompletion>();
 
         protected override void OnModelCreating(ModelBuilder mb)
@@ -83,6 +84,10 @@ namespace ExamPortal.Data
                 .HasOne(u => u.ProfileCompletion).WithOne(p => p.User).HasForeignKey<CandidateProfileCompletion>(p => p.UserId).OnDelete(DeleteBehavior.Cascade);
             mb.Entity<CandidateLanguage>()
                 .HasOne(l => l.User).WithMany(u => u.Languages).HasForeignKey(l => l.UserId).OnDelete(DeleteBehavior.Cascade);
+            mb.Entity<EmailOtpSend>()
+                .HasOne(s => s.User).WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Cascade);
+            mb.Entity<EmailOtpSend>()
+                .HasIndex(s => new { s.UserId, s.SentAt });
 
             mb.Entity<Exam>()
                 .Property(e => e.NegativeMarks).HasPrecision(5, 2);
