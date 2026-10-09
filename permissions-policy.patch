@@ -1,0 +1,56 @@
+diff --git a/ExamPortal.Tests/Middleware/SecurityHeadersMiddlewareTests.cs b/ExamPortal.Tests/Middleware/SecurityHeadersMiddlewareTests.cs
+index 32f1bd8..68c6161 100644
+--- a/ExamPortal.Tests/Middleware/SecurityHeadersMiddlewareTests.cs
++++ b/ExamPortal.Tests/Middleware/SecurityHeadersMiddlewareTests.cs
+@@ -83,5 +83,31 @@ namespace ExamPortal.Tests.Middleware
+ 
+             Assert.Contains("lh3.googleusercontent.com", csp);
+         }
++
++        [Fact]
++        public async Task SetsPermissionsPolicy_AllowingCameraMicrophoneAndFullscreenForSelfOnly()
++        {
++            var response = await SendThroughMiddlewareAsync();
++            var policy = response.Headers.GetValues("Permissions-Policy").First();
++
++            // Assessment proctoring needs these; they must not be blocked or opened to other origins.
++            Assert.Contains("camera=(self)", policy);
++            Assert.Contains("microphone=(self)", policy);
++            Assert.Contains("fullscreen=(self)", policy);
++            // Unused features are disabled.
++            Assert.Contains("geolocation=()", policy);
++            Assert.Contains("payment=()", policy);
++            Assert.Contains("display-capture=()", policy);
++        }
++
++        [Fact]
++        public async Task PermissionsPolicy_DoesNotDisableCameraOrMicrophone()
++        {
++            var response = await SendThroughMiddlewareAsync();
++            var policy = response.Headers.GetValues("Permissions-Policy").First();
++
++            Assert.DoesNotContain("camera=()", policy);
++            Assert.DoesNotContain("microphone=()", policy);
++        }
+     }
+ }
+diff --git a/Middleware/SecurityHeadersMiddleware.cs b/Middleware/SecurityHeadersMiddleware.cs
+index 1a2a1fd..5ed0744 100644
+--- a/Middleware/SecurityHeadersMiddleware.cs
++++ b/Middleware/SecurityHeadersMiddleware.cs
+@@ -14,6 +14,15 @@ namespace ExamPortal.Middleware
+                 context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+                 context.Response.Headers["X-Frame-Options"] = "DENY";
+                 context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
++                // Camera + microphone (assessment proctoring, Exam/Take.cshtml getUserMedia) and
++                // fullscreen (requestFullscreen) are allowed for this origin only. Everything
++                // below is disabled because a code search confirms the app never uses it
++                // (no geolocation/payment/USB/Bluetooth/Serial/MIDI/motion-sensor calls and no
++                // getDisplayMedia screen capture). Re-enable here if a feature is ever added.
++                context.Response.Headers["Permissions-Policy"] =
++                    "camera=(self), microphone=(self), fullscreen=(self), " +
++                    "geolocation=(), payment=(), usb=(), bluetooth=(), serial=(), midi=(), " +
++                    "accelerometer=(), gyroscope=(), magnetometer=(), display-capture=()";
+                 context.Response.Headers["Content-Security-Policy"] =
+                     "default-src 'self'; " +
+                     "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com 'unsafe-inline'; " +
