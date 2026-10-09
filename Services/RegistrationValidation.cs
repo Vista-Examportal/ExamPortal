@@ -33,6 +33,12 @@ namespace ExamPortal.Services
 
         private static readonly Regex IndianMobilePattern = new(@"^[6-9]\d{9}$", RegexOptions.Compiled);
 
+        // What a person may type into the phone field: an optional "+91" prefix, then ASCII
+        // digits, spaces, hyphens, and parentheses. Deliberately [0-9] rather than \d so
+        // non-ASCII digits (e.g. Devanagari) are rejected too. Mirrored by
+        // PHONE_ALLOWED_PATTERN in wwwroot/js/app.js (UX only — this one is authoritative).
+        private static readonly Regex AllowedPhoneInputPattern = new(@"^[ (]*(?:\+[ ()]*91)?[0-9 \-()]*\z", RegexOptions.Compiled);
+
         /// <summary>Trims and collapses runs of spaces down to one — does not touch
         /// hyphens/apostrophes/periods, which are meaningful in names like
         /// "Mary-Jane" or "O'Connor" and must never be silently rewritten.</summary>
@@ -55,6 +61,17 @@ namespace ExamPortal.Services
             foreach (var c in normalizedFullName)
                 if (char.IsLetter(c)) letterCount++;
             return letterCount >= 2;
+        }
+
+        /// <summary>True when the ORIGINAL (un-normalized) phone input contains only characters a
+        /// phone number may legitimately have. Must run before <see cref="NormalizePhoneNumber"/>,
+        /// which keeps only the digits and would otherwise silently discard letters and symbols
+        /// (so "98765abc43210" would normalize to a valid-looking "9876543210"). A blank value
+        /// returns true here — "required" and "valid number" are reported by their own checks.</summary>
+        public static bool HasOnlyAllowedPhoneCharacters(string? phoneNumber)
+        {
+            if (string.IsNullOrWhiteSpace(phoneNumber)) return true;
+            return AllowedPhoneInputPattern.IsMatch(phoneNumber.Trim());
         }
 
         /// <summary>Strips spaces, hyphens, and parentheses, and an optional leading

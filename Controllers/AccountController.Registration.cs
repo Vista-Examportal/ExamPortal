@@ -100,6 +100,7 @@ namespace ExamPortal.Controllers
         {
             var candidate = await GetSignedInOrPendingVerificationCandidateAsync();
             if (candidate == null) return RedirectToAction("Login");
+            ViewData["ResendWaitSeconds"] = CandidateWorkflowService.GetOtpResendWaitSeconds(candidate, DateTime.UtcNow);
             return View(new EmailOtpViewModel { Email = candidate.Email });
         }
 
@@ -110,6 +111,7 @@ namespace ExamPortal.Controllers
             var candidate = await GetSignedInOrPendingVerificationCandidateAsync();
             if (candidate == null) return RedirectToAction("Login");
             model.Email = candidate.Email;
+            ViewData["ResendWaitSeconds"] = CandidateWorkflowService.GetOtpResendWaitSeconds(candidate, DateTime.UtcNow);
 
             if (!ModelState.IsValid) return View(model);
             if (_candidateWorkflow.IsOtpLocked(candidate))
@@ -146,6 +148,48 @@ namespace ExamPortal.Controllers
         {
             var candidate = await GetSignedInOrPendingVerificationCandidateAsync();
             if (candidate == null) return RedirectToAction("Login");
+
+            // 60-second cooldown, enforced server-side from the persisted EmailOtpLastSentAt.
+            // The UPDATE below is the atomic claim: only one concurrent request (even across
+            // instances) can move the timestamp forward, so refreshes, second tabs and direct
+            // POSTs can't each trigger an OTP. Rejected requests generate and email nothing.
+            var now = DateTime.UtcNow;
+            var wait = CandidateWorkflowService.GetOtpResendWaitSeconds(candidate, now);
+
+            // Rolling-hour limit (5 per candidate, registration OTP included), checked before the
+            // cooldown claim below so a blocked request doesn't move EmailOtpLastSentAt, and before
+            // any code is generated or emailed.
+            string? hourlyMessage = null;
+            if (wait == 0)
+            {
+                var hourly = _candidateWorkflow.CheckEmailOtpHourlyLimit(candidate);
+                if (hourly != null)
+                {
+                    wait = Math.Max(1, (int)Math.Ceiling(hourly.RetryAfter.TotalSeconds));
+                    hourlyMessage = hourly.Message;
+                }
+            }
+
+            if (wait == 0)
+            {
+                var cutoff = now.AddSeconds(-CandidateWorkflowService.OtpResendCooldownSeconds);
+                var claimed = await _db.Users
+                    .Where(u => u.Id == candidate.Id && (u.EmailOtpLastSentAt == null || u.EmailOtpLastSentAt <= cutoff))
+                    .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailOtpLastSentAt, (DateTime?)now));
+                if (claimed == 0)
+                {
+                    await _db.Entry(candidate).ReloadAsync();
+                    wait = Math.Max(1, CandidateWorkflowService.GetOtpResendWaitSeconds(candidate, DateTime.UtcNow));
+                }
+            }
+            if (wait > 0)
+            {
+                Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                Response.Headers.RetryAfter = wait.ToString();
+                ModelState.AddModelError("", hourlyMessage ?? $"Please wait {wait} second{(wait == 1 ? "" : "s")} before requesting another OTP.");
+                ViewData["ResendWaitSeconds"] = wait;
+                return View("VerifyEmailOtp", new EmailOtpViewModel { Email = candidate.Email });
+            }
 
             _candidateWorkflow.QueueEmailOtp(candidate);
             _db.SaveChanges();

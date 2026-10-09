@@ -80,6 +80,53 @@ namespace ExamPortal.Tests.Services
             Assert.False(RegistrationValidation.IsValidIndianMobileNumber(normalized));
         }
 
+        // ── Phone Number: allowed characters (checked on the ORIGINAL input) ──────
+
+        [Theory]
+        [InlineData("9876543210")]
+        [InlineData("+91 98765 43210")]
+        [InlineData("+919876543210")]
+        [InlineData("(+91) 98765 43210")]
+        [InlineData("+91-98765-43210")]
+        [InlineData("09876543210")]
+        [InlineData("(098) 7654-3210")]
+        [InlineData("  9876543210  ")]
+        [InlineData("")]   // blank is left to the Required / valid-number checks
+        [InlineData(null)]
+        public void HasOnlyAllowedPhoneCharacters_AcceptsDigitsAndPhoneFormatting(string? input)
+        {
+            Assert.True(RegistrationValidation.HasOnlyAllowedPhoneCharacters(input));
+        }
+
+        [Theory]
+        [InlineData("98765abc43210")]      // letters in the middle — used to normalize to a "valid" number
+        [InlineData("abcdefghij")]
+        [InlineData("9876543210x")]
+        [InlineData("98765#43210")]
+        [InlineData("98765.43210")]
+        [InlineData("98765/43210")]
+        [InlineData("9876+543210")]        // "+" anywhere except as the +91 prefix
+        [InlineData("++91 9876543210")]
+        [InlineData("+44 9876543210")]     // only a +91 prefix is supported
+        [InlineData("+91 98765 43210 ext 5")]
+        [InlineData("९८७६५४३२१०")]          // non-ASCII (Devanagari) digits
+        [InlineData("<script>")]
+        public void HasOnlyAllowedPhoneCharacters_RejectsLettersAndOtherCharacters(string input)
+        {
+            Assert.False(RegistrationValidation.HasOnlyAllowedPhoneCharacters(input));
+        }
+
+        [Fact]
+        public void NormalizePhoneNumber_AloneWouldAcceptLetters_WhichIsWhyTheCharacterCheckMustRunFirst()
+        {
+            // Documents the original bug: normalization silently drops non-digits, so on its own
+            // it turns this into a valid-looking number. CandidateRegistrationViewModel.Validate
+            // therefore calls HasOnlyAllowedPhoneCharacters on the raw input before normalizing.
+            var normalized = RegistrationValidation.NormalizePhoneNumber("98765abc43210");
+            Assert.True(RegistrationValidation.IsValidIndianMobileNumber(normalized));
+            Assert.False(RegistrationValidation.HasOnlyAllowedPhoneCharacters("98765abc43210"));
+        }
+
         // ── Password ─────────────────────────────────────────────────────────────
 
         [Theory]
