@@ -1114,10 +1114,6 @@
     var FULLNAME_REPEATED_PUNCT = /[\s.'-]{3,}/;
     var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     var PHONE_PATTERN = /^[6-9]\d{9}$/;
-    /* Same rule as RegistrationValidation.AllowedPhoneInputPattern on the server:
-       optional "+91", then digits, spaces, hyphens, parentheses only. */
-    var PHONE_ALLOWED_PATTERN = /^[ (]*(?:\+[ ()]*91)?[0-9 \-()]*$/;
-    var PHONE_CHARS_MESSAGE = "Phone number can contain only digits, spaces, hyphens, parentheses, and an optional +91 prefix.";
 
     function collapseSpaces(value) { return value.trim().replace(/ {2,}/g, " "); }
 
@@ -1186,22 +1182,13 @@
             if (input.dataset.wiredLiveValidate === "1") return;
             input.dataset.wiredLiveValidate = "1";
             input.addEventListener("blur", function () {
-                // Check the original text first — normalizePhoneClientSide keeps only digits,
-                // so letters/symbols would otherwise be dropped silently and still pass.
-                if (!PHONE_ALLOWED_PATTERN.test(input.value.trim())) {
-                    showFieldError(input, PHONE_CHARS_MESSAGE);
-                    return;
-                }
                 var digits = normalizePhoneClientSide(input.value);
                 showFieldError(input, digits && !isValidPhoneClientSide(digits)
                     ? "Enter a valid 10-digit Indian mobile number."
                     : "");
             });
             input.addEventListener("input", function () {
-                // Flag a clearly wrong character (letters etc.) as it is typed; a "+" is allowed
-                // here because it may be the start of "+91" — placement is checked on blur.
-                if (/[^0-9 \-()+]/.test(input.value)) showFieldError(input, PHONE_CHARS_MESSAGE);
-                else if (input.classList.contains("is-invalid")) showFieldError(input, "");
+                if (input.classList.contains("is-invalid")) showFieldError(input, "");
             });
         });
     }
