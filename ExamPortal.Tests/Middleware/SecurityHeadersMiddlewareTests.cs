@@ -83,5 +83,31 @@ namespace ExamPortal.Tests.Middleware
 
             Assert.Contains("lh3.googleusercontent.com", csp);
         }
+
+        [Fact]
+        public async Task SetsPermissionsPolicy_AllowingCameraMicrophoneAndFullscreenForSelfOnly()
+        {
+            var response = await SendThroughMiddlewareAsync();
+            var policy = response.Headers.GetValues("Permissions-Policy").First();
+
+            // Assessment proctoring needs these; they must not be blocked or opened to other origins.
+            Assert.Contains("camera=(self)", policy);
+            Assert.Contains("microphone=(self)", policy);
+            Assert.Contains("fullscreen=(self)", policy);
+            // Unused features are disabled.
+            Assert.Contains("geolocation=()", policy);
+            Assert.Contains("payment=()", policy);
+            Assert.Contains("display-capture=()", policy);
+        }
+
+        [Fact]
+        public async Task PermissionsPolicy_DoesNotDisableCameraOrMicrophone()
+        {
+            var response = await SendThroughMiddlewareAsync();
+            var policy = response.Headers.GetValues("Permissions-Policy").First();
+
+            Assert.DoesNotContain("camera=()", policy);
+            Assert.DoesNotContain("microphone=()", policy);
+        }
     }
 }

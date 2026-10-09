@@ -14,6 +14,15 @@ namespace ExamPortal.Middleware
                 context.Response.Headers["X-Content-Type-Options"] = "nosniff";
                 context.Response.Headers["X-Frame-Options"] = "DENY";
                 context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+                // Camera + microphone (assessment proctoring, Exam/Take.cshtml getUserMedia) and
+                // fullscreen (requestFullscreen) are allowed for this origin only. Everything
+                // below is disabled because a code search confirms the app never uses it
+                // (no geolocation/payment/USB/Bluetooth/Serial/MIDI/motion-sensor calls and no
+                // getDisplayMedia screen capture). Re-enable here if a feature is ever added.
+                context.Response.Headers["Permissions-Policy"] =
+                    "camera=(self), microphone=(self), fullscreen=(self), " +
+                    "geolocation=(), payment=(), usb=(), bluetooth=(), serial=(), midi=(), " +
+                    "accelerometer=(), gyroscope=(), magnetometer=(), display-capture=()";
                 context.Response.Headers["Content-Security-Policy"] =
                     "default-src 'self'; " +
                     "script-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com 'unsafe-inline'; " +
