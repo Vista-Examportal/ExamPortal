@@ -4,9 +4,6 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace ExamPortal.Services
 {
-    /// <summary>Why an OTP send was refused, and how long until it is allowed.</summary>
-    public sealed record EmailOtpSendBlock(TimeSpan RetryAfter, string Message);
-
     public class CandidateWorkflowService
     {
         private readonly AppDbContext _db;
@@ -36,51 +33,6 @@ namespace ExamPortal.Services
             _cache = cache;
         }
 
-        /// <summary>Minimum gap between two OTP emails to the same candidate.</summary>
-        public const int OtpResendCooldownSeconds = 60;
-
-        /// <summary>Whole seconds left in the candidate's OTP resend cooldown; 0 when a send is allowed.</summary>
-        public static int GetOtpResendWaitSeconds(User candidate, DateTime nowUtc)
-        {
-            if (candidate.EmailOtpLastSentAt is not { } lastSent) return 0;
-            var remaining = (lastSent.AddSeconds(OtpResendCooldownSeconds) - nowUtc).TotalSeconds;
-            return remaining > 0 ? (int)Math.Ceiling(remaining) : 0;
-        }
-
-        /// <summary>Max OTP emails per candidate in any rolling <see cref="OtpSendWindow"/> (registration OTP + resends).</summary>
-        public const int MaxOtpSendsPerWindow = 5;
-        public static readonly TimeSpan OtpSendWindow = TimeSpan.FromHours(1);
-
-        /// <summary>
-        /// Rolling-hour send limit, read from the database (EmailOtpSends) so it holds across
-        /// restarts and app instances. Call BEFORE QueueEmailOtp; returns null when a send is
-        /// allowed, otherwise how long to wait and a message for the candidate. Complements the
-        /// 60-second cooldown (GetOtpResendWaitSeconds) and the per-IP "AuthSensitive" rate limit.
-        /// </summary>
-        public EmailOtpSendBlock? CheckEmailOtpHourlyLimit(User candidate)
-        {
-            var now = DateTime.UtcNow;
-            var windowStart = now - OtpSendWindow;
-            var sends = _db.EmailOtpSends
-                .Where(s => s.UserId == candidate.Id && s.SentAt > windowStart)
-                .Select(s => s.SentAt)
-                .ToList();
-            if (sends.Count < MaxOtpSendsPerWindow) return null;
-
-            // A slot frees up when the oldest counted send ages out of the window.
-            var wait = sends.Min() + OtpSendWindow - now;
-            return new EmailOtpSendBlock(wait,
-                $"You've reached the limit of {MaxOtpSendsPerWindow} verification codes per hour. Please try again in {FormatWait(wait)}.");
-        }
-
-        private static string FormatWait(TimeSpan wait)
-        {
-            var seconds = (int)Math.Ceiling(Math.Max(wait.TotalSeconds, 1));
-            if (seconds <= 60) return seconds == 1 ? "1 second" : $"{seconds} seconds";
-            var minutes = (int)Math.Ceiling(seconds / 60.0);
-            return minutes == 1 ? "1 minute" : $"{minutes} minutes";
-        }
-
         private static string OtpAttemptCacheKey(int candidateId) => $"otp-attempts:{candidateId}";
 
         public string QueueEmailOtp(User candidate)
@@ -92,19 +44,10 @@ namespace ExamPortal.Services
             // database leak alone then can't be used to complete email verification.
             candidate.EmailVerificationToken = SecureCodeGenerator.HashToken(otp);
             candidate.MobileOtpExpiresAt = DateTime.UtcNow.AddMinutes(15);
-            candidate.EmailOtpLastSentAt = DateTime.UtcNow;
             candidate.RecruitmentStage = RecruitmentStages.EmailVerificationPending;
 
             // A fresh OTP also resets the attempt counter — a new code deserves a new set of tries.
             _cache.Remove(OtpAttemptCacheKey(candidate.Id));
-
-            // Count this send toward the rolling-hour limit (see CheckEmailOtpHourlyLimit) and drop
-            // entries that have aged out of the window. Saved by the caller's SaveChanges,
-            // together with the queued email.
-            var sendNow = DateTime.UtcNow;
-            var expiredBefore = sendNow - OtpSendWindow;
-            _db.EmailOtpSends.RemoveRange(_db.EmailOtpSends.Where(s => s.UserId == candidate.Id && s.SentAt <= expiredBefore));
-            _db.EmailOtpSends.Add(new EmailOtpSend { UserId = candidate.Id, SentAt = sendNow });
 
             // Email channel ONLY — deliberately QueueChannel(..., "Email", ...) rather than
             // Queue(...), which would also create an InApp notification carrying the same

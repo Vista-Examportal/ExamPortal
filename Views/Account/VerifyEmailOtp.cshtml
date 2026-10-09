@@ -44,10 +44,8 @@
                 </button>
             </form>
 
-            <form asp-action="ResendEmailOtp" method="post" class="mt-2" id="resendForm">
-                <button type="submit" id="resendBtn" data-wait="@(ViewData["ResendWaitSeconds"] ?? 0)"
-                        class="w-full py-2 text-sm font-semibold text-[var(--vw-accent)] hover:underline disabled:opacity-60 disabled:no-underline disabled:cursor-not-allowed">Resend OTP</button>
-                <p id="resendHint" class="mt-1 text-center text-xs text-slate-500 dark:text-slate-400" aria-live="polite"></p>
+            <form asp-action="ResendEmailOtp" method="post" class="mt-2">
+                <button type="submit" class="w-full py-2 text-sm font-semibold text-[var(--vw-accent)] hover:underline">Resend OTP</button>
             </form>
         </div>
     </div>
@@ -64,24 +62,5 @@
                 btn.innerHTML = '<span class="ui-loader"></span>Verifying…';
             }, 0);
         });
-
-        // Resend cooldown countdown. Display only — ResendEmailOtp re-checks on the server.
-        (function () {
-            var btn = document.getElementById("resendBtn");
-            var hint = document.getElementById("resendHint");
-            var endAt = Date.now() + (parseInt(btn.getAttribute("data-wait"), 10) || 0) * 1000;
-            function tick() {
-                var left = Math.ceil((endAt - Date.now()) / 1000);
-                if (left > 0) {
-                    btn.disabled = true;
-                    hint.textContent = "You can request another OTP in " + Math.floor(left / 60) + ":" + ("0" + (left % 60)).slice(-2);
-                    setTimeout(tick, 250);
-                } else {
-                    btn.disabled = false;
-                    hint.textContent = "";
-                }
-            }
-            tick();
-        })();
     </script>
 }

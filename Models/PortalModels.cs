@@ -414,27 +414,16 @@ namespace ExamPortal.Models
                     new[] { nameof(FullName) });
             }
 
-            // Check the original input first: normalization below keeps only digits, so letters
-            // or symbols would otherwise be dropped silently and the number would still pass.
-            if (!ExamPortal.Services.RegistrationValidation.HasOnlyAllowedPhoneCharacters(PhoneNumber))
+            var normalizedPhone = ExamPortal.Services.RegistrationValidation.NormalizePhoneNumber(PhoneNumber);
+            if (!ExamPortal.Services.RegistrationValidation.IsValidIndianMobileNumber(normalizedPhone))
             {
                 yield return new System.ComponentModel.DataAnnotations.ValidationResult(
-                    "Phone number can contain only digits, spaces, hyphens, parentheses, and an optional +91 prefix.",
+                    "Enter a valid 10-digit Indian mobile number.",
                     new[] { nameof(PhoneNumber) });
             }
             else
             {
-                var normalizedPhone = ExamPortal.Services.RegistrationValidation.NormalizePhoneNumber(PhoneNumber);
-                if (!ExamPortal.Services.RegistrationValidation.IsValidIndianMobileNumber(normalizedPhone))
-                {
-                    yield return new System.ComponentModel.DataAnnotations.ValidationResult(
-                        "Enter a valid 10-digit Indian mobile number.",
-                        new[] { nameof(PhoneNumber) });
-                }
-                else
-                {
-                    PhoneNumber = normalizedPhone;
-                }
+                PhoneNumber = normalizedPhone;
             }
 
             // Password is normally already Required/MinLength-checked by the attributes

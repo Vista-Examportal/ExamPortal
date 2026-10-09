@@ -15,17 +15,14 @@ namespace ExamPortal.Services
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly EmailOptions _emailOptions;
         private readonly ILogger<NotificationService> _logger;
-        private readonly IWebHostEnvironment? _environment;
 
         public NotificationService(
             AppDbContext db,
             IConfiguration config,
             IHttpClientFactory httpClientFactory,
             IOptions<EmailOptions> emailOptions,
-            ILogger<NotificationService> logger,
-            IWebHostEnvironment? environment = null)
+            ILogger<NotificationService> logger)
         {
-            _environment = environment;
             _db = db;
             _config = config;
             _httpClientFactory = httpClientFactory;
@@ -246,8 +243,7 @@ namespace ExamPortal.Services
 
             try
             {
-                // Internal relay to the company's own inbox, not a candidate-facing email: no company footer.
-                SendGmail(recipient, subject, body, replyTo: visitorEmail, includeCompanyFooter: false);
+                SendGmail(recipient, subject, body, replyTo: visitorEmail);
                 _logger.LogInformation("Contact Us message sent to {Recipient} from {VisitorEmail}", recipient, visitorEmail);
                 error = "";
                 return true;
@@ -261,8 +257,7 @@ namespace ExamPortal.Services
         }
 
         private void SendGmail(string toEmail, string subject, string body,
-            byte[]? attachmentBytes = null, string? attachmentFileName = null, string? replyTo = null, bool rawHtmlBody = false,
-            bool includeCompanyFooter = true)
+            byte[]? attachmentBytes = null, string? attachmentFileName = null, string? replyTo = null, bool rawHtmlBody = false)
         {
             var senderEmail = _emailOptions.SenderEmail;
             var appPassword = _emailOptions.Password;
@@ -289,40 +284,16 @@ namespace ExamPortal.Services
             // by the caller, e.g. AssessmentInvitationService) — send it unchanged. Every
             // other notification type still goes through BuildEmailBody, which HTML-encodes
             // the plain-text body and renders it inside the shared "From/To/Date/Subject"
-            // chrome — that path is unchanged apart from the company footer added below the message.
-            var htmlBody = rawHtmlBody ? body : BuildEmailBody(toEmail, senderEmail, subject, body, DateTime.UtcNow, includeCompanyFooter);
-
-            // Company footer logo: attached inline (Content-ID) whenever the body references it —
-            // both the shared layout above and the prebuilt assessment invitation do. If the file
-            // can't be loaded, drop just the <img> so no broken-image icon shows; the footer's
-            // text lines remain.
-            byte[]? logoBytes = null;
-            if (htmlBody.Contains(EmailFooter.LogoCidReference))
-            {
-                logoBytes = TryLoadLogo();
-                if (logoBytes == null) htmlBody = EmailFooter.RemoveLogo(htmlBody);
-            }
-
+            // chrome — that path and its output are completely unchanged.
+            var htmlBody = rawHtmlBody ? body : BuildEmailBody(toEmail, senderEmail, subject, body, DateTime.UtcNow);
             using var mail = new MailMessage
             {
                 From = new MailAddress(senderEmail, _emailOptions.SenderName),
                 Subject = subject,
-                Body = logoBytes == null ? htmlBody : "",
+                Body = htmlBody,
                 IsBodyHtml = true
             };
             mail.To.Add(toEmail);
-
-            using var logoStream = logoBytes == null ? null : new MemoryStream(logoBytes);
-            if (logoStream != null)
-            {
-                var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, System.Text.Encoding.UTF8, "text/html");
-                htmlView.LinkedResources.Add(new LinkedResource(logoStream, "image/png")
-                {
-                    ContentId = EmailFooter.LogoContentId,
-                    TransferEncoding = System.Net.Mime.TransferEncoding.Base64
-                });
-                mail.AlternateViews.Add(htmlView);
-            }
             if (!string.IsNullOrWhiteSpace(replyTo))
                 mail.ReplyToList.Add(new MailAddress(replyTo));
 
@@ -338,31 +309,12 @@ namespace ExamPortal.Services
             }
         }
 
-        /// <summary>Reads the existing site logo from wwwroot, same approach as OfferLetterPdfService
-        /// (decorative: any problem just means the email goes out without the image).</summary>
-        private byte[]? TryLoadLogo()
-        {
-            try
-            {
-                var webRoot = _environment?.WebRootPath;
-                if (string.IsNullOrWhiteSpace(webRoot)) return null;
-                var path = Path.Combine(webRoot, EmailFooter.LogoFileName);
-                return File.Exists(path) ? File.ReadAllBytes(path) : null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Company logo could not be loaded for the email footer; sending without it.");
-                return null;
-            }
-        }
-
         public static string BuildEmailBody(
             string toEmail,
             string senderEmail,
             string subject,
             string bodyHtml,
-            DateTime sentAt,
-            bool includeCompanyFooter = true)
+            DateTime sentAt)
         {
             var dateStr = sentAt.ToString("ddd, dd MMM yyyy HH:mm:ss") + " UTC";
 
@@ -374,12 +326,6 @@ namespace ExamPortal.Services
             var safeSenderEmail = System.Net.WebUtility.HtmlEncode(senderEmail);
             var safeSubject    = System.Net.WebUtility.HtmlEncode(subject);
             var safeBody       = System.Net.WebUtility.HtmlEncode(bodyHtml);
-
-            // Company signature (logo, name, address, website) — after the message, before the
-            // existing grey footer. Same block as in the assessment invitation template.
-            var companyFooter = includeCompanyFooter
-                ? "<div style=\"padding:0 28px 28px;\">" + EmailFooter.BuildHtml() + "</div>"
-                : "";
 
             return $@"<!DOCTYPE html>
 <html lang=""en"">
@@ -396,7 +342,6 @@ namespace ExamPortal.Services
       </table>
     </div>
     <div style=""padding:28px;color:#333;font-size:14px;line-height:1.7;""><pre style=""white-space:pre-wrap;font-family:inherit;margin:0;"">{safeBody}</pre></div>
-    {companyFooter}
     <div style=""background:#f7f7f7;border-top:1px solid #e0e0e0;padding:16px 28px;font-size:11px;color:#888;"">
       <p><strong>VISTAWAYS TECH Recruitment Team</strong><br />Email: {safeSenderEmail}</p>
       <p>This email was sent to <strong>{safeToEmail}</strong> as part of your application process. Do not share your Candidate ID or password with anyone.</p>

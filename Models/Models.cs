@@ -82,9 +82,6 @@ namespace ExamPortal.Models
 
         public string EmailVerificationToken { get; set; } = "";
         public DateTime? MobileOtpExpiresAt { get; set; }
-        /// <summary>UTC time the last email-verification OTP was sent (registration or resend).
-        /// Persisted so the 60-second resend cooldown survives restarts and holds across instances.</summary>
-        public DateTime? EmailOtpLastSentAt { get; set; }
         /// <summary>SHA-256 hash of the current password-reset token. Never store the raw token —
         /// only the hash, so a DB leak alone can't be used to reset a password. Cleared after use.</summary>
         public string PasswordResetTokenHash { get; set; } = "";
@@ -277,18 +274,6 @@ namespace ExamPortal.Models
         public string PreferredJobLocation { get; set; } = "";
         public decimal? ExpectedSalary { get; set; }
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
-    }
-
-    /// <summary>One row per email-verification OTP sent to a candidate (the registration OTP and
-    /// every resend). Backs the five-per-rolling-hour limit in
-    /// CandidateWorkflowService.CheckEmailOtpHourlyLimit; stored in the database so the limit
-    /// survives restarts and is shared by every app instance. Rows older than an hour are pruned.</summary>
-    public class EmailOtpSend
-    {
-        public int Id { get; set; }
-        public int UserId { get; set; }
-        public User? User { get; set; }
-        public DateTime SentAt { get; set; } = DateTime.UtcNow;
     }
 
     public class CandidateLanguage
