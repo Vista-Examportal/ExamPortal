@@ -279,6 +279,18 @@ namespace ExamPortal.Models
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 
+    /// <summary>One row per email-verification OTP sent to a candidate (the registration OTP and
+    /// every resend). Backs the five-per-rolling-hour limit in
+    /// CandidateWorkflowService.CheckEmailOtpHourlyLimit; stored in the database so the limit
+    /// survives restarts and is shared by every app instance. Rows older than an hour are pruned.</summary>
+    public class EmailOtpSend
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public User? User { get; set; }
+        public DateTime SentAt { get; set; } = DateTime.UtcNow;
+    }
+
     public class CandidateLanguage
     {
         public int Id { get; set; }

@@ -689,5 +689,108 @@ namespace ExamPortal.Tests.Services
 
             Assert.Equal(expectedWait, CandidateWorkflowService.GetOtpResendWaitSeconds(candidate, now));
         }
+
+        // ── CheckEmailOtpHourlyLimit (five sends per rolling hour) ─────────────
+
+        private static void SeedSends(AppDbContext db, int userId, params TimeSpan[] agesAgo)
+        {
+            foreach (var age in agesAgo)
+                db.EmailOtpSends.Add(new EmailOtpSend { UserId = userId, SentAt = DateTime.UtcNow - age });
+            db.SaveChanges();
+        }
+
+        [Fact]
+        public void CheckEmailOtpHourlyLimit_FewerThanFiveSends_IsAllowed()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            SeedSends(db, 1, TimeSpan.FromMinutes(40), TimeSpan.FromMinutes(30), TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(10));
+
+            Assert.Null(service.CheckEmailOtpHourlyLimit(MakeCandidate()));
+        }
+
+        [Fact]
+        public void CheckEmailOtpHourlyLimit_FiveSendsInAnHour_IsBlockedUntilOldestAgesOut()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            SeedSends(db, 1,
+                TimeSpan.FromMinutes(50), TimeSpan.FromMinutes(40), TimeSpan.FromMinutes(30),
+                TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(10));
+
+            var block = service.CheckEmailOtpHourlyLimit(MakeCandidate());
+
+            Assert.NotNull(block);
+            Assert.InRange(block!.RetryAfter.TotalMinutes, 9, 10); // the oldest send frees a slot in ~10 minutes
+            Assert.Contains("5 verification codes per hour", block.Message);
+            Assert.Contains("10 minutes", block.Message);
+        }
+
+        [Fact]
+        public void CheckEmailOtpHourlyLimit_SendOutsideTheWindow_IsNotCounted()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            SeedSends(db, 1,
+                TimeSpan.FromMinutes(61), TimeSpan.FromMinutes(40), TimeSpan.FromMinutes(30),
+                TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(10));
+
+            Assert.Null(service.CheckEmailOtpHourlyLimit(MakeCandidate()));
+        }
+
+        [Fact]
+        public void CheckEmailOtpHourlyLimit_OtherCandidatesSendsDoNotCount()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            SeedSends(db, 2, TimeSpan.FromMinutes(50), TimeSpan.FromMinutes(40), TimeSpan.FromMinutes(30),
+                TimeSpan.FromMinutes(20), TimeSpan.FromMinutes(10));
+
+            Assert.Null(service.CheckEmailOtpHourlyLimit(MakeCandidate())); // candidate 1
+        }
+
+        [Fact]
+        public void CheckEmailOtpHourlyLimit_CountsRegistrationOtpPlusResends_AndDoesNotChangeTheCurrentOtp()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            var candidate = MakeCandidate();
+
+            string code = "";
+            for (var i = 0; i < CandidateWorkflowService.MaxOtpSendsPerWindow; i++)
+            {
+                Assert.Null(service.CheckEmailOtpHourlyLimit(candidate));
+                code = service.QueueEmailOtp(candidate); // first call = the registration OTP
+                db.SaveChanges();
+            }
+            var hash = candidate.EmailVerificationToken;
+
+            Assert.NotNull(service.CheckEmailOtpHourlyLimit(candidate)); // 6th send refused
+
+            Assert.Equal(hash, candidate.EmailVerificationToken);          // read-only check
+            Assert.Equal(CandidateWorkflowService.MaxOtpSendsPerWindow, db.Notifications.Count(n => n.Channel == "Email"));
+            Assert.True(service.VerifyEmailOtp(candidate, code));          // the latest code still verifies
+        }
+
+        [Fact]
+        public void QueueEmailOtp_RecordsTheSend_AndPrunesEntriesOlderThanTheWindow()
+        {
+            using var db = BuildContext();
+            using var cache = new MemoryCache(new MemoryCacheOptions());
+            var service = BuildService(db, cache);
+            SeedSends(db, 1, TimeSpan.FromHours(2));
+
+            service.QueueEmailOtp(MakeCandidate());
+            db.SaveChanges();
+
+            var rows = db.EmailOtpSends.Where(s => s.UserId == 1).ToList();
+            Assert.Single(rows);
+            Assert.True(DateTime.UtcNow - rows[0].SentAt < TimeSpan.FromMinutes(1));
+        }
     }
 }
