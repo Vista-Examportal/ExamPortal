@@ -45,7 +45,7 @@ namespace ExamPortal.Services
   <tr><td bgcolor=""#ffffff"" style=""background-color:#ffffff;padding:4px 10px 8px 0;"">
     <img src=""{LogoCidReference}"" alt=""{LogoAltText}"" width=""{LogoWidth}"" height=""{LogoHeight}"" style=""display:block;border:0;width:{LogoWidth}px;height:auto;background-color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;color:#1a1a2e;"" />
   </td></tr>
-  <tr><td style=""font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.6;color:#555;"">
+  <tr><td style=""font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#555;"">
     {AddressLine1}<br />
     {AddressLine2}<br />
     <a href=""{WebsiteUrl}"" style=""color:#4a4ad0;"">{WebsiteText}</a>

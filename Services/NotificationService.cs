@@ -356,6 +356,46 @@ namespace ExamPortal.Services
             }
         }
 
+        private static readonly System.Text.RegularExpressions.Regex OtpCodeLine =
+            new(@"^Your email verification OTP is (\d{4,8})\.$", System.Text.RegularExpressions.RegexOptions.Compiled);
+        private static readonly System.Text.RegularExpressions.Regex OtpExpiryLine =
+            new(@"^This OTP expires in \d+ minutes?\.$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>
+        /// Renders a plain-text message body as HTML paragraphs: a blank line in the text starts a
+        /// new paragraph (14px apart) instead of leaving a full empty line, while single line
+        /// breaks, indentation and the box-drawing/bullet lines inside a paragraph are kept as
+        /// written (white-space:pre-wrap). The text itself is only HTML-encoded, never reworded. In the
+        /// email-verification OTP message the code and its expiry line are made prominent.
+        /// </summary>
+        private static string FormatMessageParagraphs(string body)
+        {
+            var text = (body ?? "").Replace("\r\n", "\n").Trim('\n');
+            var html = new System.Text.StringBuilder();
+            foreach (var paragraph in System.Text.RegularExpressions.Regex.Split(text, "\n{2,}"))
+            {
+                if (paragraph.Length == 0) continue;
+                var otp = OtpCodeLine.Match(paragraph);
+                if (otp.Success)
+                {
+                    html.Append(@"<div style=""margin:0 0 14px;padding:14px 18px;background:#f7f7fb;border-left:4px solid #1a1a2e;font-size:16px;"">Your email verification OTP is <strong style=""font-size:28px;letter-spacing:6px;margin-right:-6px;color:#1a1a2e;"">")
+                        .Append(System.Net.WebUtility.HtmlEncode(otp.Groups[1].Value))
+                        .Append("</strong>.</div>");
+                }
+                else if (OtpExpiryLine.IsMatch(paragraph))
+                {
+                    html.Append(@"<p style=""margin:0 0 14px;font-weight:bold;color:#1a1a2e;"">")
+                        .Append(System.Net.WebUtility.HtmlEncode(paragraph)).Append("</p>");
+                }
+                else
+                {
+                    html.Append(@"<p style=""margin:0 0 14px;white-space:pre-wrap;"">")
+                        .Append(System.Net.WebUtility.HtmlEncode(paragraph)).Append("</p>");
+                }
+            }
+            return html.ToString();
+        }
+
         public static string BuildEmailBody(
             string toEmail,
             string senderEmail,
@@ -374,6 +414,13 @@ namespace ExamPortal.Services
             var safeSenderEmail = System.Net.WebUtility.HtmlEncode(senderEmail);
             var safeSubject    = System.Net.WebUtility.HtmlEncode(subject);
             var safeBody       = System.Net.WebUtility.HtmlEncode(bodyHtml);
+
+            // Candidate-facing emails (company footer on) get readable paragraph spacing; the one
+            // internal email that opts out of the footer (contact-form relay) keeps its original
+            // markup exactly.
+            var messageHtml = includeCompanyFooter
+                ? $@"<div style=""padding:28px 28px 8px;color:#333;font-size:14px;line-height:1.5;"">{FormatMessageParagraphs(bodyHtml)}</div>"
+                : $@"<div style=""padding:28px;color:#333;font-size:14px;line-height:1.7;""><pre style=""white-space:pre-wrap;font-family:inherit;margin:0;"">{safeBody}</pre></div>";
 
             // Company signature (logo, name, address, website) — after the message, before the
             // existing grey footer. Same block as in the assessment invitation template.
@@ -395,7 +442,7 @@ namespace ExamPortal.Services
         <tr><td style=""width:80px;font-weight:bold;color:#333;"">Subject:</td><td><strong>{safeSubject}</strong></td></tr>
       </table>
     </div>
-    <div style=""padding:28px;color:#333;font-size:14px;line-height:1.7;""><pre style=""white-space:pre-wrap;font-family:inherit;margin:0;"">{safeBody}</pre></div>
+    {messageHtml}
     {companyFooter}
     <div style=""background:#f7f7f7;border-top:1px solid #e0e0e0;padding:16px 28px;font-size:11px;color:#888;"">
       <p><strong>VISTAWAYS TECH Recruitment Team</strong><br />Email: {safeSenderEmail}</p>

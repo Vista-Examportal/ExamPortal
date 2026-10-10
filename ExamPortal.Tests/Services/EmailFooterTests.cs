@@ -98,16 +98,16 @@ namespace ExamPortal.Tests.Services
         {
             var html = NotificationService.BuildEmailBody(
                 "candidate@example.com", "sender@example.com", "Verify your VISTAWAYS TECH email",
-                "Your email verification OTP is 123456.", new DateTime(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc));
+                "Your application has been received.", new DateTime(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc));
 
             // existing content is all still there
-            Assert.Contains("Your email verification OTP is 123456.", html);
+            Assert.Contains("Your application has been received.", html);
             Assert.Contains("VISTAWAYS TECH Recruitment Team", html);
             Assert.Contains("This email was sent to", html);
             Assert.Contains("All rights reserved.", html);
 
             // footer present, positioned after the message and before the existing grey footer
-            var message = html.IndexOf("Your email verification OTP is 123456.", StringComparison.Ordinal);
+            var message = html.IndexOf("Your application has been received.", StringComparison.Ordinal);
             var company = html.IndexOf("Opp. JNTU, KPHB, Hyderabad-500072", StringComparison.Ordinal);
             var legal = html.IndexOf("This email was sent to", StringComparison.Ordinal);
             Assert.True(message < company && company < legal, "footer should sit between the message and the legal footer");

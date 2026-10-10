@@ -238,7 +238,7 @@ namespace ExamPortal.Services
       </div>
 
       <!-- Body -->
-      <div style=""padding:32px;color:#2a2a2a;font-size:14px;line-height:1.6;"">
+      <div style=""padding:32px;color:#2a2a2a;font-size:14px;line-height:1.5;"">
         <p style=""margin:0 0 16px;"">Dear {Enc(user.FullName)},</p>
         <p style=""margin:0 0 16px;"">Thank you for your interest in the <strong>{Enc(role)}</strong> position at {Enc(companyName)}.</p>
         <p style=""margin:0 0 24px;"">As part of our recruitment process, you are invited to complete the following assessment.</p>
@@ -294,7 +294,7 @@ namespace ExamPortal.Services
           </td></tr>
         </table>
 
-        <p style=""margin:0 0 8px;"">You will log in using your Candidate ID (<strong>{Enc(user.CandidateId)}</strong>) or registered email, together with your account password, or with the one-time code above.</p>
+        <p style=""margin:0 0 12px;"">You will log in using your Candidate ID (<strong>{Enc(user.CandidateId)}</strong>) or registered email, together with your account password, or with the one-time code above.</p>
         <p style=""margin:0;"">If you have any questions regarding the assessment or the recruitment process, please contact our recruitment team at <a href=""mailto:{Enc(contactEmail)}"" style=""color:#4a4ad0;"">{Enc(contactEmail)}</a>.</p>
 
         <!-- Company footer (shared with the generic email layout) -->
