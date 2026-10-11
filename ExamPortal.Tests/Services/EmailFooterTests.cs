@@ -102,7 +102,10 @@ namespace ExamPortal.Tests.Services
 
             // existing content is all still there
             Assert.Contains("Your application has been received.", html);
-            Assert.Contains("VISTAWAYS TECH Recruitment Team", html);
+            // contact line shows the company mailbox, not the SMTP sender, and the team name isn't repeated
+            Assert.Contains("Email: info@vistawaystech.com", html);
+            Assert.DoesNotContain("sender@example.com</p>", html);
+            Assert.DoesNotContain("Recruitment Team", html);
             Assert.Contains("This email was sent to", html);
             Assert.Contains("All rights reserved.", html);
 
@@ -124,6 +127,8 @@ namespace ExamPortal.Tests.Services
             Assert.DoesNotContain("VISTAWAYSTECH LLP", html);
             Assert.DoesNotContain("cid:vwtech-logo", html);
             Assert.Contains("Hello", html);
+            // internal relay keeps its original footer text
+            Assert.Contains("<strong>VISTAWAYS TECH Recruitment Team</strong><br />Email: sender@example.com", html);
         }
 
         [Fact]

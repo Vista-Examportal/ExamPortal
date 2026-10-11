@@ -20,14 +20,18 @@ namespace ExamPortal.Services
         /// <summary>What appears in the HTML where the logo is referenced.</summary>
         public const string LogoCidReference = "cid:" + LogoContentId;
 
-        /// <summary>The existing site logo (wwwroot/logo-full.png: dark text on a transparent
-        /// background, i.e. the variant used on light pages — emails are white).</summary>
-        public const string LogoFileName = "logo-full.png";
+        /// <summary>The site logo (wwwroot/logo-email.png: a 360px-wide copy of logo-full.png, ~30 KB
+        /// instead of ~420 KB, shown at 180px — dark text on a transparent background, i.e. the
+        /// variant used on light pages; emails are white).</summary>
+        public const string LogoFileName = "logo-email.png";
 
         public const string LogoAltText = "VISTAWAYS TECH \u2014 Innovation. Integration. Impact.";
         public const string CompanyName = "VISTAWAYSTECH LLP";
         public const string AddressLine1 = "621, 6th Floor, Manjeera Majestic Commercials,";
         public const string AddressLine2 = "Opp. JNTU, KPHB, Hyderabad-500072";
+        /// <summary>Company mailbox shown in the grey legal footer of candidate emails (in place of
+        /// the SMTP sender account).</summary>
+        public const string CompanyEmail = "info@vistawaystech.com";
         public const string WebsiteText = "www.vistawaystech.com";
         public const string WebsiteUrl = "https://www.vistawaystech.com";
 
@@ -51,6 +55,19 @@ namespace ExamPortal.Services
     <a href=""{WebsiteUrl}"" style=""color:#4a4ad0;"">{WebsiteText}</a>
   </td></tr>
 </table>";
+
+        /// <summary>The same footer as plain text, for the text/plain part of the email (no logo, so
+        /// the company name is spelled out).</summary>
+        public static string BuildPlainText() =>
+            string.Join("\n", CompanyName, AddressLine1, AddressLine2, WebsiteText);
+
+        /// <summary>Hidden "preview text" that inbox lists show beside the subject. Placed first in
+        /// the HTML body; padded so the client doesn't pull in the visible body after it.</summary>
+        public static string BuildPreheaderHtml(string previewText) =>
+            "<div style=\"display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;\">"
+            + System.Net.WebUtility.HtmlEncode(previewText)
+            + string.Concat(Enumerable.Repeat("&zwnj;&nbsp;", 60))
+            + "</div>";
 
         /// <summary>Replaces the logo <c>&lt;img&gt;</c> with the company name as text. Used when the
         /// logo file isn't available at send time, so recipients don't see a broken-image icon and

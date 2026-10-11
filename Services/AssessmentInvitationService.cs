@@ -204,7 +204,7 @@ namespace ExamPortal.Services
             var role = ResolveRole(exam);
 
             var scheduleRow = invitation.AssessmentDate.HasValue
-                ? DetailRow("Available From", $"{invitation.AssessmentDate.Value:dd MMM yyyy, HH:mm} UTC")
+                ? DetailRow("Available From", UtcWithIst(invitation.AssessmentDate.Value))
                 : "";
 
             // Operational instructions only — proctoring rules describe how the candidate
@@ -228,6 +228,7 @@ namespace ExamPortal.Services
   <title>{Enc($"Assessment Invitation – {role}")}</title>
 </head>
 <body style=""margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;"">
+  {EmailFooter.BuildPreheaderHtml($"You're invited to complete the {role} assessment. The link expires {invitation.ExpiresAt:dd MMM yyyy, HH:mm} UTC.")}
   <div style=""max-width:600px;margin:0 auto;padding:24px 16px;"">
     <div style=""background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;"">
 
@@ -256,7 +257,7 @@ namespace ExamPortal.Services
               {DetailRow("Duration", $"{invitation.DurationMinutes} minutes")}
               {DetailRow("Number of Questions", exam.TotalQuestions.ToString())}
               {scheduleRow}
-              {DetailRow("Link Expires", $"{invitation.ExpiresAt:dd MMM yyyy, HH:mm} UTC")}
+              {DetailRow("Link Expires", UtcWithIst(invitation.ExpiresAt))}
             </table>
           </td></tr>
         </table>
@@ -313,6 +314,11 @@ namespace ExamPortal.Services
 </body>
 </html>";
         }
+
+        /// <summary>The stored UTC time, plus the same moment in IST (UTC+5:30) for candidates in India —
+        /// the portal itself still shows UTC, so UTC stays the primary value.</summary>
+        private static string UtcWithIst(DateTime utc) =>
+            $"{utc:dd MMM yyyy, HH:mm} UTC ({utc.AddMinutes(330):dd MMM yyyy, HH:mm} IST)";
 
         private static string DetailRow(string label, string value) =>
             $@"<tr>

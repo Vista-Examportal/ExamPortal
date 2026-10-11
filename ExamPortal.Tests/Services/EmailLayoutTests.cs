@@ -99,6 +99,8 @@ namespace ExamPortal.Tests.Services
             Assert.Contains("line-height:1.7", html);
             Assert.Contains("<pre style=\"white-space:pre-wrap;font-family:inherit;margin:0;\">Name: A\n\nMessage: Hi</pre>", html);
             Assert.DoesNotContain("cid:vwtech-logo", html);
+            Assert.Contains("Subject:</td>", html);          // internal relay keeps its From/To/Date/Subject box
+            Assert.DoesNotContain("display:none", html);     // ...and has no preview text
         }
 
         // ── Assessment invitation (its own HTML layout) ────────────────────────
@@ -130,6 +132,142 @@ namespace ExamPortal.Tests.Services
             Assert.True(contact > 0 && contact < logo && logo < legal);
             Assert.DoesNotContain("blockquote", html, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("gmail_quote", html, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // ── Header box, preview text, links, plain text, logo file ────────────
+
+        [Fact]
+        public void CandidateEmails_DropTheFromToDateSubjectBox()
+        {
+            var html = Build("Dear A,\n\nHello.");
+
+            Assert.DoesNotContain("From:</td>", html);
+            Assert.DoesNotContain("Date:</td>", html);
+            Assert.DoesNotContain("Subject:</td>", html);
+            Assert.Contains("This email was sent to", html); // recipient-specific line stays
+        }
+
+        [Fact]
+        public void OtpEmail_HasPreviewTextWithCodeAndExpiry_BeforeAnyVisibleContent()
+        {
+            var html = Build(OtpMessage);
+
+            var hidden = html.IndexOf("display:none", StringComparison.Ordinal);
+            var preview = html.IndexOf("Your email verification OTP is 123456. This OTP expires in 15 minutes.", StringComparison.Ordinal);
+            var header = html.IndexOf("<h1", StringComparison.Ordinal);
+            Assert.True(hidden > 0 && hidden < preview && preview < header);
+        }
+
+        [Fact]
+        public void PreviewText_SkipsGreeting_AndIsShortened()
+        {
+            var longText = new string('x', 300);
+            var html = Build("Dear A,\n\n" + longText);
+
+            Assert.Contains(new string('x', 110) + "…", html);
+            Assert.DoesNotContain(new string('x', 111) + "…", html);
+            Assert.DoesNotMatch("display:none[^>]*>Dear A", html);
+        }
+
+        [Fact]
+        public void LinkOnItsOwnLine_BecomesAButton_WithTheUrlStillVisible()
+        {
+            const string url = "https://portal.example.com/Account/ResetPassword?token=abc&email=a%40b.com";
+            var html = Build("Dear A,\n\nClick the link below.\n\n" + url + "\n\nBye");
+
+            var encoded = System.Net.WebUtility.HtmlEncode(url);
+            Assert.Contains($"<a href=\"{encoded}\" style=\"display:inline-block;", html);
+            Assert.Contains(">Reset password</a>", html);
+            Assert.Contains($">{encoded}</a></p>", html);                 // full URL visible and clickable
+            Assert.Contains(">Click the link below.</p>", html);          // surrounding wording untouched
+        }
+
+        [Fact]
+        public void UrlsInsideAParagraph_AreLinked_ButOtherSchemesAreNot()
+        {
+            var html = Build("Meeting Link: https://meet.example.com/abc, see you.\njavascript:alert(1)");
+
+            Assert.Contains("<a href=\"https://meet.example.com/abc\"", html);
+            Assert.Contains(">https://meet.example.com/abc</a>, see you.", html); // trailing comma stays outside the link
+            Assert.DoesNotContain("href=\"javascript", html);
+        }
+
+        [Fact]
+        public void PlainTextAlternative_ForMessages_HasSameWordingAndTheCompanyFooter()
+        {
+            var text = EmailPlainText.FromMessage(OtpMessage, "candidate@example.com");
+
+            Assert.Contains("Your email verification OTP is 123456.", text);
+            Assert.Contains("This OTP expires in 15 minutes.", text);
+            Assert.Contains("VISTAWAYSTECH LLP", text);
+            Assert.Contains("Opp. JNTU, KPHB, Hyderabad-500072", text);
+            Assert.Contains("www.vistawaystech.com", text);
+            Assert.Contains("Email: info@vistawaystech.com", text);
+            Assert.Contains("This email was sent to candidate@example.com", text);
+            Assert.DoesNotContain("<", text);
+            Assert.Contains("\r\n", text);
+        }
+
+        private static (string Html, AssessmentInvitation Invitation) BuildInvitation()
+        {
+            var db = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString()).Options);
+            var emailOptions = Options.Create(new EmailOptions());
+            var notifications = new NotificationService(db, config: null!, httpClientFactory: null!,
+                emailOptions: emailOptions, logger: NullLogger<NotificationService>.Instance);
+            var service = new AssessmentInvitationService(db, notifications, emailOptions);
+            var candidate = new User { Id = 1, Username = "VWT1", CandidateId = "VWT1", Email = "c@example.com",
+                PasswordHash = "x", FullName = "Test Candidate", Role = PortalRoles.Candidate };
+            var exam = new Exam { Id = 1, Title = "Assessment", DurationMinutes = 20, TotalMarks = 10, PassingMarks = 5 };
+            var invitation = service.Issue(candidate, exam, "t", "https://portal/link", new[] { "Pending" });
+            db.SaveChanges();
+            return (db.Notifications.Single(n => n.Channel == "Email").Body, invitation);
+        }
+
+        [Fact]
+        public void PlainTextAlternative_ForTheInvitation_KeepsTheCodeAndLink_AndHasNoMarkup()
+        {
+            var (html, _) = BuildInvitation();
+            var code = System.Text.RegularExpressions.Regex.Match(html, @"<!--otp-->(\d{6})<!--/otp-->").Groups[1].Value;
+
+            var text = EmailPlainText.FromHtml(html);
+
+            Assert.Contains(code, text);
+            Assert.Contains("ONE-TIME LOGIN CODE", text);
+            Assert.Contains("https://portal/link", text);
+            Assert.Contains("VISTAWAYSTECH LLP", text);
+            Assert.Contains("Opp. JNTU, KPHB, Hyderabad-500072", text);
+            Assert.DoesNotContain("<", text);
+            Assert.DoesNotContain("&nbsp;", text);
+            Assert.DoesNotContain("otp-->", text);
+        }
+
+        [Fact]
+        public void Invitation_ShowsExpiryInUtcAndIst_AndHasPreviewTextWithoutTheCode()
+        {
+            var (html, invitation) = BuildInvitation();
+            var code = System.Text.RegularExpressions.Regex.Match(html, @"<!--otp-->(\d{6})<!--/otp-->").Groups[1].Value;
+
+            var expected = $"{invitation.ExpiresAt:dd MMM yyyy, HH:mm} UTC ({invitation.ExpiresAt.AddMinutes(330):dd MMM yyyy, HH:mm} IST)";
+            Assert.Contains(expected, html);
+
+            var hidden = html.IndexOf("display:none", StringComparison.Ordinal);
+            var header = html.IndexOf("<!-- Header -->", StringComparison.Ordinal);
+            Assert.True(hidden > 0 && hidden < header);
+            Assert.True(html.IndexOf(code, StringComparison.Ordinal) > header, "the one-time code must not appear in the preview text");
+        }
+
+        [Fact]
+        public void EmailLogo_IsTheSmallCopy_AndExistsInWwwroot()
+        {
+            Assert.Equal("logo-email.png", EmailFooter.LogoFileName);
+
+            var dir = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
+            while (dir != null && !System.IO.File.Exists(System.IO.Path.Combine(dir.FullName, "ExamPortal.csproj"))) dir = dir.Parent;
+            Assert.NotNull(dir);
+            var file = new System.IO.FileInfo(System.IO.Path.Combine(dir!.FullName, "wwwroot", EmailFooter.LogoFileName));
+            Assert.True(file.Exists, "wwwroot/logo-email.png is missing");
+            Assert.InRange(file.Length, 1_000, 100_000);
         }
     }
 }

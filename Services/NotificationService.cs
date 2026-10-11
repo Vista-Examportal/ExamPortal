@@ -303,24 +303,34 @@ namespace ExamPortal.Services
                 if (logoBytes == null) htmlBody = EmailFooter.RemoveLogo(htmlBody);
             }
 
+            // Candidate-facing emails also carry a plain-text alternative (text/plain first, then the
+            // HTML part). The internal contact-form relay is unchanged (HTML only).
+            var plainText = !includeCompanyFooter ? null
+                : rawHtmlBody ? EmailPlainText.FromHtml(htmlBody)
+                : EmailPlainText.FromMessage(body, toEmail);
+
             using var mail = new MailMessage
             {
                 From = new MailAddress(senderEmail, _emailOptions.SenderName),
                 Subject = subject,
-                Body = logoBytes == null ? htmlBody : "",
-                IsBodyHtml = true
+                Body = plainText ?? (logoBytes == null ? htmlBody : ""),
+                IsBodyHtml = plainText == null
             };
+            if (plainText != null) mail.BodyEncoding = System.Text.Encoding.UTF8;
             mail.To.Add(toEmail);
 
             using var logoStream = logoBytes == null ? null : new MemoryStream(logoBytes);
-            if (logoStream != null)
+            if (logoStream != null || plainText != null)
             {
                 var htmlView = AlternateView.CreateAlternateViewFromString(htmlBody, System.Text.Encoding.UTF8, "text/html");
-                htmlView.LinkedResources.Add(new LinkedResource(logoStream, "image/png")
+                if (logoStream != null)
                 {
-                    ContentId = EmailFooter.LogoContentId,
-                    TransferEncoding = System.Net.Mime.TransferEncoding.Base64
-                });
+                    htmlView.LinkedResources.Add(new LinkedResource(logoStream, "image/png")
+                    {
+                        ContentId = EmailFooter.LogoContentId,
+                        TransferEncoding = System.Net.Mime.TransferEncoding.Base64
+                    });
+                }
                 mail.AlternateViews.Add(htmlView);
             }
             if (!string.IsNullOrWhiteSpace(replyTo))
@@ -368,13 +378,55 @@ namespace ExamPortal.Services
         /// written (white-space:pre-wrap). The text itself is only HTML-encoded, never reworded. In the
         /// email-verification OTP message the code and its expiry line are made prominent.
         /// </summary>
-        private static string FormatMessageParagraphs(string body)
+        private static readonly System.Text.RegularExpressions.Regex UrlOnlyLine =
+            new(@"^https?://\S+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+        private static readonly System.Text.RegularExpressions.Regex UrlInText =
+            new(@"https?://[^\s<>""]+", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>Splits a plain-text message into paragraphs (blank-line separated).</summary>
+        private static IEnumerable<string> SplitParagraphs(string body)
         {
             var text = (body ?? "").Replace("\r\n", "\n").Trim('\n');
-            var html = new System.Text.StringBuilder();
-            foreach (var paragraph in System.Text.RegularExpressions.Regex.Split(text, "\n{2,}"))
+            return System.Text.RegularExpressions.Regex.Split(text, "\n{2,}").Where(p => p.Length > 0);
+        }
+
+        /// <summary>Turns http(s) URLs in already HTML-encoded text into clickable links; the URL text
+        /// itself stays visible and unchanged.</summary>
+        private static string LinkifyEncoded(string encoded) =>
+            UrlInText.Replace(encoded, m =>
             {
-                if (paragraph.Length == 0) continue;
+                var url = m.Value;
+                var trailing = "";
+                while (url.Length > 0 && ".,!?):".Contains(url[^1])) { trailing = url[^1] + trailing; url = url[..^1]; }
+                return $"<a href=\"{url}\" style=\"color:#4a4ad0;\">{url}</a>{trailing}";
+            });
+
+        /// <summary>Hidden inbox preview text: for the OTP email the code and its expiry, otherwise the
+        /// first paragraph after the greeting. Taken from the message itself, shortened to ~110 chars.</summary>
+        private static string BuildPreviewText(string body)
+        {
+            var paragraphs = SplitParagraphs(body).ToList();
+            string preview;
+            var otpParagraph = paragraphs.FirstOrDefault(p => OtpCodeLine.IsMatch(p));
+            if (otpParagraph != null)
+            {
+                var expiry = paragraphs.FirstOrDefault(p => OtpExpiryLine.IsMatch(p));
+                preview = expiry == null ? otpParagraph : otpParagraph + " " + expiry;
+            }
+            else
+            {
+                preview = paragraphs.FirstOrDefault(p => !p.StartsWith("Dear ", StringComparison.Ordinal) && !p.StartsWith("━", StringComparison.Ordinal))
+                          ?? paragraphs.FirstOrDefault() ?? "";
+            }
+            preview = System.Text.RegularExpressions.Regex.Replace(preview, @"\s+", " ").Trim();
+            return preview.Length > 110 ? preview[..110].TrimEnd() + "…" : preview;
+        }
+
+        private static string FormatMessageParagraphs(string body)
+        {
+            var html = new System.Text.StringBuilder();
+            foreach (var paragraph in SplitParagraphs(body))
+            {
                 var otp = OtpCodeLine.Match(paragraph);
                 if (otp.Success)
                 {
@@ -387,10 +439,20 @@ namespace ExamPortal.Services
                     html.Append(@"<p style=""margin:0 0 14px;font-weight:bold;color:#1a1a2e;"">")
                         .Append(System.Net.WebUtility.HtmlEncode(paragraph)).Append("</p>");
                 }
+                else if (UrlOnlyLine.IsMatch(paragraph.Trim()))
+                {
+                    // A link on its own line (e.g. the password-reset link) becomes a button; the full URL
+                    // stays visible underneath as a clickable fallback.
+                    var url = paragraph.Trim();
+                    var encodedUrl = System.Net.WebUtility.HtmlEncode(url);
+                    var label = url.Contains("reset", StringComparison.OrdinalIgnoreCase) ? "Reset password" : "Open link";
+                    html.Append($@"<p style=""margin:0 0 8px;""><a href=""{encodedUrl}"" style=""display:inline-block;background:#1a1a2e;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 28px;border-radius:6px;"">{label}</a></p>")
+                        .Append($@"<p style=""margin:0 0 14px;font-size:12px;color:#888;word-break:break-all;""><a href=""{encodedUrl}"" style=""color:#4a4ad0;"">{encodedUrl}</a></p>");
+                }
                 else
                 {
                     html.Append(@"<p style=""margin:0 0 14px;white-space:pre-wrap;"">")
-                        .Append(System.Net.WebUtility.HtmlEncode(paragraph)).Append("</p>");
+                        .Append(LinkifyEncoded(System.Net.WebUtility.HtmlEncode(paragraph))).Append("</p>");
                 }
             }
             return html.ToString();
@@ -424,6 +486,27 @@ namespace ExamPortal.Services
 
             // Company signature (logo, name, address, website) — after the message, before the
             // existing grey footer. Same block as in the assessment invitation template.
+            // Contact line of the grey legal footer: the company address for candidate emails (the
+            // team name is not repeated here — each message already signs off with it). The internal
+            // contact-form relay keeps its original footer text.
+            var legalContact = includeCompanyFooter
+                ? $"<p>Email: {EmailFooter.CompanyEmail}</p>"
+                : $"<p><strong>VISTAWAYS TECH Recruitment Team</strong><br />Email: {safeSenderEmail}</p>";
+
+            // Candidate emails drop the From/To/Date/Subject box (the mail client already shows all of it)
+            // and instead carry hidden inbox preview text. The internal contact-form relay keeps the box.
+            var metaBox = includeCompanyFooter
+                ? ""
+                : $@"<div style=""background:#f0f0f0;padding:12px 28px;border-bottom:1px solid #ddd;font-size:12px;color:#555;"">
+      <table style=""border-collapse:collapse;width:100%;"">
+        <tr><td style=""width:80px;font-weight:bold;color:#333;"">From:</td><td>VISTAWAYS TECH Recruitment &lt;{safeSenderEmail}&gt;</td></tr>
+        <tr><td style=""width:80px;font-weight:bold;color:#333;"">To:</td><td>{safeToEmail}</td></tr>
+        <tr><td style=""width:80px;font-weight:bold;color:#333;"">Date:</td><td>{dateStr}</td></tr>
+        <tr><td style=""width:80px;font-weight:bold;color:#333;"">Subject:</td><td><strong>{safeSubject}</strong></td></tr>
+      </table>
+    </div>";
+            var preheader = includeCompanyFooter ? EmailFooter.BuildPreheaderHtml(BuildPreviewText(bodyHtml)) : "";
+
             var companyFooter = includeCompanyFooter
                 ? "<div style=\"padding:0 28px 28px;\">" + EmailFooter.BuildHtml() + "</div>"
                 : "";
@@ -432,20 +515,14 @@ namespace ExamPortal.Services
 <html lang=""en"">
 <head><meta charset=""UTF-8"" /><meta name=""viewport"" content=""width=device-width, initial-scale=1.0"" /><title>{safeSubject}</title></head>
 <body style=""font-family:Arial,sans-serif;background:#f4f4f4;margin:0;padding:0;"">
+  {preheader}
   <div style=""max-width:640px;margin:32px auto;background:#ffffff;border:1px solid #ddd;border-radius:6px;overflow:hidden;"">
     <div style=""background:#1a1a2e;padding:20px 28px;""><h1 style=""color:#ffffff;font-size:20px;margin:0;letter-spacing:1px;"">VISTAWAYS TECH</h1></div>
-    <div style=""background:#f0f0f0;padding:12px 28px;border-bottom:1px solid #ddd;font-size:12px;color:#555;"">
-      <table style=""border-collapse:collapse;width:100%;"">
-        <tr><td style=""width:80px;font-weight:bold;color:#333;"">From:</td><td>VISTAWAYS TECH Recruitment &lt;{safeSenderEmail}&gt;</td></tr>
-        <tr><td style=""width:80px;font-weight:bold;color:#333;"">To:</td><td>{safeToEmail}</td></tr>
-        <tr><td style=""width:80px;font-weight:bold;color:#333;"">Date:</td><td>{dateStr}</td></tr>
-        <tr><td style=""width:80px;font-weight:bold;color:#333;"">Subject:</td><td><strong>{safeSubject}</strong></td></tr>
-      </table>
-    </div>
+    {metaBox}
     {messageHtml}
     {companyFooter}
     <div style=""background:#f7f7f7;border-top:1px solid #e0e0e0;padding:16px 28px;font-size:11px;color:#888;"">
-      <p><strong>VISTAWAYS TECH Recruitment Team</strong><br />Email: {safeSenderEmail}</p>
+      {legalContact}
       <p>This email was sent to <strong>{safeToEmail}</strong> as part of your application process. Do not share your Candidate ID or password with anyone.</p>
       <p>&copy; {sentAt.Year} VISTAWAYS TECH. All rights reserved.</p>
     </div>
