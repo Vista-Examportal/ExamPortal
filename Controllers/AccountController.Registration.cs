@@ -303,7 +303,7 @@ namespace ExamPortal.Controllers
             var candidateId = _candidateWorkflow.CompleteResumeAndSkills(candidate, resumePath, profilePhotoPath, model);
             _db.SaveChanges();
             await SignInUserAsync(candidate);
-            TempData["Success"] = $"Registration complete! Your Candidate ID is {candidateId}. Recruiters will now review your profile.";
+            TempData["Success"] = $"Registration complete! Your Candidate ID is {candidateId}. Your profile is now ready for recruiter review.";
             return RedirectToAction("Index", "Home");
         }
 

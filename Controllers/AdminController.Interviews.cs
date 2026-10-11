@@ -262,7 +262,7 @@ namespace ExamPortal.Controllers
                 // team will follow up. See SchedulingHelper.BuildCancellationEmailBody.
                 _notifications.Queue(user, null, "Interview Cancelled",
                     $"Interview Cancelled — {interview.Round} Round — VISTAWAYS TECH",
-                    SchedulingHelper.BuildCancellationEmailBody(user.FullName, user.CandidateId, interview.Round, interview.ScheduledAt));
+                    SchedulingHelper.BuildCancellationEmailBody(user.FullName, user.CandidateId, interview.Round, interview.ScheduledAt, interview.TimeZone));
             }
 
             _db.SaveChanges();

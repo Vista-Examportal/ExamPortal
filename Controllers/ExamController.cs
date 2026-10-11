@@ -152,7 +152,7 @@ namespace ExamPortal.Controllers
                 var opensAtUtc = DateTime.SpecifyKind(activeInvitation.AssessmentDate.Value, DateTimeKind.Utc);
                 if (DateTime.UtcNow < opensAtUtc)
                 {
-                    TempData["Error"] = $"This assessment opens on {opensAtUtc:dd MMM yyyy HH:mm} UTC.";
+                    TempData["Error"] = $"This assessment opens on {SchedulingHelper.FormatBusinessTime(opensAtUtc)}.";
                     return RedirectToAction("Index", "Home");
                 }
             }
@@ -334,12 +334,12 @@ namespace ExamPortal.Controllers
                 $"  SUBMISSION CONFIRMATION\n" +
                 $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
                 $"📋 Assessment : {exam.Title}\n" +
-                $"🕐 Submitted  : {DateTime.UtcNow:dd MMM yyyy HH:mm} UTC\n\n" +
+                $"🕐 Submitted  : {SchedulingHelper.FormatUtcWithIst(DateTime.UtcNow)}\n\n" +
                 $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
                 $"  WHAT HAPPENS NEXT\n" +
                 $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                $"Thank you for completing the assessment. Our recruitment team will review your submission " +
-                $"and contact you regarding the next steps.\n\n" +
+                $"Thank you for completing the assessment. Our recruitment team will review your submission. " +
+                $"If you are selected to proceed, they will contact you regarding the next steps.\n\n" +
                 $"Please keep an eye on your inbox and log in to the portal periodically for updates.\n\n" +
                 $"Best regards,\n" +
                 $"VISTAWAYS TECH Recruitment Team");

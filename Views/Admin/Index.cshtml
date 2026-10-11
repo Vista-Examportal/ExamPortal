@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @using ExamPortal.Models
 @using System.Text.RegularExpressions
 @using System.Globalization
@@ -323,7 +324,7 @@
                         <span class="ui-stat-icon h-9 w-9 bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]"><i data-lucide="clipboard-list" class="h-4 w-4"></i></span>
                         <div class="min-w-0 flex-1">
                             <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@exam.Title</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400">Opens @exam.StartDateTime?.ToLocalTime().ToString("dd MMM, HH:mm") &middot; @exam.Questions.Count questions</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">Opens @SchedulingHelper.FormatBusinessTime(exam.StartDateTime, "dd MMM, HH:mm") &middot; @exam.Questions.Count questions</div>
                         </div>
                     </li>
                 }
@@ -366,7 +367,7 @@
                                 <span class="ui-stat-icon relative z-10 h-8 w-8 shrink-0 bg-slate-100 text-slate-500 ring-4 ring-[var(--vw-surface)] dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@item.Icon" class="h-3.5 w-3.5"></i></span>
                                 <div class="min-w-0 flex-1 rounded-lg px-1 py-0.5 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                     <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@item.Text</div>
-                                    <div class="text-xs text-slate-500 dark:text-slate-400">@item.Sub &middot; @item.When.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">@item.Sub &middot; @SchedulingHelper.FormatBusinessTime(item.When, "dd MMM, HH:mm")</div>
                                 </div>
                             </li>
                         }
@@ -446,7 +447,7 @@
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@recruiter.FullName</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@recruiter.Email</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@recruiter.MobileNumber</td>
-                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(recruiter.CreatedAt.ToString("o"))">@recruiter.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(recruiter.CreatedAt.ToString("o"))">@SchedulingHelper.FormatBusinessTime(recruiter.CreatedAt, "dd MMM yyyy")</td>
                             </tr>
                         }
                     </tbody>
@@ -474,7 +475,7 @@
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@hr.FullName</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@hr.Email</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@hr.MobileNumber</td>
-                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@hr.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatBusinessTime(hr.CreatedAt, "dd MMM yyyy")</td>
                             </tr>
                         }
                     </tbody>
@@ -605,7 +606,7 @@
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@exam.Title</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@exam.Questions.Count</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@exam.PassingMarks / @exam.TotalMarks</td>
-                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@exam.StartDateTime?.ToLocalTime().ToString("dd MMM") - @exam.EndDateTime?.ToLocalTime().ToString("dd MMM")</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatBusinessTime(exam.StartDateTime, "dd MMM") - @SchedulingHelper.FormatBusinessTime(exam.EndDateTime, "dd MMM")</td>
                                 <td class="px-5 py-3">
                                     <div class="flex flex-wrap gap-2">
                                         <a asp-action="ExamResults" asp-route-id="@exam.Id" class="ui-btn-outline !px-3 !py-1.5 text-xs">Results</a>
@@ -645,7 +646,7 @@
                             <tr>
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@interview.User?.FullName</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@interview.Round</td>
-                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@interview.ScheduledAt?.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatScheduledTimeWithZone(interview.ScheduledAt, interview.TimeZone, "dd MMM yyyy, HH:mm")</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@interview.Format</td>
                                 <td class="px-5 py-3"><span class="ui-badge-primary">@interview.Status</span></td>
                             </tr>
@@ -764,7 +765,7 @@
                         <span class="ui-stat-icon h-8 w-8 shrink-0 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@auditIcon(log.Action)" class="h-3.5 w-3.5"></i></span>
                         <div class="min-w-0">
                             <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@log.Action <span class="font-normal text-slate-500 dark:text-slate-400">on @log.EntityName</span></div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400">@log.Actor &middot; @log.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">@log.Actor &middot; @SchedulingHelper.FormatBusinessTime(log.CreatedAt, "dd MMM yyyy, HH:mm")</div>
                         </div>
                     </li>
                 }
@@ -816,7 +817,7 @@
                 {
                     <li class="px-5 py-2.5">
                         <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@log.Action <span class="font-normal text-slate-500 dark:text-slate-400">on @log.EntityName</span></div>
-                        <div class="text-xs text-slate-500 dark:text-slate-400">@log.Actor &middot; @log.CreatedAt.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">@log.Actor &middot; @SchedulingHelper.FormatBusinessTime(log.CreatedAt, "dd MMM, HH:mm")</div>
                     </li>
                 }
             </ul>
@@ -946,7 +947,7 @@
                         {
                             <li class="flex items-center justify-between py-2">
                                 <span class="text-slate-600 dark:text-slate-300">@log.EventType &middot; @log.Attempt?.User?.FullName</span>
-                                <span class="text-xs text-slate-500 dark:text-slate-400">@log.OccurredAt.ToLocalTime().ToString("HH:mm")</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatBusinessTime(log.OccurredAt, "HH:mm")</span>
                             </li>
                         }
                     </ul>

@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @model ExamResultViewModel
 @{ ViewData["Title"] = "Assessment Submitted"; }
 
@@ -16,12 +17,12 @@
                 <div>
                     Your responses have been recorded. You can track its status any time in
                     <a asp-controller="Home" asp-action="Results" class="font-semibold underline underline-offset-2">My Assessments</a>.
-                    Our recruitment team will reach out with an update.
+                    Our recruitment team will review your submission; if you're selected to proceed, they will contact you with the next steps.
                 </div>
             </div>
 
             <p class="text-sm text-[var(--vw-text-muted)] mt-4 mb-0">
-                Submitted on @Model.Attempt.SubmittedAt?.ToLocalTime().ToString("dd MMM yyyy, HH:mm")
+                Submitted on @SchedulingHelper.FormatBusinessTime(Model.Attempt.SubmittedAt, "dd MMM yyyy, HH:mm")
             </p>
 
             <div class="mt-5">

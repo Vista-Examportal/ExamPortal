@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @{
     ViewData["Title"] = "Offer Letter";
     Layout = "_AuthLayout";
@@ -59,7 +60,7 @@
                 </div>
             }
 
-            <p class="text-sm text-slate-500 dark:text-slate-400">@(offer.OfferValidUntil.HasValue ? $"This offer is valid until {offer.OfferValidUntil.Value:dd MMM yyyy HH:mm} UTC. " : "")Please accept or decline below.</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400">@(offer.OfferValidUntil.HasValue ? $"This offer is valid until {SchedulingHelper.OfferDeadlineWallClock(offer.OfferValidUntil.Value):dd MMM yyyy, HH:mm} IST. " : "")Please accept or decline below.</p>
 
             <div class="flex flex-col sm:flex-row gap-4 mt-4">
                 <form method="post" asp-action="AcceptOffer" class="flex-1">

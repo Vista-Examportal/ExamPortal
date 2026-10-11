@@ -133,11 +133,16 @@ namespace ExamPortal.Services
         /// e.g. internal evaluation notes).
         /// </summary>
         public static string BuildCancellationEmailBody(
-            string candidateFullName, string candidateId, string round, DateTime? previouslyScheduledAtUtc)
+            string candidateFullName, string candidateId, string round, DateTime? previouslyScheduledAtUtc,
+            string? timeZoneId = null)
         {
-            var scheduleLine = previouslyScheduledAtUtc.HasValue
-                ? $"previously scheduled for {previouslyScheduledAtUtc.Value:dddd, dd MMMM yyyy 'at' HH:mm} UTC, "
-                : "";
+            // With a saved zone, show the original time in that zone with its label (same shape
+            // as the schedule/reschedule emails); without one, fall back to the UTC wording.
+            var scheduleLine = !previouslyScheduledAtUtc.HasValue
+                ? ""
+                : string.IsNullOrWhiteSpace(timeZoneId)
+                    ? $"previously scheduled for {previouslyScheduledAtUtc.Value:dddd, dd MMMM yyyy 'at' HH:mm} UTC, "
+                    : $"previously scheduled for {FormatScheduledTimeWithZone(previouslyScheduledAtUtc, timeZoneId, "dddd, dd MMMM yyyy 'at' HH:mm")}, ";
 
             return
                 $"Dear {candidateFullName} (ID: {candidateId}),\n\n" +
@@ -146,6 +151,97 @@ namespace ExamPortal.Services
                 $"If you have any questions, please reply to this email.\n\n" +
                 $"Best regards,\n" +
                 $"VISTAWAYS TECH Recruitment Team";
+        }
+
+        /// <summary>The application's established business time zone (the default offered on every
+        /// scheduling form — see Views/Shared/_TimeZoneOptions.cshtml). Offer deadlines are
+        /// date-only inputs, so they are interpreted in this zone.</summary>
+        public const string BusinessTimeZoneId = "Asia/Kolkata";
+
+        /// <summary>Short label shown next to business-time-zone values in the portal.</summary>
+        public const string BusinessTimeZoneLabel = "IST";
+
+        /// <summary>A stored UTC instant as business-time-zone wall-clock time.</summary>
+        public static DateTime ToBusinessTime(DateTime utc) => ConvertUtcToWallClock(utc, BusinessTimeZoneId);
+
+        /// <summary>The current business-time-zone calendar date (what "today" means to HR,
+        /// recruiters and candidates) — not the server's date, which is UTC on most hosts.</summary>
+        public static DateTime BusinessToday => ToBusinessTime(DateTime.UtcNow).Date;
+
+        /// <summary>The UTC instant at which the given business-time-zone calendar date begins,
+        /// for translatable "that whole day" range queries.</summary>
+        public static DateTime BusinessDayStartUtc(DateTime businessDate) =>
+            ConvertWallClockToUtc(businessDate.Date, BusinessTimeZoneId);
+
+        /// <summary>
+        /// Portal display of a stored UTC instant in the business time zone. The label
+        /// ("IST") is appended whenever the format shows a time of day, so a time is never
+        /// shown unlabelled; date-only formats stay label-free. Replaces direct
+        /// <c>.ToLocalTime()</c> calls, which rendered in whatever zone the web server
+        /// happened to run in (UTC on most hosts) with no label.
+        /// </summary>
+        public static string FormatBusinessTime(DateTime? utc, string format = "dd MMM yyyy HH:mm")
+        {
+            if (!utc.HasValue) return "";
+            var text = ToBusinessTime(utc.Value).ToString(format);
+            return format.Contains('H') || format.Contains('h') ? $"{text} {BusinessTimeZoneLabel}" : text;
+        }
+
+        /// <summary>Email form of a UTC instant: UTC first, with the same moment in IST
+        /// (identical to the invitation email's "Link Expires" / "Available From" rows).</summary>
+        public static string FormatUtcWithIst(DateTime utc) =>
+            $"{utc:dd MMM yyyy, HH:mm} UTC ({utc.AddMinutes(330):dd MMM yyyy, HH:mm} IST)";
+
+        /// <summary>
+        /// Converts the date-only "Offer Valid Until" value picked by HR into the true UTC instant
+        /// at which the offer stops being acceptable: the END of that calendar day (23:59:59) in the
+        /// business time zone. Previously the bare date (00:00) was stored and compared against
+        /// DateTime.UtcNow, so the offer lapsed at the START of its displayed last date.
+        /// </summary>
+        public static DateTime ConvertOfferDateToDeadlineUtc(DateTime pickedDate) =>
+            ConvertWallClockToUtc(pickedDate.Date.AddHours(23).AddMinutes(59).AddSeconds(59), BusinessTimeZoneId);
+
+        /// <summary>
+        /// Returns a stored OfferLetter.OfferValidUntil as a UTC instant. Values saved by
+        /// ConvertOfferDateToDeadlineUtc are already instants (never exactly midnight, because
+        /// 23:59:59 IST is 18:29:59 UTC). Rows saved before that change hold the raw picked date at
+        /// exactly 00:00:00 — those are interpreted as a date-only deadline and normalised to the end
+        /// of that day in the business time zone, so no data migration is needed.
+        /// </summary>
+        public static DateTime NormalizeOfferDeadlineUtc(DateTime stored) =>
+            stored.TimeOfDay == TimeSpan.Zero
+                ? ConvertOfferDateToDeadlineUtc(stored)
+                : DateTime.SpecifyKind(stored, DateTimeKind.Utc);
+
+        /// <summary>True once the offer deadline has passed. A null deadline never expires
+        /// (unchanged from before).</summary>
+        public static bool IsOfferExpired(DateTime? storedDeadline, DateTime utcNow) =>
+            storedDeadline.HasValue && utcNow > NormalizeOfferDeadlineUtc(storedDeadline.Value);
+
+        /// <summary>The offer deadline as business-time-zone wall-clock time (for display).</summary>
+        public static DateTime OfferDeadlineWallClock(DateTime storedDeadline) =>
+            ConvertUtcToWallClock(NormalizeOfferDeadlineUtc(storedDeadline), BusinessTimeZoneId);
+
+        /// <summary>
+        /// Formats a stored UTC instant as wall-clock time in the zone it was scheduled in, followed
+        /// by that zone's label — the same "date/time (Zone)" shape the interview emails use
+        /// (see ScheduleInterview / BuildRescheduleEmailBody). A blank or unrecognised zone is
+        /// shown as UTC, which is how ConvertUtcToWallClock treats it.
+        /// </summary>
+        public static string FormatScheduledTimeWithZone(DateTime? utc, string? timeZoneId, string format = "dd MMM yyyy HH:mm")
+        {
+            if (!utc.HasValue) return "";
+            var label = IsKnownTimeZone(timeZoneId) ? timeZoneId! : "UTC";
+            return $"{ConvertUtcToWallClock(utc.Value, label).ToString(format)} ({label})";
+        }
+
+        private static bool IsKnownTimeZone(string? timeZoneId)
+        {
+            if (string.IsNullOrWhiteSpace(timeZoneId)) return false;
+            if (timeZoneId == "UTC") return true;
+            try { TimeZoneInfo.FindSystemTimeZoneById(timeZoneId); return true; }
+            catch (TimeZoneNotFoundException) { return false; }
+            catch (InvalidTimeZoneException) { return false; }
         }
 
         /// <summary>

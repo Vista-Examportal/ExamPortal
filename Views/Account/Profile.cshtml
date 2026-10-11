@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @model User
 @{ ViewData["Title"] = "My Profile"; }
 
@@ -30,7 +31,7 @@
             </div>
             <div>
                 <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Member since</div>
-                <div class="text-sm text-slate-800 dark:text-slate-100">@Model.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</div>
+                <div class="text-sm text-slate-800 dark:text-slate-100">@SchedulingHelper.FormatBusinessTime(Model.CreatedAt, "dd MMM yyyy")</div>
             </div>
         </div>
     </div>

@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @model CandidateDashboardViewModel
 @{ ViewData["Title"] = "My Dashboard"; }
 
@@ -99,7 +100,7 @@
                         <span class="ui-stat-icon h-9 w-9 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@activity.Icon" class="h-4 w-4"></i></span>
                         <div class="min-w-0">
                             <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@activity.Text</div>
-                            <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @activity.When.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @SchedulingHelper.FormatBusinessTime(activity.When, "dd MMM, HH:mm")</div>
                         </div>
                     </li>
                 }
@@ -138,7 +139,7 @@
                                 @note.Subject <span class="ui-badge-neutral">@note.Channel</span>
                             </div>
                             <div class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">@preview</div>
-                            <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">@note.CreatedAt.ToLocalTime().ToString("dd MMM HH:mm") &middot; @note.Status</div>
+                            <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatBusinessTime(note.CreatedAt, "dd MMM HH:mm") &middot; @note.Status</div>
                         </div>
                         @if (!note.IsRead)
                         {
@@ -193,7 +194,11 @@
                 @foreach (var inv in activeInvitations)
                 {
                     <div class="mt-1.5 flex flex-wrap items-center gap-2">
-                        <strong>@inv.Exam?.Title</strong> <span>— expires @inv.ExpiresAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                        <strong>@inv.Exam?.Title</strong> @if (inv.AssessmentDate.HasValue && inv.AssessmentDate.Value > DateTime.UtcNow)
+                        {
+                            <span>— opens @SchedulingHelper.FormatBusinessTime(inv.AssessmentDate, "dd MMM yyyy HH:mm")</span>
+                        }
+                        <span>— expires @SchedulingHelper.FormatBusinessTime(inv.ExpiresAt, "dd MMM yyyy HH:mm")</span>
                         <a asp-controller="Exam" asp-action="Details" asp-route-id="@inv.ExamId" class="ui-btn-primary !px-3 !py-1.5 text-xs">Start Assessment</a>
                     </div>
                 }
@@ -405,7 +410,7 @@
                             var irBadge = ir.Status == "Completed" ? "ui-badge-success" : ir.Status is "Cancelled" or "Missed" ? "ui-badge-danger" : "ui-badge-primary";
                             <tr>
                                 <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">@ir.Round</td>
-                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@ir.ScheduledAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatScheduledTimeWithZone(ir.ScheduledAt, ir.TimeZone)</td>
                                 <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@ir.Format</td>
                                 <td class="px-4 py-3"><span class="@irBadge">@ir.Status</span></td>
                             </tr>
@@ -447,7 +452,7 @@
                             <tr>
                                 <td class="px-4 py-3 font-semibold text-slate-800 dark:text-slate-100">@a.Exam?.Title</td>
                                 <td class="px-4 py-3"><span class="@statusBadge">@statusLabel</span></td>
-                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@a.StartedAt.ToLocalTime().ToString("dd MMM, HH:mm")</td>
+                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatBusinessTime(a.StartedAt, "dd MMM, HH:mm")</td>
                                 <td class="px-4 py-3">
                                     @if (a.SubmittedAt != null)
                                     {
@@ -478,7 +483,7 @@
     {
         <div class="ui-alert-info">
             <div class="ui-alert-icon"><i data-lucide="info" class="h-4 w-4"></i></div>
-            <div><strong>Your profile is awaiting recruiter review.</strong> A recruiter will review your profile and send a secure assessment invitation via email. Your Candidate ID is <strong>@Model.Candidate.CandidateId</strong>.</div>
+            <div><strong>Your profile is awaiting recruiter review.</strong> A recruiter will review your profile. If you're selected to proceed, you'll receive a secure assessment invitation by email. Your Candidate ID is <strong>@Model.Candidate.CandidateId</strong>.</div>
         </div>
     }
 </div>

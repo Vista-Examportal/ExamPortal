@@ -79,6 +79,21 @@ namespace ExamPortal.Controllers
                 return RedirectToAction("CandidateDetail", new { id = model.UserId });
             }
 
+            // Date sanity. "Valid Until" is the last day the candidate can accept (end of that
+            // day, IST), so it can't already be past, and joining can't precede the last
+            // acceptance day — otherwise the candidate could accept an offer after its own
+            // joining date, or the offer would be dead on arrival.
+            if (model.OfferValidUntil.Date < SchedulingHelper.BusinessToday)
+            {
+                TempData["Error"] = "The offer's 'Valid Until' date can't be in the past.";
+                return RedirectToAction("CandidateDetail", new { id = model.UserId });
+            }
+            if (model.JoiningDate.Date < model.OfferValidUntil.Date)
+            {
+                TempData["Error"] = "The joining date must be on or after the offer's 'Valid Until' date.";
+                return RedirectToAction("CandidateDetail", new { id = model.UserId });
+            }
+
             // Revoke any existing offer
             var existing = _db.OfferLetters.Include(o => o.History)
                 .Where(o => o.UserId == model.UserId && (o.Status == "PendingHRApproval" || o.Status == "Issued"))
@@ -102,7 +117,7 @@ namespace ExamPortal.Controllers
                 BonusLpa         = model.BonusLpa,
                 CompensationBreakup = model.CompensationBreakup,
                 JoiningDate      = model.JoiningDate,
-                OfferValidUntil  = model.OfferValidUntil,
+                OfferValidUntil  = SchedulingHelper.ConvertOfferDateToDeadlineUtc(model.OfferValidUntil),
                 BasicMonthly             = model.BasicMonthly,
                 HraMonthly               = model.HraMonthly,
                 SpecialAllowanceMonthly  = model.SpecialAllowanceMonthly,

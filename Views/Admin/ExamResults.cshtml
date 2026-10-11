@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @model List<ExamAttempt>
 @{
     ViewData["Title"] = "Assessment Analytics"; var exam = ViewBag.Exam as Exam;
@@ -120,7 +121,7 @@ else
                                 }
                             </td>
                             <td class="px-5 py-3" data-sort-value="@a.ProctoringLogs.Count"><span class="@badgeClass(a.ProctoringLogs.Count == 0 ? "neutral" : "danger")">@a.ProctoringLogs.Count</span></td>
-                            <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(a.SubmittedAt?.ToString("o"))">@a.SubmittedAt?.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                            <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(a.SubmittedAt?.ToString("o"))">@SchedulingHelper.FormatBusinessTime(a.SubmittedAt, "dd MMM yyyy, HH:mm")</td>
                             <td class="px-5 py-3">
                                 @if (a.Status == "PendingManualReview") {
                                     <a asp-action="GradeAttempt" asp-route-id="@a.Id" class="ui-btn-outline !py-1 !px-2.5 text-xs"><i data-lucide="pencil-line" class="h-3.5 w-3.5"></i>Grade</a>

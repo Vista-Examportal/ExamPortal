@@ -321,8 +321,13 @@ namespace ExamPortal.Services
                     Severity = "info", ActionController = "Admin", ActionAction = "Pipeline", ActionFragment = "pipeline-offer"
                 });
 
+            // "Today" is the business-time-zone (IST) calendar day, not the server's UTC day.
+            var businessToday = SchedulingHelper.BusinessToday;
+            var todayStartUtc = SchedulingHelper.BusinessDayStartUtc(businessToday);
+            var tomorrowStartUtc = todayStartUtc.AddDays(1);
             var verifiedToday = _db.CandidateDocuments.AsNoTracking()
-                .Count(d => d.VerificationStatus == "Verified" && d.VerifiedAt != null && d.VerifiedAt.Value.Date == DateTime.UtcNow.Date);
+                .Count(d => d.VerificationStatus == "Verified" && d.VerifiedAt != null
+                    && d.VerifiedAt >= todayStartUtc && d.VerifiedAt < tomorrowStartUtc);
             if (verifiedToday > 0)
                 alerts.Add(new PortalAlert
                 {
@@ -333,7 +338,7 @@ namespace ExamPortal.Services
                 });
 
             var onboardingToday = _db.OfferLetters.AsNoTracking().Include(o => o.User)
-                .Where(o => o.Status == "Accepted" && o.JoiningDate.Date == DateTime.UtcNow.Date)
+                .Where(o => o.Status == "Accepted" && o.JoiningDate >= businessToday && o.JoiningDate < businessToday.AddDays(1))
                 .ToList();
             if (onboardingToday.Count > 0)
                 alerts.Add(new PortalAlert
@@ -344,9 +349,19 @@ namespace ExamPortal.Services
                     Severity = "success", ActionController = "Admin", ActionAction = "Pipeline", ActionFragment = "pipeline-onboarding"
                 });
 
+            // Deadlines are normalised in memory (SchedulingHelper.NormalizeOfferDeadlineUtc) so
+            // offers saved before the end-of-day fix (stored as a bare date at 00:00) are read
+            // the same way as new ones. Only Issued offers are loaded, so the set is small.
+            var nowUtc = DateTime.UtcNow;
             var expiringOffers = _db.OfferLetters.AsNoTracking()
-                .Count(o => o.Status == "Issued" && o.OfferValidUntil != null
-                    && o.OfferValidUntil > DateTime.UtcNow && o.OfferValidUntil < DateTime.UtcNow.AddDays(3));
+                .Where(o => o.Status == "Issued" && o.OfferValidUntil != null)
+                .Select(o => o.OfferValidUntil!.Value)
+                .ToList()
+                .Count(v =>
+                {
+                    var deadline = SchedulingHelper.NormalizeOfferDeadlineUtc(v);
+                    return deadline > nowUtc && deadline < nowUtc.AddDays(3);
+                });
             if (expiringOffers > 0)
                 alerts.Add(new PortalAlert
                 {

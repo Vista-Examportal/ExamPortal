@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @model List<ExamAttempt>
 @{
     ViewData["Title"] = "My Assessments";
@@ -71,7 +72,7 @@ else
                             <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@(i + 1)</td>
                             <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@a.Exam?.Title">@a.Exam?.Title</td>
                             <td class="px-5 py-3" data-sort-value="@statusLabel"><span class="@statusBadge">@statusLabel</span></td>
-                            <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(a.StartedAt.ToString("o"))">@a.StartedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")</td>
+                            <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400" data-sort-value="@(a.StartedAt.ToString("o"))">@SchedulingHelper.FormatBusinessTime(a.StartedAt, "dd MMM yyyy, HH:mm")</td>
                             <td class="px-5 py-3">
                                 @if (a.SubmittedAt != null)
                                 {

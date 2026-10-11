@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @model PortalDashboardViewModel
 @{
     // EnterprisePortalService.cs / PortalModels.cs (Services & Models layers —
@@ -59,7 +60,7 @@
     // from Model.ActiveOffers, which already carries JoiningDate on each
     // OfferLetter. No Service/Model change needed.
     var upcomingJoiners = Model.ActiveOffers
-        .Where(o => o.JoiningDate.Date >= DateTime.UtcNow.Date)
+        .Where(o => o.JoiningDate.Date >= SchedulingHelper.BusinessToday)
         .OrderBy(o => o.JoiningDate)
         .Take(6)
         .ToList();
@@ -227,7 +228,7 @@
                                 <span class="ui-stat-icon h-9 w-9 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@activity.Icon" class="h-4 w-4"></i></span>
                                 <div class="min-w-0">
                                     <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@activity.Text</div>
-                                    <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @activity.When.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @SchedulingHelper.FormatBusinessTime(activity.When, "dd MMM, HH:mm")</div>
                                 </div>
                             </li>
                         }
@@ -284,7 +285,7 @@
                         <div class="vw-info-row-icon side-icon text-[var(--vw-accent)]"><i data-lucide="message-square"></i></div>
                         <div>
                             <div class="font-semibold text-sm">@interview.User?.FullName</div>
-                            <div class="text-sm text-slate-500 dark:text-slate-400">@interview.Round round - @interview.ScheduledAt?.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                            <div class="text-sm text-slate-500 dark:text-slate-400">@interview.Round round - @SchedulingHelper.FormatScheduledTimeWithZone(interview.ScheduledAt, interview.TimeZone, "dd MMM, HH:mm")</div>
                         </div>
                     </div>
                 }

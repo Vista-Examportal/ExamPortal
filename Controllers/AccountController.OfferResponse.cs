@@ -27,7 +27,7 @@ namespace ExamPortal.Controllers
                 return RedirectToAction("Login");
             }
 
-            if (offer.OfferValidUntil.HasValue && DateTime.UtcNow > offer.OfferValidUntil.Value)
+            if (SchedulingHelper.IsOfferExpired(offer.OfferValidUntil, DateTime.UtcNow))
             {
                 offer.Status = "Expired";
                 _db.SaveChanges();
@@ -49,7 +49,7 @@ namespace ExamPortal.Controllers
             var offer = _db.OfferLetters.Include(o => o.History).FirstOrDefault(o => o.AcceptanceToken == token && o.Status == "Issued");
             if (offer == null) return BadRequest("Invalid token.");
 
-            if (offer.OfferValidUntil.HasValue && DateTime.UtcNow > offer.OfferValidUntil.Value)
+            if (SchedulingHelper.IsOfferExpired(offer.OfferValidUntil, DateTime.UtcNow))
             {
                 offer.Status = "Expired";
                 _db.SaveChanges();

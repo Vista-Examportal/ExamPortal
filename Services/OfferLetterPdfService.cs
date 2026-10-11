@@ -50,7 +50,9 @@ namespace ExamPortal.Services
             catch { /* logo is decorative; letter still generates without it */ }
 
             var refNumber = $"VIST01/{offer.IssuedAt:yyyy}/{offer.Id:D5}";
-            var validUntil = offer.OfferValidUntil ?? offer.IssuedAt.AddDays(7);
+            var validUntil = offer.OfferValidUntil.HasValue
+                ? SchedulingHelper.OfferDeadlineWallClock(offer.OfferValidUntil.Value)
+                : offer.IssuedAt.AddDays(7);
 
             var doc = Document.Create(container =>
             {

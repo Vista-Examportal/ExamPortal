@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @model AdminCandidateDetailViewModel
 @{ ViewData["Title"] = "Candidate: " + Model.Candidate.FullName; }
 
@@ -320,9 +321,9 @@
                             <textarea id="offerBreakup" name="CompensationBreakup" class="ui-field !py-1.5 text-sm mb-1" rows="2"></textarea>
                             <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">e.g. how base/variable/bonus are structured.</div>
                             <label for="offerJoiningDate" class="ui-label text-xs">Joining Date<span class="ui-required" aria-hidden="true">*</span></label>
-                            <input id="offerJoiningDate" type="date" name="JoiningDate" class="ui-field !py-1.5 text-sm mb-2" required aria-required="true" />
+                            <input id="offerJoiningDate" type="date" name="JoiningDate" min="@SchedulingHelper.BusinessToday.ToString("yyyy-MM-dd")" class="ui-field !py-1.5 text-sm mb-2" required aria-required="true" />
                             <label for="offerValidUntil" class="ui-label text-xs">Offer Valid Until<span class="ui-required" aria-hidden="true">*</span></label>
-                            <input id="offerValidUntil" type="date" name="OfferValidUntil" class="ui-field !py-1.5 text-sm mb-1" required aria-required="true" />
+                            <input id="offerValidUntil" type="date" name="OfferValidUntil" min="@SchedulingHelper.BusinessToday.ToString("yyyy-MM-dd")" class="ui-field !py-1.5 text-sm mb-1" required aria-required="true" />
                             <div class="mb-2 text-xs text-slate-500 dark:text-slate-400">Last date the candidate can accept before the offer is withdrawn.</div>
 
                             <div class="mb-2 mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
@@ -474,8 +475,8 @@
                             var invColor = invEffectiveStatus == "Accepted" ? "success" : invEffectiveStatus == "Pending" ? "primary" : invEffectiveStatus == "Used" ? "warning" : invEffectiveStatus == "Expired" ? "danger" : "secondary";
                             <tr>
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@inv.Exam?.Title">@inv.Exam?.Title</td>
-                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(inv.SentAt.ToString("o"))">@inv.SentAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
-                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(inv.ExpiresAt.ToString("o"))">@inv.ExpiresAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(inv.SentAt.ToString("o"))">@SchedulingHelper.FormatBusinessTime(inv.SentAt, "dd MMM HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(inv.ExpiresAt.ToString("o"))">@SchedulingHelper.FormatBusinessTime(inv.ExpiresAt, "dd MMM HH:mm")</td>
                                 <td class="px-5 py-3"><span class="@badgeClass(invColor)">@invEffectiveStatus</span></td>
                                 <td class="px-5 py-3">
                                     <form asp-action="ResendInvitation" method="post" class="inline">
@@ -523,7 +524,7 @@
                                         <span class="@badgeClass(a.Passed ? "success" : "danger")">@(a.Passed ? "ELIGIBLE" : "NOT ELIGIBLE")</span>
                                     }
                                 </td>
-                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(a.StartedAt.ToString("o"))">@a.StartedAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(a.StartedAt.ToString("o"))">@SchedulingHelper.FormatBusinessTime(a.StartedAt, "dd MMM HH:mm")</td>
                             </tr>
                         }
                         </tbody>
@@ -551,7 +552,7 @@
                             var irColor = ir.Status == "Completed" ? "success" : ir.Status == "Missed" ? "warning" : ir.Status == "Cancelled" ? "danger" : "primary";
                             <tr>
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@ir.Round">@ir.Round</td>
-                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(ir.ScheduledAt?.ToString("o"))">@ir.ScheduledAt?.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(ir.ScheduledAt?.ToString("o"))">@SchedulingHelper.FormatScheduledTimeWithZone(ir.ScheduledAt, ir.TimeZone, "dd MMM HH:mm")</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@(string.IsNullOrWhiteSpace(ir.PanelMembers) ? ir.InterviewerNames : ir.PanelMembers)</td>
                                 <td class="px-5 py-3"><span class="@badgeClass(irColor)">@ir.Status</span></td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(ir.Rating ?? 0)">@(ir.Rating.HasValue ? $"{ir.Rating}/5" : "-")</td>
@@ -695,7 +696,7 @@
                         @foreach (var h in Model.OfferHistory.Take(8)) {
                             <div class="text-sm border-t border-slate-100 dark:border-slate-700 py-1">
                                 <span class="font-semibold">@h.Action</span>
-                                <span class="text-slate-500 dark:text-slate-400">by @h.Actor on @h.CreatedAt.ToLocalTime().ToString("dd MMM HH:mm")</span>
+                                <span class="text-slate-500 dark:text-slate-400">by @h.Actor on @SchedulingHelper.FormatBusinessTime(h.CreatedAt, "dd MMM HH:mm")</span>
                                 @if (!string.IsNullOrWhiteSpace(h.Remarks)) { <div class="text-slate-500 dark:text-slate-400">@h.Remarks</div> }
                             </div>
                         }

@@ -321,7 +321,9 @@ namespace ExamPortal.Tests.Services
 
             Assert.DoesNotContain("reason", parameterNames);
             Assert.DoesNotContain("notes", parameterNames);
-            Assert.Equal(4, parameterNames.Length);
+            // 4 original parameters + the optional saved time zone (shows the old schedule in the
+            // interview's own zone); still no free-text parameter that could carry a reason.
+            Assert.Equal(5, parameterNames.Length);
         }
 
         // ── IsValidWindow ────────────────────────────────────────────────────────
@@ -381,6 +383,157 @@ namespace ExamPortal.Tests.Services
         public void IsValidWindow_BothNull_IsValid()
         {
             Assert.True(SchedulingHelper.IsValidWindow(null, null));
+        }
+
+        // ── Offer deadline (date-only input → end of that day in IST) ─────────
+
+        [Fact]
+        public void ConvertOfferDateToDeadlineUtc_IsEndOfPickedDayInIst()
+        {
+            var deadline = SchedulingHelper.ConvertOfferDateToDeadlineUtc(new DateTime(2026, 10, 20));
+
+            // 23:59:59 IST (UTC+5:30) == 18:29:59 UTC the same calendar day.
+            Assert.Equal(new DateTime(2026, 10, 20, 18, 29, 59, DateTimeKind.Utc), deadline);
+        }
+
+        [Fact]
+        public void IsOfferExpired_StillAcceptableLateOnLastDisplayedDate()
+        {
+            var stored = SchedulingHelper.ConvertOfferDateToDeadlineUtc(new DateTime(2026, 10, 20));
+            // 22:00 IST on 20 Oct == 16:30 UTC — the old midnight comparison rejected this.
+            var now = new DateTime(2026, 10, 20, 16, 30, 0, DateTimeKind.Utc);
+
+            Assert.False(SchedulingHelper.IsOfferExpired(stored, now));
+        }
+
+        [Fact]
+        public void IsOfferExpired_ExpiredOnceTheIstDayHasEnded()
+        {
+            var stored = SchedulingHelper.ConvertOfferDateToDeadlineUtc(new DateTime(2026, 10, 20));
+            // 00:00:01 IST on 21 Oct == 18:30:01 UTC on 20 Oct.
+            var now = new DateTime(2026, 10, 20, 18, 30, 1, DateTimeKind.Utc);
+
+            Assert.True(SchedulingHelper.IsOfferExpired(stored, now));
+        }
+
+        [Fact]
+        public void IsOfferExpired_LegacyMidnightValue_IsTreatedAsDateOnly()
+        {
+            // Rows saved before the fix hold the raw picked date at exactly 00:00.
+            var legacy = new DateTime(2026, 10, 20, 0, 0, 0);
+
+            Assert.False(SchedulingHelper.IsOfferExpired(legacy, new DateTime(2026, 10, 20, 12, 0, 0, DateTimeKind.Utc)));
+            Assert.True(SchedulingHelper.IsOfferExpired(legacy, new DateTime(2026, 10, 20, 18, 30, 1, DateTimeKind.Utc)));
+        }
+
+        [Fact]
+        public void IsOfferExpired_NullDeadline_NeverExpires()
+        {
+            Assert.False(SchedulingHelper.IsOfferExpired(null, DateTime.UtcNow));
+        }
+
+        [Fact]
+        public void OfferDeadlineWallClock_ShowsPickedDateAtEndOfDay()
+        {
+            var stored = SchedulingHelper.ConvertOfferDateToDeadlineUtc(new DateTime(2026, 10, 20));
+
+            Assert.Equal(new DateTime(2026, 10, 20, 23, 59, 59), SchedulingHelper.OfferDeadlineWallClock(stored));
+            Assert.Equal(new DateTime(2026, 10, 20, 23, 59, 59), SchedulingHelper.OfferDeadlineWallClock(new DateTime(2026, 10, 20)));
+        }
+
+        // ── Candidate-facing interview time (saved zone + label) ──────────────
+
+        [Fact]
+        public void FormatScheduledTimeWithZone_ShowsSavedZoneWallClockAndLabel()
+        {
+            // 10:00 IST == 04:30 UTC
+            var utc = new DateTime(2026, 11, 2, 4, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal("02 Nov 2026 10:00 (Asia/Kolkata)", SchedulingHelper.FormatScheduledTimeWithZone(utc, "Asia/Kolkata"));
+        }
+
+        [Fact]
+        public void FormatScheduledTimeWithZone_UtcZone_IsLabelledUtc()
+        {
+            var utc = new DateTime(2026, 11, 2, 4, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal("02 Nov 2026 04:30 (UTC)", SchedulingHelper.FormatScheduledTimeWithZone(utc, "UTC"));
+        }
+
+        [Fact]
+        public void FormatScheduledTimeWithZone_UnknownOrBlankZone_FallsBackToUtcLabel()
+        {
+            var utc = new DateTime(2026, 11, 2, 4, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal("02 Nov 2026 04:30 (UTC)", SchedulingHelper.FormatScheduledTimeWithZone(utc, "Not/AZone"));
+            Assert.Equal("02 Nov 2026 04:30 (UTC)", SchedulingHelper.FormatScheduledTimeWithZone(utc, ""));
+        }
+
+        [Fact]
+        public void FormatScheduledTimeWithZone_NullTime_ReturnsEmpty()
+        {
+            Assert.Equal("", SchedulingHelper.FormatScheduledTimeWithZone(null, "Asia/Kolkata"));
+        }
+
+        // ── Business-time-zone display & day boundaries ───────────────────────
+
+        [Fact]
+        public void ToBusinessTime_ConvertsUtcToIst()
+        {
+            var utc = new DateTime(2026, 11, 2, 18, 45, 0, DateTimeKind.Utc);
+
+            // 18:45 UTC is already the next day in IST (00:15 on 3 Nov).
+            Assert.Equal(new DateTime(2026, 11, 3, 0, 15, 0), SchedulingHelper.ToBusinessTime(utc));
+        }
+
+        [Fact]
+        public void FormatBusinessTime_TimeFormats_AreLabelledIst()
+        {
+            var utc = new DateTime(2026, 11, 2, 4, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal("02 Nov 2026 10:00 IST", SchedulingHelper.FormatBusinessTime(utc));
+            Assert.Equal("10:00 IST", SchedulingHelper.FormatBusinessTime(utc, "HH:mm"));
+        }
+
+        [Fact]
+        public void FormatBusinessTime_DateOnlyFormat_HasNoLabel()
+        {
+            var utc = new DateTime(2026, 11, 2, 4, 30, 0, DateTimeKind.Utc);
+
+            Assert.Equal("02 Nov", SchedulingHelper.FormatBusinessTime(utc, "dd MMM"));
+        }
+
+        [Fact]
+        public void FormatBusinessTime_Null_ReturnsEmpty()
+        {
+            Assert.Equal("", SchedulingHelper.FormatBusinessTime(null));
+        }
+
+        [Fact]
+        public void BusinessDayStartUtc_IsPreviousEveningInUtc()
+        {
+            // IST midnight on 3 Nov == 18:30 UTC on 2 Nov.
+            Assert.Equal(new DateTime(2026, 11, 2, 18, 30, 0, DateTimeKind.Utc),
+                SchedulingHelper.BusinessDayStartUtc(new DateTime(2026, 11, 3)));
+        }
+
+        [Fact]
+        public void FormatUtcWithIst_MatchesInvitationEmailFormat()
+        {
+            var utc = new DateTime(2026, 11, 2, 20, 0, 0, DateTimeKind.Utc);
+
+            Assert.Equal("02 Nov 2026, 20:00 UTC (03 Nov 2026, 01:30 IST)", SchedulingHelper.FormatUtcWithIst(utc));
+        }
+
+        [Fact]
+        public void BuildCancellationEmailBody_WithTimeZone_ShowsOldScheduleInThatZoneWithLabel()
+        {
+            var utc = new DateTime(2026, 9, 1, 4, 30, 0, DateTimeKind.Utc);
+
+            var body = SchedulingHelper.BuildCancellationEmailBody("Priya Rao", "VWT202600042", "Technical", utc, "Asia/Kolkata");
+
+            Assert.Contains("Tuesday, 01 September 2026 at 10:00 (Asia/Kolkata)", body);
+            Assert.DoesNotContain(" UTC,", body);
         }
     }
 }

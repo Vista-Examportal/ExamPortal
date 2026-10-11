@@ -188,5 +188,45 @@ namespace ExamPortal.Tests.Services
             Assert.Contains("ONE-TIME LOGIN CODE", scrubbed);
             Assert.Contains("https://portal/link", scrubbed);
         }
+
+        // ── Invitation expiry window (runs from the later of "now" and the open time) ──
+
+        [Fact]
+        public void ComputeExpiresAt_NoAssessmentDate_RunsFromNow()
+        {
+            var now = new DateTime(2026, 10, 11, 10, 0, 0, DateTimeKind.Utc);
+
+            Assert.Equal(now.AddHours(72), AssessmentInvitationService.ComputeExpiresAt(null, 72, now));
+        }
+
+        [Fact]
+        public void ComputeExpiresAt_AssessmentOpensBeyondExpiryWindow_RunsFromOpenTime()
+        {
+            var now = new DateTime(2026, 10, 11, 10, 0, 0, DateTimeKind.Utc);
+            var opens = now.AddDays(5);
+
+            var expires = AssessmentInvitationService.ComputeExpiresAt(opens, 72, now);
+
+            // Previously now+72h — i.e. before the assessment could even be opened.
+            Assert.Equal(opens.AddHours(72), expires);
+            Assert.True(expires > opens);
+        }
+
+        [Fact]
+        public void ComputeExpiresAt_AssessmentAlreadyOpen_RunsFromNow()
+        {
+            var now = new DateTime(2026, 10, 11, 10, 0, 0, DateTimeKind.Utc);
+
+            Assert.Equal(now.AddHours(24), AssessmentInvitationService.ComputeExpiresAt(now.AddHours(-3), 24, now));
+        }
+
+        [Fact]
+        public void ComputeExpiresAt_ClampsExpiryHours()
+        {
+            var now = new DateTime(2026, 10, 11, 10, 0, 0, DateTimeKind.Utc);
+
+            Assert.Equal(now.AddHours(1), AssessmentInvitationService.ComputeExpiresAt(null, 0, now));
+            Assert.Equal(now.AddHours(24 * 14), AssessmentInvitationService.ComputeExpiresAt(null, 100000, now));
+        }
     }
 }

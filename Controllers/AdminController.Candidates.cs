@@ -199,8 +199,8 @@ namespace ExamPortal.Controllers
                 $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
                 $"  WHAT HAPPENS NEXT\n" +
                 $"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                $"Our recruitment team will be in touch shortly with details about the next round, " +
-                $"including interview schedule information.\n\n" +
+                $"Our recruitment team will contact you with details about the next round, " +
+                $"including interview schedule information, once it has been arranged.\n\n" +
                 $"Please keep an eye on your inbox and ensure your contact details are up to date in the portal.\n\n" +
                 $"We look forward to speaking with you.\n\n" +
                 $"Best regards,\n" +

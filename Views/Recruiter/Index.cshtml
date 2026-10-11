@@ -1,3 +1,4 @@
+@using ExamPortal.Services
 @{
     ViewData["Title"] = "Recruiter Portal";
     var assessments = ViewBag.Assessments as List<Exam> ?? new();
@@ -63,7 +64,7 @@
     // ViewBag.UpcomingInterviews, which this view already receives.
     var needsReviewCount = assignmentCandidates.Count(c => c.RecruitmentStage == RecruitmentStages.ProfileUnderReview);
     var todaysInterviews = interviews
-        .Where(iv => iv.ScheduledAt.HasValue && iv.ScheduledAt.Value.ToLocalTime().Date == DateTime.Now.Date)
+        .Where(iv => iv.ScheduledAt.HasValue && SchedulingHelper.ToBusinessTime(iv.ScheduledAt.Value).Date == SchedulingHelper.BusinessToday)
         .OrderBy(iv => iv.ScheduledAt)
         .ToList();
     var nextInterviewToday = todaysInterviews.FirstOrDefault();
@@ -233,7 +234,7 @@
                         <div class="text-xs text-slate-500 dark:text-slate-400">
                             @if (nextInterviewToday != null)
                             {
-                                @:next: @nextInterviewToday.User?.FullName at @nextInterviewToday.ScheduledAt?.ToLocalTime().ToString("HH:mm")
+                                @:next: @nextInterviewToday.User?.FullName at @SchedulingHelper.FormatScheduledTimeWithZone(nextInterviewToday.ScheduledAt, nextInterviewToday.TimeZone, "HH:mm")
                             }
                             else
                             {
@@ -277,7 +278,7 @@
                             <span class="ui-stat-icon h-9 w-9 bg-[var(--vw-accent-bg)] text-[var(--vw-accent-text)]"><i data-lucide="clipboard-list" class="h-4 w-4"></i></span>
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@exam.Title</div>
-                                <div class="text-xs text-slate-500 dark:text-slate-400">Opens @exam.StartDateTime?.ToLocalTime().ToString("dd MMM, HH:mm") &middot; @exam.Questions.Count questions</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">Opens @SchedulingHelper.FormatBusinessTime(exam.StartDateTime, "dd MMM, HH:mm") &middot; @exam.Questions.Count questions</div>
                             </div>
                         </li>
                     }
@@ -318,7 +319,7 @@
                             <span class="ui-stat-icon h-9 w-9 bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300"><i data-lucide="@activity.Icon" class="h-4 w-4"></i></span>
                             <div class="min-w-0">
                                 <div class="text-sm font-medium text-slate-800 dark:text-slate-100">@activity.Text</div>
-                                <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @activity.When.ToLocalTime().ToString("dd MMM, HH:mm")</div>
+                                <div class="text-xs text-slate-500 dark:text-slate-400">@activity.Sub &middot; @SchedulingHelper.FormatBusinessTime(activity.When, "dd MMM, HH:mm")</div>
                             </div>
                         </li>
                     }
@@ -552,7 +553,7 @@
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@exam.Title</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@exam.Questions.Count</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@exam.PassingMarks / @exam.TotalMarks</td>
-                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@exam.StartDateTime?.ToLocalTime().ToString("dd MMM") - @exam.EndDateTime?.ToLocalTime().ToString("dd MMM")</td>
+                                <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@SchedulingHelper.FormatBusinessTime(exam.StartDateTime, "dd MMM") - @SchedulingHelper.FormatBusinessTime(exam.EndDateTime, "dd MMM")</td>
                                 <td class="px-5 py-3">
                                     <div class="flex flex-wrap gap-2">
                                         <a asp-controller="Admin" asp-action="EditSchedule" asp-route-id="@exam.Id" class="ui-btn-outline !px-3 !py-1.5 text-xs"><i data-lucide="calendar-clock" class="h-3.5 w-3.5"></i>Edit Schedule</a>
@@ -585,7 +586,7 @@
                                 <div class="sm:col-span-2"><label class="ui-label" for="assignAssessmentDateLocal">Assessment Date<span class="ui-required" aria-hidden="true">*</span></label><input type="datetime-local" id="assignAssessmentDateLocal" class="ui-field" required aria-required="true" /><input type="hidden" name="assessmentDate" id="assignAssessmentDateUtc" /></div>
                                 <div><label class="ui-label">Duration (minutes)<span class="ui-required" aria-hidden="true">*</span></label><input type="number" name="durationMinutes" class="ui-field" min="5" max="300" value="60" required aria-required="true" /></div>
                                 <div><label class="ui-label">Passing Marks<span class="ui-required" aria-hidden="true">*</span></label><input type="number" name="passingMarks" class="ui-field" min="1" value="35" required aria-required="true" /></div>
-                                <div class="sm:col-span-2"><label class="ui-label">Expires In Hours<span class="ui-required" aria-hidden="true">*</span></label><input type="number" name="expiryHours" class="ui-field" min="1" max="336" value="72" required aria-required="true" /></div>
+                                <div class="sm:col-span-2"><label class="ui-label">Expires In Hours (after the assessment opens)<span class="ui-required" aria-hidden="true">*</span></label><input type="number" name="expiryHours" class="ui-field" min="1" max="336" value="72" required aria-required="true" /></div>
                             </div>
                             <div class="ui-label mt-4 mb-1.5">Candidates to assign<span class="ui-required" aria-hidden="true">*</span></div>
                             <div class="max-h-64 overflow-auto rounded-lg border border-slate-200 p-2 dark:border-slate-700" role="group" aria-label="Candidates to assign">
@@ -618,7 +619,7 @@
                                 <div class="flex flex-wrap gap-2 mt-2 text-xs">
                                     <span class="@badgeClass(invColor)">@effectiveStatus</span>
                                     <span class="ui-badge-info">@invitation.DurationMinutes min</span>
-                                    <span class="ui-badge-warning">Expires @invitation.ExpiresAt.ToLocalTime().ToString("dd MMM HH:mm")</span>
+                                    <span class="ui-badge-warning">Expires @SchedulingHelper.FormatBusinessTime(invitation.ExpiresAt, "dd MMM HH:mm")</span>
                                 </div>
                             </div>
                         }
@@ -696,7 +697,7 @@
                                     <tr>
                                         <td class="px-5 py-3" data-sort-value="@interview.User?.FullName"><div class="font-semibold text-slate-800 dark:text-slate-100">@interview.User?.FullName</div><div class="text-xs text-slate-500 dark:text-slate-400">@interview.User?.CandidateId</div></td>
                                         <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@interview.Round</td>
-                                        <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(interview.ScheduledAt?.ToString("o"))">@interview.ScheduledAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td>
+                                        <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(interview.ScheduledAt?.ToString("o"))">@SchedulingHelper.FormatScheduledTimeWithZone(interview.ScheduledAt, interview.TimeZone, "dd MMM yyyy HH:mm")</td>
                                         <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@(string.IsNullOrWhiteSpace(interview.PanelMembers) ? interview.InterviewerNames : interview.PanelMembers)</td>
                                         <td class="px-5 py-3"><a asp-controller="Admin" asp-action="CandidateDetail" asp-route-id="@interview.UserId" class="ui-btn-primary !px-3 !py-1.5 text-xs">Manage</a></td>
                                     </tr>
@@ -850,7 +851,7 @@
                                 <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100" data-sort-value="@note.User?.FullName">@note.User?.FullName</td>
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400">@note.Subject</td>
                                 <td class="px-5 py-3"><span class="@badgeClass(noteColor)">@note.Status</span></td>
-                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(note.CreatedAt.ToString("o"))">@note.CreatedAt.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                                <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(note.CreatedAt.ToString("o"))">@SchedulingHelper.FormatBusinessTime(note.CreatedAt, "dd MMM HH:mm")</td>
                             </tr>
                         }
                         </tbody>

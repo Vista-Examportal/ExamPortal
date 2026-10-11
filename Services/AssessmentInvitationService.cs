@@ -112,7 +112,7 @@ namespace ExamPortal.Services
                 AssessmentDate = assessmentDateUtc,
                 DurationMinutes = resolvedDuration,
                 PassingMarks = resolvedPassingMarks,
-                ExpiresAt = DateTime.UtcNow.AddHours(expiryHours),
+                ExpiresAt = ComputeExpiresAt(assessmentDateUtc, expiryHours, DateTime.UtcNow),
                 SentAt = DateTime.UtcNow
             };
             _db.AssessmentInvitations.Add(invitation);
@@ -124,6 +124,19 @@ namespace ExamPortal.Services
                 BuildInvitationInAppSummary(exam, invitation));
 
             return invitation;
+        }
+
+        /// <summary>
+        /// When an invitation stops being usable. The window runs from the moment the
+        /// assessment opens (or from now, if it opens immediately / has already opened) — it
+        /// used to always run from "now", so an assessment scheduled further ahead than
+        /// <paramref name="expiryHours"/> expired before it could ever be started.
+        /// </summary>
+        public static DateTime ComputeExpiresAt(DateTime? assessmentDateUtc, int expiryHours, DateTime utcNow)
+        {
+            expiryHours = Math.Clamp(expiryHours, 1, 24 * 14);
+            var from = assessmentDateUtc.HasValue && assessmentDateUtc.Value > utcNow ? assessmentDateUtc.Value : utcNow;
+            return from.AddHours(expiryHours);
         }
 
         /// <summary>True only when <paramref name="submittedCode"/> matches this invitation's
@@ -228,7 +241,7 @@ namespace ExamPortal.Services
   <title>{Enc($"Assessment Invitation – {role}")}</title>
 </head>
 <body style=""margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;"">
-  {EmailFooter.BuildPreheaderHtml($"You're invited to complete the {role} assessment. The link expires {invitation.ExpiresAt:dd MMM yyyy, HH:mm} UTC.")}
+  {EmailFooter.BuildPreheaderHtml($"You're invited to complete the {role} assessment. The link expires {UtcWithIst(invitation.ExpiresAt)}.")}
   <div style=""max-width:600px;margin:0 auto;padding:24px 16px;"">
     <div style=""background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;"">
 
@@ -316,7 +329,7 @@ namespace ExamPortal.Services
         }
 
         /// <summary>The stored UTC time, plus the same moment in IST (UTC+5:30) for candidates in India —
-        /// the portal itself still shows UTC, so UTC stays the primary value.</summary>
+        /// UTC stays the primary value in emails.</summary>
         private static string UtcWithIst(DateTime utc) =>
             $"{utc:dd MMM yyyy, HH:mm} UTC ({utc.AddMinutes(330):dd MMM yyyy, HH:mm} IST)";
 
@@ -335,7 +348,7 @@ namespace ExamPortal.Services
             return $"You've been invited to complete the \"{exam.Title}\" assessment for the {role} role. " +
                    $"Duration: {invitation.DurationMinutes} minutes, {exam.TotalQuestions} question(s). " +
                    $"Check your email for the secure link, or open this assessment from your dashboard. " +
-                   $"Link expires {invitation.ExpiresAt:dd MMM yyyy, HH:mm} UTC.";
+                   $"Link expires {UtcWithIst(invitation.ExpiresAt)}.";
         }
     }
 }
