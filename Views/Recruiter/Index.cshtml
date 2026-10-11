@@ -576,7 +576,7 @@
                 <div class="ui-card h-full">
                     <div class="ui-card-body">
                         <div class="flex items-start justify-between gap-3 mb-4">
-                            <div><h2 class="ui-heading-sm mb-1">Assessment Management</h2><p class="text-xs text-slate-500 dark:text-slate-400">Create via existing assessment builder, assign here.</p></div>
+                            <div><h2 class="ui-heading-sm mb-1">Assessment Management</h2><p class="text-xs text-slate-500 dark:text-slate-400">Create assessments in the assessment builder, then assign them to candidates here.</p></div>
                             <a asp-controller="Admin" asp-action="CreateExam" class="ui-btn-primary !px-3 !py-1.5 text-xs shrink-0">Create Assessment</a>
                         </div>
                         <form asp-action="AssignAssessment" method="post">
@@ -826,9 +826,9 @@
             <div class="ui-card-header"><h2 class="ui-heading-sm">Email Templates</h2></div>
             <div class="ui-card-body divide-y divide-slate-100 dark:divide-slate-700 text-xs">
                 <div class="py-2.5 first:pt-0"><strong class="text-slate-800 dark:text-slate-100">Assessment Invitation</strong><div class="text-slate-500 dark:text-slate-400">Generated automatically from recruiter assignment.</div></div>
-                <div class="py-2.5"><strong class="text-slate-800 dark:text-slate-100">Interview Schedule</strong><div class="text-slate-500 dark:text-slate-400">Sent from candidate detail schedule workflow.</div></div>
-                <div class="py-2.5"><strong class="text-slate-800 dark:text-slate-100">Offer Letter</strong><div class="text-slate-500 dark:text-slate-400">Sent from existing offer-release workflow.</div></div>
-                <div class="py-2.5 last:pb-0"><strong class="text-slate-800 dark:text-slate-100">Document Request</strong><div class="text-slate-500 dark:text-slate-400">Sent from existing document workflow.</div></div>
+                <div class="py-2.5"><strong class="text-slate-800 dark:text-slate-100">Interview Schedule</strong><div class="text-slate-500 dark:text-slate-400">Sent when you schedule an interview from the candidate profile.</div></div>
+                <div class="py-2.5"><strong class="text-slate-800 dark:text-slate-100">Offer Letter</strong><div class="text-slate-500 dark:text-slate-400">Sent when an offer is approved and released to the candidate.</div></div>
+                <div class="py-2.5 last:pb-0"><strong class="text-slate-800 dark:text-slate-100">Document Request</strong><div class="text-slate-500 dark:text-slate-400">Sent when documents are requested from the candidate.</div></div>
             </div>
         </div></div><div class="md:col-span-7"><div class="ui-card h-full">
             <div class="ui-card-header"><h2 class="ui-heading-sm">Notifications</h2></div>

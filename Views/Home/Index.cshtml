@@ -156,7 +156,7 @@
     <!-- Recruitment journey -->
     <div class="ui-card p-5">
         <div class="mb-2 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-            <span class="flex items-center gap-1.5"><i data-lucide="route" class="h-4 w-4"></i>Recruitment journey &middot; step @currentStepDisplay of @steps.Length</span>
+            <span class="flex items-center gap-1.5"><i data-lucide="route" class="h-4 w-4"></i>Recruitment journey &middot; stage @currentStepDisplay of @steps.Length</span>
             <strong class="text-slate-800 dark:text-slate-100">@journeyPct%</strong>
         </div>
         <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
@@ -170,7 +170,7 @@
     {
         var action = Model.Candidate.RecruitmentStage switch
         {
-            "EmailVerificationPending" => ("VerifyEmailOtp", "Verify Email OTP", "Check your inbox and verify your email address."),
+            "EmailVerificationPending" => ("VerifyEmailOtp", "Verify Email", "Enter the OTP sent to your email address to continue."),
             "ProfilePending" => ("CompleteProfile", "Complete Candidate Profile", "Add your academic and personal details."),
             _ => ("UploadResume", "Upload Resume & Skills", "Upload your resume and add your skills, projects, and preferences.")
         };
@@ -470,7 +470,7 @@
     {
         <div class="ui-alert-info">
             <div class="ui-alert-icon"><i data-lucide="info" class="h-4 w-4"></i></div>
-            <div><strong>Your registration is in progress.</strong> Your Candidate ID is active. Complete email OTP verification, profile details, resume upload, and skill profile so recruiters can review you.</div>
+            <div><strong>Your registration is in progress.</strong> Your Candidate ID is active. Finish email verification, your personal profile, and your resume, skills, and preferences so recruiters can review you.</div>
         </div>
     }
 

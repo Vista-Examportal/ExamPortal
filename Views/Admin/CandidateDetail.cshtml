@@ -203,7 +203,7 @@
                                 <textarea name="notes" class="ui-field !py-1.5 text-sm mb-1" rows="1"></textarea>
                                 <button class="ui-btn-warning w-full !rounded-full"
                                         data-confirm-title="Mark this interview as Missed?"
-                                        data-confirm-message="The candidate will be notified that they missed this interview."><i data-lucide="user-x" class="h-4 w-4 me-2"></i>Mark as Missed</button>
+                                        data-confirm-message="No email is sent to the candidate when an interview is marked as missed."><i data-lucide="user-x" class="h-4 w-4 me-2"></i>Mark as Missed</button>
                             </form>
                             <form asp-action="CancelInterview" method="post" class="mt-1">
                                 <input type="hidden" name="interviewId" value="@ir.Id" />
@@ -395,7 +395,7 @@
                         <textarea name="reason" class="ui-field !py-1.5 text-sm mb-2" rows="2"></textarea>
                         <button class="ui-btn-outline w-full !rounded-full !text-red-600 dark:!text-red-400 !border-red-300 dark:!border-red-800"
                                 data-confirm-title="Reject this candidate?"
-                                data-confirm-message="This moves the candidate to the Rejected stage. This action can be reversed later, but the candidate may be notified."><i data-lucide="x" class="h-4 w-4 me-2"></i>Reject</button>
+                                data-confirm-message="This moves the candidate to the Rejected stage and sends them a status update email."><i data-lucide="x" class="h-4 w-4 me-2"></i>Reject</button>
                     </form>
                 }
             </div>

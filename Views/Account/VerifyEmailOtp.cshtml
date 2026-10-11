@@ -9,7 +9,17 @@
                 </a>
                 <i data-lucide="mail-check" class="h-8 w-8 mx-auto mb-3 text-[var(--vw-accent)]"></i>
                 <h1 class="vw-page-title no-icon">Verify Your Email</h1>
-                <p class="text-sm text-slate-500 dark:text-slate-400">Step 2 of 6 — Enter the 6-digit OTP sent to <strong>@Model.Email</strong>.</p>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Enter the 6-digit OTP sent to <strong>@Model.Email</strong>.</p>
+            </div>
+
+            <div class="mb-6" aria-label="Registration progress, step 2 of 4">
+                <div class="vw-step-progress-label"><span>Step 2 of 4</span><span>Email verification</span></div>
+                <div class="vw-step-progress-track">
+                    <div class="vw-step-progress-seg done" title="Step 1: Account"></div>
+                    <div class="vw-step-progress-seg done" title="Step 2: Verify Email"></div>
+                    <div class="vw-step-progress-seg" title="Step 3: Personal Profile"></div>
+                    <div class="vw-step-progress-seg" title="Step 4: Resume, Skills &amp; Preferences"></div>
+                </div>
             </div>
 
             @if (TempData["Success"] != null)
@@ -35,7 +45,7 @@
                            maxlength="6" inputmode="numeric" pattern="\d*" autocomplete="one-time-code"
                            required aria-required="true"
                            aria-describedby="otpHint err-otp" />
-                    <div id="otpHint" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Enter the 6-digit code. Expires 15 minutes after it's sent.</div>
+                    <div id="otpHint" class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Enter the 6-digit OTP. It expires 15 minutes after it is sent.</div>
                     <span asp-validation-for="Otp" id="err-otp" class="ui-field-error"></span>
                 </div>
 

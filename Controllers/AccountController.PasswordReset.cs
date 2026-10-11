@@ -138,7 +138,7 @@ namespace ExamPortal.Controllers
                 $"Dear {user.FullName},\n\nYour password was just changed. If this wasn't you, please contact " +
                 "the recruitment team immediately.\n\nVISTAWAYS TECH Recruitment Team");
 
-            TempData["Success"] = "Your password has been reset. Please log in with your new password.";
+            TempData["Success"] = "Your password has been reset. Please sign in with your new password.";
             return RedirectToAction("Login");
         }
 

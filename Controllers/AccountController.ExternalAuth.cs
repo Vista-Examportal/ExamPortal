@@ -27,7 +27,7 @@ namespace ExamPortal.Controllers
         {
             if (!_googleSignIn.IsConfigured)
             {
-                TempData["Error"] = "Google sign-in isn't set up on this environment yet. Please sign in with your Candidate ID and password.";
+                TempData["Error"] = "Google sign-in is not available right now. Please sign in with your Candidate ID and password.";
                 return RedirectToAction("Login");
             }
 
