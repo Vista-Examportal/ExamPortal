@@ -36,8 +36,19 @@ namespace ExamPortal.Controllers
 
         private async Task<bool> CanAccessAsync(string path)
         {
-            if (User.IsInRole(PortalRoles.Admin) || User.IsInRole(PortalRoles.Recruiter) || User.IsInRole(PortalRoles.Hr))
+            // Admin and HR review every candidate file (including identity/education proofs).
+            if (User.IsInRole(PortalRoles.Admin) || User.IsInRole(PortalRoles.Hr))
                 return true;
+
+            // Recruiters screen on resume / photo / certifications only (DocumentTypes.RecruiterVisible,
+            // the same types their dashboard lists). Anything else — Aadhar, PAN, marksheets, degree,
+            // experience letters — is HR/Admin document verification, so a direct URL must not open it.
+            if (User.IsInRole(PortalRoles.Recruiter))
+            {
+                return await _db.Users.AsNoTracking().AnyAsync(u => u.ResumePath == path || u.ProfilePhotoPath == path)
+                    || await _db.CandidateDocuments.AsNoTracking().AnyAsync(d =>
+                        d.FilePath == path && DocumentTypes.RecruiterVisible.Contains(d.DocumentType));
+            }
 
             var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(userIdClaim, out var userId)) return false;

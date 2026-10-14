@@ -188,6 +188,11 @@ namespace ExamPortal.Controllers
                 && o.AcceptedAt.Value.Month == DateTime.UtcNow.Month
                 && o.AcceptedAt.Value.Year == DateTime.UtcNow.Year);
             ViewBag.TotalAuditLogsCount = _db.AuditLogs.Count();
+            // The lists above are capped for display (Take); these are the matching full counts
+            // for the tiles that show a number.
+            ViewBag.ReportsCount = _db.AssessmentReports.Count();
+            ViewBag.NotificationsCount = _db.Notifications.Count();
+            ViewBag.ProctoringLogsCount = _db.ProctoringLogs.Count();
 
             vm.ActivityFeed = _activityFeed.BuildAdminFeed();
             vm.Alerts = _activityFeed.BuildAdminAlerts();
@@ -387,6 +392,7 @@ namespace ExamPortal.Controllers
         /// Useful in development to verify credentials without waiting 30 s for the background service.
         /// GET /Admin/DispatchNotifications
         /// </summary>
+        [Authorize(Roles = PortalRoles.Admin)] // operational tool: previously open to every back-office role, then redirected to the Admin-only dashboard
         public async Task<IActionResult> DispatchNotifications()
         {
             int sent = await _notifications.DispatchPendingAsync(HttpContext.RequestAborted);

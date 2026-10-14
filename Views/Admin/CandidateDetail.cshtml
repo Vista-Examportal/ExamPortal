@@ -15,6 +15,10 @@
     var isAdmin = User.IsInRole(PortalRoles.Admin);
     var isHr = User.IsInRole(PortalRoles.Hr);
     var canManageOffers = isAdmin || isHr;
+    // Same mirroring for the candidate-screening actions (Admin+Recruiter: review, assessment
+    // invitations, shortlist) and document review (Admin+HR: request / verify documents).
+    var canScreen = isAdmin || User.IsInRole(PortalRoles.Recruiter);
+    var canReviewDocuments = isAdmin || isHr;
 
     // Badge color name ("success"/"danger"/"warning"/"primary"/etc, as already
     // computed by the ternaries below) -> ui-badge-* class. Same mapping used
@@ -63,14 +67,14 @@
             <div class="ui-card-body">
                 <h2 class="ui-heading-md mb-3"><i data-lucide="list-checks" class="h-4 w-4 text-[var(--vw-accent)]"></i>Pipeline Actions</h2>
 
-                @if (stage == "Registered") {
+                @if (stage == "Registered" && canScreen) {
                     <form asp-action="ReviewProfile" method="post" class="mb-2">
                         <input type="hidden" name="userId" value="@Model.Candidate.Id" />
                         <button class="ui-btn-primary w-full !rounded-full"><i data-lucide="search" class="h-4 w-4 me-2"></i>Mark Under Review</button>
                     </form>
                 }
 
-                @if (stage == "ProfileUnderReview") {
+                @if (stage == "ProfileUnderReview" && canScreen) {
                     <div class="mb-2">
                         <label class="ui-label">Send Assessment Invitation</label>
                         <form asp-action="SendInvitation" method="post">
@@ -85,7 +89,7 @@
                     </div>
                 }
 
-                @if (stage is "AssessmentCompleted" or "AssessmentStarted") {
+                @if ((stage is "AssessmentCompleted" or "AssessmentStarted") && canScreen) {
                     <form asp-action="Shortlist" method="post" class="mb-2">
                         <input type="hidden" name="userId" value="@Model.Candidate.Id" />
                         <button class="ui-btn-success w-full !rounded-full"><i data-lucide="star" class="h-4 w-4 me-2"></i>Shortlist Candidate</button>
@@ -93,13 +97,15 @@
                 }
 
                 @if (stage == "Shortlisted") {
-                    @* Admin must manually send the shortlist email via Gmail *@
+                    @* Admin/Recruiter must manually send the shortlist email via Gmail *@
+                    @if (canScreen) {
                     <form asp-action="SendShortlistEmail" method="post" class="mb-2">
                         <input type="hidden" name="userId" value="@Model.Candidate.Id" />
                         <button class="ui-btn-outline w-full !rounded-full !text-green-600 dark:!text-green-400 !border-green-300 dark:!border-green-800">
                             <i data-lucide="mail" class="h-4 w-4 me-2"></i>Send Shortlist Email
                         </button>
                     </form>
+                    }
                     <div class="mb-2">
                         <label class="ui-label">Schedule Technical Interview</label>
                         <form asp-action="ScheduleInterview" method="post">
@@ -283,7 +289,10 @@
                         </div>
                     }
 
-                    @if (progress.DocumentsUnlocked) {
+                    @if (progress.DocumentsUnlocked && !canReviewDocuments) {
+                        <div class="ui-alert-info mb-2 text-sm">All required interview rounds have passed. HR or Admin requests and verifies the candidate's documents.</div>
+                    }
+                    @if (progress.DocumentsUnlocked && canReviewDocuments) {
                         <form asp-action="RequestDocuments" method="post" class="mb-2">
                             <input type="hidden" name="userId" value="@Model.Candidate.Id" />
                             <button class="ui-btn-warning w-full !rounded-full"><i data-lucide="folder" class="h-4 w-4 me-2"></i>Request Documents</button>
@@ -479,6 +488,7 @@
                                 <td class="px-5 py-3 text-slate-500 dark:text-slate-400" data-sort-value="@(inv.ExpiresAt.ToString("o"))">@SchedulingHelper.FormatBusinessTime(inv.ExpiresAt, "dd MMM HH:mm")</td>
                                 <td class="px-5 py-3"><span class="@badgeClass(invColor)">@invEffectiveStatus</span></td>
                                 <td class="px-5 py-3">
+                                    @if (canScreen) {
                                     <form asp-action="ResendInvitation" method="post" class="inline">
                                         <input type="hidden" name="userId" value="@Model.Candidate.Id" />
                                         <input type="hidden" name="examId" value="@inv.ExamId" />
@@ -488,6 +498,7 @@
                                             <i data-lucide="rotate-cw" class="h-4 w-4"></i>Resend
                                         </button>
                                     </form>
+                                    }
                                 </td>
                             </tr>
                         }
@@ -620,10 +631,26 @@
                                         <span class="ui-badge-info ml-1 !text-[10px]">Required</span>
                                     }
                                 </td>
-                                <td class="px-5 py-3"><a href="@doc.FilePath" target="_blank" class="text-[var(--vw-accent)]">@doc.OriginalFileName</a></td>
+                                <td class="px-5 py-3">
+                                    @if (canReviewDocuments || ExamPortal.Models.DocumentTypes.IsRecruiterVisible(doc.DocumentType))
+                                    {
+                                        <a href="@doc.FilePath" target="_blank" class="text-[var(--vw-accent)]">@doc.OriginalFileName</a>
+                                    }
+                                    else
+                                    {
+                                        @* Identity/education proofs are for HR/Admin verification only (SecureFilesController enforces this). *@
+                                        <span class="text-slate-500 dark:text-slate-400" title="Visible to HR and Admin only">@doc.OriginalFileName</span>
+                                    }
+                                </td>
                                 <td class="px-5 py-3"><span class="@badgeClass(docColor)">@doc.VerificationStatus</span></td>
                                 <td class="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">@(string.IsNullOrWhiteSpace(doc.VerifiedBy) ? "" : $"By {doc.VerifiedBy}")<br />@(string.IsNullOrWhiteSpace(doc.FileHash) ? "" : doc.FileHash[..Math.Min(12, doc.FileHash.Length)])</td>
                                 <td class="px-5 py-3">
+                                    @if (!canReviewDocuments)
+                                    {
+                                        <span class="text-xs text-slate-400">HR / Admin verifies</span>
+                                    }
+                                    else
+                                    {
                                     <form asp-action="VerifyDocument" method="post" class="flex gap-1 items-center">
                                         <input type="hidden" name="documentId" value="@doc.Id" />
                                         <label class="sr-only" for="docVerifyNotes-@doc.Id">Verification notes</label>
@@ -631,6 +658,7 @@
                                         <button name="status" value="Verified" class="ui-btn-primary !px-2.5 !py-1 text-xs">✓</button>
                                         <button name="status" value="Rejected" class="ui-btn-danger !px-2.5 !py-1 text-xs">✗</button>
                                     </form>
+                                    }
                                 </td>
                             </tr>
                         }

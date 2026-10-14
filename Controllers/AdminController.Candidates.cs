@@ -68,6 +68,7 @@ namespace ExamPortal.Controllers
         // ── Step 4 – Admin reviews the profile ───────────────────────────────
 
         [HttpPost]
+        [Authorize(Roles = PortalRoles.Admin + "," + PortalRoles.Recruiter)] // candidate screening & assessment invitations: Recruiter workflow (HR does not screen/invite)
         public IActionResult ReviewProfile(int userId)
         {
             var user = _db.Users.Find(userId);
@@ -109,6 +110,7 @@ namespace ExamPortal.Controllers
         // is ever omitted. If a recruiter/admin needs to schedule or customize an invite for a
         // single candidate, use AssignAssessment with that one candidate selected instead.
         [HttpPost]
+        [Authorize(Roles = PortalRoles.Admin + "," + PortalRoles.Recruiter)] // candidate screening & assessment invitations: Recruiter workflow (HR does not screen/invite)
         public IActionResult SendInvitation(int userId, int examId)
         {
             var user = _db.Users.Find(userId);
@@ -140,6 +142,7 @@ namespace ExamPortal.Controllers
         // ── Resend assessment invitation (admin can resend at any stage) ─────
 
         [HttpPost]
+        [Authorize(Roles = PortalRoles.Admin + "," + PortalRoles.Recruiter)] // candidate screening & assessment invitations: Recruiter workflow (HR does not screen/invite)
         public IActionResult ResendInvitation(int userId, int examId)
         {
             var user = _db.Users.Find(userId);
@@ -165,6 +168,7 @@ namespace ExamPortal.Controllers
         // (SendShortlistEmail action below) to dispatch the Gmail notification manually.
 
         [HttpPost]
+        [Authorize(Roles = PortalRoles.Admin + "," + PortalRoles.Recruiter)] // candidate screening & assessment invitations: Recruiter workflow (HR does not screen/invite)
         public IActionResult Shortlist(int userId)
         {
             var user = _db.Users.Find(userId);
@@ -181,6 +185,7 @@ namespace ExamPortal.Controllers
         // ── Step 10b – Admin manually sends shortlist notification via Gmail ──
 
         [HttpPost]
+        [Authorize(Roles = PortalRoles.Admin + "," + PortalRoles.Recruiter)] // candidate screening & assessment invitations: Recruiter workflow (HR does not screen/invite)
         public IActionResult SendShortlistEmail(int userId)
         {
             var user = _db.Users.Find(userId);

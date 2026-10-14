@@ -56,14 +56,11 @@
     // attempts) that aren't HR's concern.
     var recentActivityFeed = Model.ActivityFeed;
 
-    // Upcoming Joining Dates (HR-specific list) — filtered/sorted view-locally
-    // from Model.ActiveOffers, which already carries JoiningDate on each
-    // OfferLetter. No Service/Model change needed.
-    var upcomingJoiners = Model.ActiveOffers
-        .Where(o => o.JoiningDate.Date >= SchedulingHelper.BusinessToday)
-        .OrderBy(o => o.JoiningDate)
-        .Take(6)
-        .ToList();
+    // Upcoming Joining Dates (HR-specific list). Supplied by EnterprisePortalService as
+    // ACCEPTED offers only, joining today or later (IST). It used to be filtered here from
+    // Model.ActiveOffers, which also holds Issued (not yet accepted) offers and is capped
+    // to the 8 most recently issued.
+    var upcomingJoiners = Model.UpcomingJoiners;
 }
 
 <div class="enterprise-hero mb-4">
@@ -79,7 +76,7 @@
 
 @* ================================================================
    HR HIRING PIPELINE — the granular RecruitmentStage values rolled up
-   into the 5-stage flow HR actually works: Interview Completed →
+   into the 5-stage flow HR actually works: Interview In Progress →
    Background Verification → Offer Generated → Offer Accepted →
    Onboarding. Counts come from Model.PipelineCounts (grouped from the
    same full candidate list EnterprisePortalService already loads for
@@ -89,7 +86,7 @@
 @{
     Func<string, int> hrPcount = s => Model.PipelineCounts.TryGetValue(s, out var v) ? v : 0;
     var hrBuckets = new (string Label, string Icon, string Fragment, string[] Stages)[] {
-        ("Interview Completed", "message-square", "pipeline-interview", new[] { RecruitmentStages.InterviewInProgress }),
+        ("Interview In Progress", "message-square", "pipeline-interview", new[] { RecruitmentStages.InterviewInProgress }),
         ("Background Verification", "folder-open", "pipeline-offer", new[] { RecruitmentStages.DocumentsRequested, RecruitmentStages.DocumentsVerified }),
         ("Offer Generated", "file-check", "pipeline-offer", new[] { RecruitmentStages.OfferIssued }),
         ("Offer Accepted", "handshake", "pipeline-offer", new[] { RecruitmentStages.OfferAccepted }),

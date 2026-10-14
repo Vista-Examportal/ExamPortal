@@ -54,6 +54,10 @@ namespace ExamPortal.Controllers
                                   .OrderByDescending(n => n.CreatedAt).Take(20).ToList(),
                 Offer       = _db.OfferLetters.AsNoTracking().FirstOrDefault(o => o.UserId == UserId)
             };
+            // Attempts/Notifications above are capped for display (5 / 20) — the stat cards and
+            // the unread badge use full counts.
+            vm.AttemptCount = _db.ExamAttempts.Count(a => a.UserId == UserId);
+            vm.UnreadNotificationCount = _db.Notifications.Count(n => n.UserId == UserId && !n.IsRead);
             vm.ActivityFeed = _activityFeed.BuildCandidateFeed(vm.Invitations, vm.Attempts, vm.Interviews, vm.Offer);
             return View(vm);
         }

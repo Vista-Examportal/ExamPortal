@@ -27,6 +27,9 @@
     var pendingOffersCount = (int)(ViewBag.PendingOffersCount ?? 0);
     var monthlyHiredCount = (int)(ViewBag.MonthlyHiredCount ?? 0);
     var totalAuditLogsCount = (int)(ViewBag.TotalAuditLogsCount ?? 0);
+    var reportsCount = (int)(ViewBag.ReportsCount ?? 0);
+    var notificationsCount = (int)(ViewBag.NotificationsCount ?? 0);
+    var proctoringLogsCount = (int)(ViewBag.ProctoringLogsCount ?? 0);
     var activeJobsCount = Model.Exams.Where(e => e.IsActive && !e.IsTemplate)
         .Select(e => string.IsNullOrWhiteSpace(e.Subject) ? "Unspecified" : e.Subject)
         .Distinct().Count();
@@ -184,7 +187,7 @@
                         ("HR Users", hrStaff.Count.ToString("N0"), "users-round", "hrstaff"),
                         ("Monthly Hiring", monthlyHiredCount.ToString("N0"), "trending-up", "analytics"),
                         ("Pending Offers", pendingOffersCount.ToString("N0"), "file-check", "offers"),
-                        ("Reports", reports.Count().ToString("N0"), "bar-chart-3", "analytics"),
+                        ("Reports", reportsCount.ToString("N0"), "bar-chart-3", "analytics"),
                         ("Audit Logs", totalAuditLogsCount.ToString("N0"), "shield", "auditlogs"),
                     };
                 }
@@ -523,10 +526,10 @@
                     </tbody>
                 </table>
             </div>
-            @if (candidates.Count() > 5)
+            @if (Model.TotalUsers > 5)
             {
                 <div class="ui-card-body !pt-0">
-                    <a asp-action="Students" class="text-sm font-medium text-[var(--vw-accent-text)] hover:underline">View all @candidates.Count() candidates →</a>
+                    <a asp-action="Students" class="text-sm font-medium text-[var(--vw-accent-text)] hover:underline">View all @Model.TotalUsers.ToString("N0") candidates →</a>
                 </div>
             }
         </div>
@@ -892,11 +895,11 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/40">
                         <div class="text-xs text-slate-500 dark:text-slate-400">Notification History</div>
-                        <div class="text-xl font-bold text-slate-800 dark:text-slate-100">@notifications.Count()</div>
+                        <div class="text-xl font-bold text-slate-800 dark:text-slate-100">@notificationsCount.ToString("N0")</div>
                     </div>
                     <div class="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/40">
-                        <div class="text-xs text-slate-500 dark:text-slate-400">Recent Suspicious Logs</div>
-                        <div class="text-xl font-bold text-slate-800 dark:text-slate-100">@proctoringLogs.Count()</div>
+                        <div class="text-xs text-slate-500 dark:text-slate-400">Proctoring Logs</div>
+                        <div class="text-xl font-bold text-slate-800 dark:text-slate-100">@proctoringLogsCount.ToString("N0")</div>
                     </div>
                 </div>
 

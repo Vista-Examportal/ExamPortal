@@ -168,6 +168,16 @@ namespace ExamPortal.Services
         /// recruiters and candidates) — not the server's date, which is UTC on most hosts.</summary>
         public static DateTime BusinessToday => ToBusinessTime(DateTime.UtcNow).Date;
 
+        /// <summary>
+        /// Earliest scheduled time that still counts as an "upcoming" interview: the start of
+        /// today in the business time zone. Interviews earlier today stay listed (they are
+        /// today's schedule); anything before today that is still "Scheduled" is overdue — it
+        /// needs an outcome recorded, it is not upcoming. Used by both the HR and Recruiter
+        /// dashboards so the two agree (they previously used a rolling 24 hours and no bound
+        /// at all, respectively).
+        /// </summary>
+        public static DateTime UpcomingInterviewCutoffUtc => BusinessDayStartUtc(BusinessToday);
+
         /// <summary>The UTC instant at which the given business-time-zone calendar date begins,
         /// for translatable "that whole day" range queries.</summary>
         public static DateTime BusinessDayStartUtc(DateTime businessDate) =>

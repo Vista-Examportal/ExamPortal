@@ -29,20 +29,25 @@
     string stage = ViewBag.Stage ?? "";
     string skill = ViewBag.Skill ?? "";
     string location = ViewBag.Location ?? "";
-    // Registered-date range: RecruiterController.Index has no dateFrom/dateTo
-    // parameters yet, so nothing here changes candidate filtering. These are
-    // read straight off the query string (not ViewBag, since the controller
-    // never sets it) purely so the fields redisplay whatever was submitted,
-    // and so the chips/reset link below can include them. Wiring the actual
-    // registered-date filter is a separate, backend change.
+    // Registered-date range: RecruiterController.Index filters candidates on
+    // dateFrom/dateTo (their registration date, inclusive, IST days). They are read
+    // straight off the query string so the fields redisplay what was submitted and
+    // the chips/reset link below can include them.
     string dateFrom = Context.Request.Query["dateFrom"].ToString();
     string dateTo = Context.Request.Query["dateTo"].ToString();
     var stages = RecruitmentStages.Ordered.Concat(new[] { RecruitmentStages.Rejected, RecruitmentStages.OfferDeclined }).Distinct().ToList();
     var shortlisted = candidates.Count(c => c.RecruitmentStage == RecruitmentStages.Shortlisted || c.RecruitmentStage == RecruitmentStages.InterviewInProgress);
     var activeAssessments = assessments.Count;
-    var pendingLinks = invitations.Count(i => effectiveInvStatus(i) == "Pending" || effectiveInvStatus(i) == "Accepted");
-    var issuedOffers = offers.Count(o => o.Status == "Issued");
-    var acceptedOffers = offers.Count(o => o.Status == "Accepted");
+    // Headline figures come from full database counts in RecruiterController.Index — the
+    // invitation/offer lists in this view are capped to the 12 most recent for display and
+    // must not be counted.
+    var pendingInvites = (int)(ViewBag.PendingLinkCount ?? 0);
+    var acceptedInvites = (int)(ViewBag.AcceptedLinkCount ?? 0);
+    var usedInvites = (int)(ViewBag.UsedLinkCount ?? 0);
+    var otherInvites = (int)(ViewBag.OtherLinkCount ?? 0);
+    var pendingLinks = pendingInvites + acceptedInvites;
+    var issuedOffers = (int)(ViewBag.IssuedOffersCount ?? 0);
+    var acceptedOffers = (int)(ViewBag.AcceptedOffersCount ?? 0);
 
     // ── Dashboard-tab-only aggregates (view-local only; every figure below
     // reuses a ViewBag list this view already receives — no controller,
@@ -52,10 +57,6 @@
         .OrderBy(e => e.StartDateTime)
         .Take(5)
         .ToList();
-    var pendingInvites = invitations.Count(i => effectiveInvStatus(i) == "Pending");
-    var acceptedInvites = invitations.Count(i => effectiveInvStatus(i) == "Accepted");
-    var usedInvites = invitations.Count(i => effectiveInvStatus(i) == "Used");
-    var otherInvites = invitations.Count - pendingInvites - acceptedInvites - usedInvites;
 
     // Dashboard summary cards below need to answer "which candidates need review"
     // and "which interviews are today" without repeating the top KPI strip's
@@ -63,10 +64,7 @@
     // Issued). Both are filtered view-local from ViewBag.Candidates and
     // ViewBag.UpcomingInterviews, which this view already receives.
     var needsReviewCount = assignmentCandidates.Count(c => c.RecruitmentStage == RecruitmentStages.ProfileUnderReview);
-    var todaysInterviews = interviews
-        .Where(iv => iv.ScheduledAt.HasValue && SchedulingHelper.ToBusinessTime(iv.ScheduledAt.Value).Date == SchedulingHelper.BusinessToday)
-        .OrderBy(iv => iv.ScheduledAt)
-        .ToList();
+    var todaysInterviews = ViewBag.TodaysInterviews as List<InterviewRecord> ?? new();
     var nextInterviewToday = todaysInterviews.FirstOrDefault();
 
     // Recruiter-scoped Recent Activity (new applicants, invitations sent, assessments
@@ -158,7 +156,7 @@
     <button type="button" class="ui-tab" data-tabs-trigger="candidates" role="tab">Candidates</button>
     <button type="button" class="ui-tab" data-tabs-trigger="assessments" role="tab">Assessments</button>
     <button type="button" class="ui-tab" data-tabs-trigger="interviews" role="tab">Interviews</button>
-    <button type="button" class="ui-tab" data-tabs-trigger="offers" role="tab">Offers</button>
+    <button type="button" class="ui-tab" data-tabs-trigger="offers" role="tab">Offer Status</button>
     <button type="button" class="ui-tab" data-tabs-trigger="reports" role="tab">Reports</button>
     <button type="button" class="ui-tab" data-tabs-trigger="communications" role="tab">Email & Notifications</button>
 </div>
@@ -744,9 +742,9 @@
 
     <section data-tabs-panel="offers" data-tabs-group="recruiter-dash" class="hidden">
         <div class="ui-card">
-            <div class="ui-card-header"><h2 class="ui-heading-sm">Offer Release</h2></div>
+            <div class="ui-card-header"><h2 class="ui-heading-sm">Offer Status</h2></div>
             <div class="ui-card-body">
-                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Issue offers from candidate detail after documents are verified. Active offers are listed below.</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-3">Offers are prepared, approved and released by HR or Admin; this list is view-only so you can track where each candidate stands. Open a candidate for details.</p>
                 @{ ViewData["TableId"] = "recruiterOffersTable"; ViewData["ShowPageSize"] = true; ViewData["SearchPlaceholder"] = "Search offers..."; }
                 @await Html.PartialAsync("_TableToolbar")
                 <div class="overflow-x-auto">
@@ -755,7 +753,7 @@
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
                         @if (!offers.Any())
                         {
-                            <tr data-sort-exclude><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "file-check", Title = "No active offers", Message = "Offers you issue will show up here for tracking.", Compact = true })</td></tr>
+                            <tr data-sort-exclude><td colspan="5" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "file-check", Title = "No active offers", Message = "Offers released by HR will show up here for tracking.", Compact = true })</td></tr>
                         }
                         @foreach (var offer in offers)
                         {

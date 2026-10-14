@@ -219,6 +219,20 @@ namespace ExamPortal.Services
                     Severity = "warning", ActionController = "Recruiter", ActionAction = "Index"
                 });
 
+            // Past-dated interviews still marked Scheduled are not "upcoming" any more (they are
+            // excluded from the dashboards' upcoming lists), so surface them here instead.
+            var overdueCutoff = SchedulingHelper.UpcomingInterviewCutoffUtc;
+            var awaitingOutcome = _db.InterviewRecords.AsNoTracking()
+                .Count(iv => iv.Status == "Scheduled" && iv.ScheduledAt != null && iv.ScheduledAt < overdueCutoff);
+            if (awaitingOutcome > 0)
+                alerts.Add(new PortalAlert
+                {
+                    When = DateTime.UtcNow, Icon = "calendar-x",
+                    Title = "Interviews awaiting an outcome",
+                    Detail = $"{awaitingOutcome} interview(s) are past their scheduled day but still marked Scheduled",
+                    Severity = "warning", ActionController = "Recruiter", ActionAction = "Index"
+                });
+
             var closingSoon = _db.Exams.AsNoTracking()
                 .Count(e => e.IsActive && !e.IsTemplate && e.EndDateTime != null
                     && e.EndDateTime > DateTime.UtcNow && e.EndDateTime < DateTime.UtcNow.AddDays(3));
@@ -279,13 +293,38 @@ namespace ExamPortal.Services
         {
             var alerts = new List<PortalAlert>();
 
-            var pendingApprovals = _db.OfferLetters.AsNoTracking().Count(o => o.Status == "Issued");
-            if (pendingApprovals > 0)
+            // Two different things used to be reported as "Pending offer approvals": Issued
+            // offers are already approved and are waiting on the CANDIDATE; the offers that are
+            // actually waiting on HR approval have Status "PendingHRApproval".
+            var awaitingHrApproval = _db.OfferLetters.AsNoTracking().Count(o => o.Status == "PendingHRApproval");
+            if (awaitingHrApproval > 0)
                 alerts.Add(new PortalAlert
                 {
                     When = DateTime.UtcNow, Icon = "file-check",
-                    Title = "Pending offer approvals",
-                    Detail = $"{pendingApprovals} offer(s) issued, awaiting candidate response",
+                    Title = "Offers awaiting HR approval",
+                    Detail = $"{awaitingHrApproval} offer(s) prepared and waiting for HR approval",
+                    Severity = "warning", ActionController = "Admin", ActionAction = "Pipeline", ActionFragment = "pipeline-offer"
+                });
+
+            var overdueCutoff = SchedulingHelper.UpcomingInterviewCutoffUtc;
+            var awaitingOutcome = _db.InterviewRecords.AsNoTracking()
+                .Count(iv => iv.Status == "Scheduled" && iv.ScheduledAt != null && iv.ScheduledAt < overdueCutoff);
+            if (awaitingOutcome > 0)
+                alerts.Add(new PortalAlert
+                {
+                    When = DateTime.UtcNow, Icon = "calendar-x",
+                    Title = "Interviews awaiting an outcome",
+                    Detail = $"{awaitingOutcome} interview(s) are past their scheduled day but still marked Scheduled",
+                    Severity = "warning", ActionController = "Admin", ActionAction = "Pipeline", ActionFragment = "pipeline-interview"
+                });
+
+            var awaitingCandidate = _db.OfferLetters.AsNoTracking().Count(o => o.Status == "Issued");
+            if (awaitingCandidate > 0)
+                alerts.Add(new PortalAlert
+                {
+                    When = DateTime.UtcNow, Icon = "file-check",
+                    Title = "Offers awaiting candidate response",
+                    Detail = $"{awaitingCandidate} offer(s) issued, awaiting candidate response",
                     Severity = "info", ActionController = "Admin", ActionAction = "Pipeline", ActionFragment = "pipeline-offer"
                 });
 

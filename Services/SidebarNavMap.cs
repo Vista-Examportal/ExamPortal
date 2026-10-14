@@ -20,13 +20,13 @@ namespace ExamPortal.Services
     ///    links into the shared Admin Pipeline board, and the candidate
     ///    dashboard's status sections).
     ///
-    /// Deliberately NOT in any of these lists: the granular Admin-only
-    /// working tabs (Candidates/Assessments/Create Assessment/Interviews/
-    /// Offers/Pipeline) that still exist and are still fully reachable from
-    /// inside Admin/Index's own tab bar — promoting every one of them to
-    /// the sidebar as well would just be the "duplicate navigation" the
-    /// redesign brief asks to remove. Nothing was deleted; they're one
-    /// click away instead of two.
+    /// Admin's working areas (Candidates, Pipeline, Assessments, Interviews,
+    /// Offers) and the Recruiter's Offer Status and Communications tabs are
+    /// in the sidebar as well as their in-page tab bars: a destination that
+    /// is only reachable from a tab bar is easy to miss, and each role's
+    /// workflow needs them (Admin runs the whole pipeline; a Recruiter must
+    /// be able to follow an offer and see outgoing communications).
+    /// Create Assessment stays a button on the Assessments tab.
     /// </summary>
     public static class SidebarNavMap
     {
@@ -59,6 +59,11 @@ namespace ExamPortal.Services
                         Items = new()
                         {
                             new SidebarNavItem { Label = "Jobs", Icon = "briefcase", Controller = "Admin", Action = "Index", Tab = "jobs" },
+                            new SidebarNavItem { Label = "Candidates", Icon = "users", Controller = "Admin", Action = "Index", Tab = "candidates" },
+                            new SidebarNavItem { Label = "Pipeline", Icon = "workflow", Controller = "Admin", Action = "Pipeline" },
+                            new SidebarNavItem { Label = "Assessments", Icon = "clipboard-list", Controller = "Admin", Action = "Index", Tab = "assessments" },
+                            new SidebarNavItem { Label = "Interviews", Icon = "message-square", Controller = "Admin", Action = "Index", Tab = "interviews" },
+                            new SidebarNavItem { Label = "Offers", Icon = "file-check", Controller = "Admin", Action = "Index", Tab = "offers" },
                         }
                     },
                     new SidebarNavSection
@@ -94,6 +99,8 @@ namespace ExamPortal.Services
                             new SidebarNavItem { Label = "Candidates", Icon = "users", Controller = "Recruiter", Action = "Index", Tab = "candidates" },
                             new SidebarNavItem { Label = "Assessments", Icon = "clipboard-list", Controller = "Recruiter", Action = "Index", Tab = "assessments" },
                             new SidebarNavItem { Label = "Interviews", Icon = "message-square", Controller = "Recruiter", Action = "Index", Tab = "interviews" },
+                            // View-only offer tracking (offers are released by HR/Admin).
+                            new SidebarNavItem { Label = "Offer Status", Icon = "file-check", Controller = "Recruiter", Action = "Index", Tab = "offers" },
                         }
                     },
                     new SidebarNavSection
@@ -101,13 +108,10 @@ namespace ExamPortal.Services
                         Items = new()
                         {
                             new SidebarNavItem { Label = "Reports", Icon = "bar-chart-3", Controller = "Recruiter", Action = "Index", Tab = "reports" },
+                            new SidebarNavItem { Label = "Communications", Icon = "mail", Controller = "Recruiter", Action = "Index", Tab = "communications" },
                             new SidebarNavItem { Label = "Profile", Icon = "circle-user-round", Controller = "Account", Action = "Profile" },
                         }
                     },
-                    // "Offers" and "Email & Notifications" stay reachable from the
-                    // in-page tab bar itself (nothing removed) — Offers isn't in the
-                    // target sidebar list for this role, and Notifications is an
-                    // operational utility panel rather than a primary destination.
                 };
             }
 
@@ -165,6 +169,8 @@ namespace ExamPortal.Services
                         new SidebarNavItem { Label = "Assessments", Icon = "bar-chart-3", Controller = "Home", Action = "Results" },
                         new SidebarNavItem { Label = "Interviews", Icon = "message-square", Controller = "Home", Action = "Index", Fragment = "interview-status" },
                         new SidebarNavItem { Label = "Offers", Icon = "file-check", Controller = "Home", Action = "Index", Fragment = "offer-status" },
+                        new SidebarNavItem { Label = "Documents", Icon = "folder-open", Controller = "Home", Action = "Index", Fragment = "documents-status" },
+                        new SidebarNavItem { Label = "Notifications", Icon = "bell", Controller = "Home", Action = "Index", Fragment = "notifications" },
                     }
                 },
                 new SidebarNavSection

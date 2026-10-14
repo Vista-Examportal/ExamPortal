@@ -191,6 +191,15 @@ namespace ExamPortal.Models
         /// — used to reject an upload for any type outside this known set. Includes
         /// ExperienceLetter (optional-if-applicable, see Required above) and Other.</summary>
         public static readonly string[] AllOffered = { Aadhar, Pan, MarkSheet10, MarkSheet12, Degree, ExperienceLetter, Other };
+
+        /// <summary>Recruiters screen candidates on their resume, photo and certifications only
+        /// (the document types the Recruiter dashboard lists). Identity and education proofs
+        /// (Aadhar, PAN, marksheets, degree, experience letter, other) are for HR/Admin
+        /// document verification — see SecureFilesController and AdminController.VerifyDocument.</summary>
+        public static readonly string[] RecruiterVisible = { "Resume", "Photo", "Certification" };
+
+        public static bool IsRecruiterVisible(string? documentType) =>
+            documentType != null && RecruiterVisible.Contains(documentType);
     }
 
     /// <summary>
@@ -853,6 +862,11 @@ namespace ExamPortal.Models
         public List<CandidateDocument> Documents { get; set; } = new();
         public List<NotificationMessage> Notifications { get; set; } = new();
         public OfferLetter? Offer { get; set; }
+
+        /// <summary><see cref="Attempts"/> only holds the 5 most recent attempts for display;
+        /// these are the full counts the stat cards and chart should show.</summary>
+        public int AttemptCount { get; set; }
+        public int UnreadNotificationCount { get; set; }
 
         /// <summary>The candidate's own "Recent Activity" timeline (their actions only —
         /// see ActivityFeedService.BuildCandidateFeed). Distinct from Notifications, which

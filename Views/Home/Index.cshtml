@@ -45,7 +45,7 @@
     // as step zero.
     var isTerminalOutcome = currentStep < 0;
     var completion = Model.Candidate.ProfileCompletion?.CompletionPercentage ?? 0;
-    var unreadNotifications = Model.Notifications.Count(n => !n.IsRead);
+    var unreadNotifications = Model.UnreadNotificationCount;
     var currentStepDisplay = isTerminalOutcome ? steps.Length : currentStep + 1;
     var journeyPct = isTerminalOutcome ? 100
         : steps.Length > 1 ? (int)(Math.Max(currentStep, 0) * 100.0 / (steps.Length - 1)) : 0;
@@ -111,7 +111,7 @@
     <!-- Notifications -->
     @if (Model.Notifications.Any())
     {
-        <div class="ui-card">
+        <div id="notifications" class="ui-card scroll-mt-20">
             <div class="ui-card-header">
                 <h2 class="ui-heading-sm">
                     <i data-lucide="bell" class="h-4 w-4 text-[var(--vw-accent)]"></i>Notifications
@@ -269,7 +269,7 @@
             <div class="ui-card p-4">
                 <div class="flex items-center gap-3">
                     <div class="metric-icon text-emerald-600"><i data-lucide="check-check" class="h-5 w-5"></i></div>
-                    <div><div class="text-xs text-slate-500 dark:text-slate-400">Assessments</div><div class="ui-stat-figure"><span data-count-to="@Model.Attempts.Count">0</span></div></div>
+                    <div><div class="text-xs text-slate-500 dark:text-slate-400">Assessments</div><div class="ui-stat-figure"><span data-count-to="@Model.AttemptCount">0</span></div></div>
                 </div>
             </div>
             <div class="ui-card p-4">
@@ -322,7 +322,7 @@
     <!-- Document upload -->
     @if (Model.Candidate.RecruitmentStage == "DocumentsRequested")
     {
-        <div>
+        <div id="documents-status" class="scroll-mt-20">
             <h2 class="ui-heading-sm mb-3">
                 <i data-lucide="file-up" class="h-4 w-4 text-[var(--vw-accent)]"></i>Upload Required Documents
             </h2>
@@ -381,7 +381,7 @@
     }
     else if (Model.Candidate.RecruitmentStage == "DocumentsVerified")
     {
-        <div class="ui-card p-5 flex items-center gap-3">
+        <div id="documents-status" class="ui-card p-5 flex items-center gap-3 scroll-mt-20">
             <i data-lucide="shield-check" class="h-5 w-5 text-emerald-500 shrink-0"></i>
             <span class="text-sm font-medium text-slate-700 dark:text-slate-200">All required documents have been verified.</span>
         </div>
@@ -517,7 +517,7 @@
                 data: {
                     labels: ['Invitations', 'Assessments', 'Interviews', 'Documents'],
                     datasets: [{
-                        data: [@Model.Invitations.Count, @Model.Attempts.Count, @Model.Interviews.Count, @Model.Documents.Count],
+                        data: [@Model.Invitations.Count, @Model.AttemptCount, @Model.Interviews.Count, @Model.Documents.Count],
                         backgroundColor: palette,
                         borderWidth: 0
                     }]

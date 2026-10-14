@@ -1,5 +1,9 @@
-@model PortalDashboardViewModel
-@{ ViewData["Title"] = "HR Reports"; }
+@using ExamPortal.Services
+@model HrReportViewModel
+@{
+    ViewData["Title"] = "HR Reports";
+    Func<int?, string> pct = p => p.HasValue ? $"{p.Value}%" : "—";
+}
 
 <div class="mx-auto max-w-6xl space-y-6">
 
@@ -8,42 +12,97 @@
             <div class="vw-page-header-icon"><i data-lucide="bar-chart-3"></i></div>
             <div>
                 <h1 class="vw-page-title no-icon">HR Reports</h1>
-                <p class="vw-page-subtitle">Hiring metrics and pending HR actions.</p>
+                <p class="vw-page-subtitle">Hiring funnel, interview outcomes, document verification and offer results across all candidates.</p>
             </div>
         </div>
     </div>
 
     <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        @foreach (var m in Model.Metrics)
-        {
-            <div class="ui-card p-4">
-                <div class="text-xs text-slate-500 dark:text-slate-400">@m.Label</div>
-                <div class="ui-stat-figure">@m.Value</div>
-            </div>
-        }
+        <div class="ui-card p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Interview pass rate</div>
+            <div class="ui-stat-figure">@pct(Model.InterviewPassRatePercent)</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">of decided interviews</div>
+        </div>
+        <div class="ui-card p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Offer acceptance rate</div>
+            <div class="ui-stat-figure">@pct(Model.OfferAcceptanceRatePercent)</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">accepted vs declined / expired</div>
+        </div>
+        <div class="ui-card p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Offers awaiting HR approval</div>
+            <div class="ui-stat-figure">@Model.OffersAwaitingApproval.ToString("N0")</div>
+        </div>
+        <div class="ui-card p-4">
+            <div class="text-xs text-slate-500 dark:text-slate-400">Joining in next 30 days</div>
+            <div class="ui-stat-figure">@Model.JoiningNext30Days.ToString("N0")</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">accepted offers only</div>
+        </div>
     </div>
 
-    <div class="ui-card">
-        <div class="ui-card-header"><h2 class="ui-heading-sm"><i data-lucide="users" class="h-4 w-4 text-[var(--vw-accent)]"></i>Priority Candidates</h2></div>
-        <div class="overflow-x-auto">
-            <table class="ui-table">
-                <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
-                    <tr><th class="px-5 py-3 font-medium">Candidate</th><th class="px-5 py-3 font-medium">Stage</th></tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-                    @if (!Model.PriorityCandidates.Any())
-                    {
-                        <tr><td colspan="2" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "users", Title = "Nothing pending", Message = "No candidates currently need HR action.", Compact = true })</td></tr>
-                    }
-                    @foreach (var c in Model.PriorityCandidates)
-                    {
-                        <tr>
-                            <td class="px-5 py-3 font-semibold text-slate-800 dark:text-slate-100">@c.FullName</td>
-                            <td class="px-5 py-3"><span class="ui-badge-neutral">@c.RecruitmentStage</span></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
+    @{
+        var reportCards = new (string Title, string Icon, string Subtitle, List<HrReportRow> Rows)[]
+        {
+            ("Hiring funnel", "git-branch", $"{Model.TotalCandidates:N0} candidates by current stage", Model.Funnel),
+            ("Interviews by status", "message-square", "All interview rounds scheduled to date", Model.InterviewStatuses),
+            ("Completed interview outcomes", "check-circle-2", "Outcome recorded when the round was closed", Model.InterviewOutcomes),
+            ("Document verification", "folder-open", "Uploaded candidate documents", Model.DocumentStatuses),
+            ("Offers by status", "file-check", "All offers issued to date", Model.OfferStatuses),
+        };
+    }
+    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        @foreach (var card in reportCards)
+        {
+            <div class="ui-card">
+                <div class="ui-card-header">
+                    <h2 class="ui-heading-sm"><i data-lucide="@card.Icon" class="h-4 w-4 text-[var(--vw-accent)]"></i>@card.Title</h2>
+                </div>
+                <div class="px-5 pb-1 text-xs text-slate-500 dark:text-slate-400">@card.Subtitle</div>
+                <div class="overflow-x-auto">
+                    <table class="ui-table">
+                        <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                            <tr><th class="px-5 py-3 font-medium">Item</th><th class="px-5 py-3 font-medium text-right">Count</th><th class="px-5 py-3 font-medium text-right">Share</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                            @foreach (var row in card.Rows)
+                            {
+                                <tr>
+                                    <td class="px-5 py-2.5 text-slate-800 dark:text-slate-100">@row.Label</td>
+                                    <td class="px-5 py-2.5 text-right font-semibold">@row.Count.ToString("N0")</td>
+                                    <td class="px-5 py-2.5 text-right text-slate-500 dark:text-slate-400">@pct(row.Percent)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+
+        <div class="ui-card">
+            <div class="ui-card-header">
+                <h2 class="ui-heading-sm"><i data-lucide="door-open" class="h-4 w-4 text-[var(--vw-accent)]"></i>Upcoming joiners</h2>
+            </div>
+            <div class="px-5 pb-1 text-xs text-slate-500 dark:text-slate-400">Accepted offers, soonest joining date first</div>
+            <div class="overflow-x-auto">
+                <table class="ui-table">
+                    <thead class="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 dark:border-slate-700">
+                        <tr><th class="px-5 py-3 font-medium">Candidate</th><th class="px-5 py-3 font-medium">Role</th><th class="px-5 py-3 font-medium text-right">Joining</th></tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
+                        @if (!Model.UpcomingJoiners.Any())
+                        {
+                            <tr><td colspan="3" class="p-0">@await Html.PartialAsync("_EmptyState", new EmptyStateViewModel { Icon = "door-open", Title = "No upcoming joiners", Message = "Accepted offers with a future joining date appear here.", Compact = true })</td></tr>
+                        }
+                        @foreach (var offer in Model.UpcomingJoiners)
+                        {
+                            <tr>
+                                <td class="px-5 py-2.5 font-semibold text-slate-800 dark:text-slate-100">@offer.User?.FullName</td>
+                                <td class="px-5 py-2.5 text-slate-500 dark:text-slate-400">@offer.Designation</td>
+                                <td class="px-5 py-2.5 text-right">@offer.JoiningDate.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>

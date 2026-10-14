@@ -15,6 +15,7 @@ namespace ExamPortal.Controllers
         // ── Step 12 – Request document upload ────────────────────────────────
 
         [HttpPost]
+        [Authorize(Roles = PortalRoles.Admin + "," + PortalRoles.Hr)] // document review is an HR/Admin step (recruiters screen on resume/photo only)
         public IActionResult RequestDocuments(int userId)
         {
             var user = _db.Users.Find(userId);
@@ -45,6 +46,7 @@ namespace ExamPortal.Controllers
         // ── Step 13 – Admin verifies documents ───────────────────────────────
 
         [HttpPost]
+        [Authorize(Roles = PortalRoles.Admin + "," + PortalRoles.Hr)] // document review is an HR/Admin step (recruiters screen on resume/photo only)
         public IActionResult VerifyDocument(int documentId, string status, string notes)
         {
             var doc = _db.CandidateDocuments.Find(documentId);

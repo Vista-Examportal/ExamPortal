@@ -194,6 +194,13 @@ namespace ExamPortal.Models
         public List<ExamAttempt> RecentAttempts { get; set; } = new();
         public List<InterviewRecord> UpcomingInterviews { get; set; } = new();
         public List<OfferLetter> ActiveOffers { get; set; } = new();
+
+        /// <summary>HR's "Upcoming Joining Dates" list: only offers the candidate has ACCEPTED
+        /// (an Issued offer may still be declined or expire), joining today or later in the
+        /// business time zone, soonest first. Queried directly rather than filtered from the
+        /// capped <see cref="ActiveOffers"/> display list, which mixes in Issued offers and only
+        /// holds the 8 most recently issued.</summary>
+        public List<OfferLetter> UpcomingJoiners { get; set; } = new();
         public List<NotificationMessage> Notifications { get; set; } = new();
         public Dictionary<string, int> PipelineCounts { get; set; } = new();
 
@@ -206,6 +213,39 @@ namespace ExamPortal.Models
         /// pending-work signals (e.g. "3 documents pending verification"), not the raw
         /// outbound-email log. Built by ActivityFeedService.</summary>
         public List<PortalAlert> Alerts { get; set; } = new();
+    }
+
+    /// <summary>One labelled figure in an HR report table.</summary>
+    public class HrReportRow
+    {
+        public string Label { get; set; } = "";
+        public int Count { get; set; }
+        /// <summary>Share of the report's base population, 0–100 (null when not meaningful).</summary>
+        public int? Percent { get; set; }
+    }
+
+    /// <summary>
+    /// Data behind HR → Reports. Unlike the dashboard (today's headline counts and a short
+    /// priority queue), this is aggregate reporting over the whole hiring pipeline: stage
+    /// funnel, interview outcomes, document verification, offer outcomes and joining
+    /// outlook. Every figure is a full database count, never derived from a capped list.
+    /// </summary>
+    public class HrReportViewModel
+    {
+        public int TotalCandidates { get; set; }
+        public List<HrReportRow> Funnel { get; set; } = new();
+        public List<HrReportRow> InterviewStatuses { get; set; } = new();
+        public List<HrReportRow> InterviewOutcomes { get; set; } = new();
+        /// <summary>Passed / (Passed + Failed) across completed interviews; null until one is decided.</summary>
+        public int? InterviewPassRatePercent { get; set; }
+        public List<HrReportRow> DocumentStatuses { get; set; } = new();
+        public List<HrReportRow> OfferStatuses { get; set; } = new();
+        /// <summary>Accepted / (Accepted + Declined + Expired) — offers the candidate has
+        /// resolved one way or the other; null until there is at least one.</summary>
+        public int? OfferAcceptanceRatePercent { get; set; }
+        public int OffersAwaitingApproval { get; set; }
+        public int JoiningNext30Days { get; set; }
+        public List<OfferLetter> UpcomingJoiners { get; set; } = new();
     }
 
     /// <summary>

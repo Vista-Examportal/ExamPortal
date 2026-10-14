@@ -20,14 +20,13 @@ namespace ExamPortal.Controllers
             return View(_portal.BuildDashboard(PortalRoles.Hr));
         }
 
-        // Reuses the same cached dashboard snapshot as Index() — this is the
-        // "hiring metrics" (Interviews / Docs Requested / Offers Issued /
-        // Onboarding) and priority-candidate queue already computed there,
-        // just given its own dedicated view instead of only appearing as a
-        // strip of cards above the module links.
+        // Aggregate reporting over the whole hiring pipeline (stage funnel, interview
+        // outcomes, document verification, offer outcomes, joining outlook). This used to
+        // re-render the dashboard's own metric cards and priority queue, which made it a
+        // duplicate of Index(); see EnterprisePortalService.BuildHrReport.
         public IActionResult Reports()
         {
-            return View(_portal.BuildDashboard(PortalRoles.Hr));
+            return View(_portal.BuildHrReport());
         }
     }
 }

@@ -21,7 +21,8 @@ namespace ExamPortal.Controllers
             _activityFeed = activityFeed;
         }
 
-        public IActionResult Index(string q = "", string stage = "", string skill = "", string location = "", int page = 1)
+        public IActionResult Index(string q = "", string stage = "", string skill = "", string location = "", int page = 1,
+            string dateFrom = "", string dateTo = "")
         {
             ViewBag.Assessments = _db.Exams
                 .AsNoTracking()
@@ -81,6 +82,25 @@ namespace ExamPortal.Controllers
                     u.CurrentLocation.ToLower().Contains(locationTerm));
             }
 
+            // Registered-date range (the "Registered" From/To inputs). Both are calendar dates
+            // picked by the recruiter, so they are read as business-time-zone (IST) days:
+            // From is inclusive of that whole day, To is inclusive of that whole day. Unparseable
+            // values are ignored (no filter) rather than failing the page.
+            var hasFrom = TryParseFilterDate(dateFrom, out var fromDate);
+            var hasTo = TryParseFilterDate(dateTo, out var toDate);
+            if (hasFrom && hasTo && fromDate > toDate)
+                (fromDate, toDate) = (toDate, fromDate);
+            if (hasFrom)
+            {
+                var fromUtc = SchedulingHelper.BusinessDayStartUtc(fromDate);
+                candidateQuery = candidateQuery.Where(u => u.CreatedAt >= fromUtc);
+            }
+            if (hasTo)
+            {
+                var toExclusiveUtc = SchedulingHelper.BusinessDayStartUtc(toDate.AddDays(1));
+                candidateQuery = candidateQuery.Where(u => u.CreatedAt < toExclusiveUtc);
+            }
+
             ViewBag.Candidates = _db.Users
                 .AsNoTracking()
                 .Include(u => u.ProfileCompletion)
@@ -126,10 +146,14 @@ namespace ExamPortal.Controllers
                 .OrderByDescending(l => l.OccurredAt)
                 .Take(20)
                 .ToList();
+            // Upcoming = still Scheduled and not before today (IST). A Scheduled interview from an
+            // earlier day is overdue (needs an outcome — see the "interviews awaiting an outcome"
+            // alert), and used to fill this list's 12 slots oldest-first, hiding real upcoming ones.
+            var upcomingCutoffUtc = SchedulingHelper.UpcomingInterviewCutoffUtc;
             ViewBag.UpcomingInterviews = _db.InterviewRecords
                 .AsNoTracking()
                 .Include(i => i.User)
-                .Where(i => i.Status == "Scheduled")
+                .Where(i => i.Status == "Scheduled" && i.ScheduledAt >= upcomingCutoffUtc)
                 .OrderBy(i => i.ScheduledAt)
                 .Take(12)
                 .ToList();
@@ -145,6 +169,30 @@ namespace ExamPortal.Controllers
                 .Where(o => o.Status == "Issued" || o.Status == "Accepted")
                 .OrderByDescending(o => o.IssuedAt)
                 .Take(12)
+                .ToList();
+            // Dashboard figures below are full database counts. The lists above are capped for
+            // display (Take) and must not be counted for headline numbers — e.g. 12 offers
+            // shown is not "12 offers issued".
+            var nowUtc = DateTime.UtcNow;
+            ViewBag.IssuedOffersCount = _db.OfferLetters.Count(o => o.Status == "Issued");
+            ViewBag.AcceptedOffersCount = _db.OfferLetters.Count(o => o.Status == "Accepted");
+            // Same "effective status" rule as the view: a Pending/Accepted link past its
+            // ExpiresAt is Expired even though the Status column only flips when it is opened.
+            var pendingLinks = _db.AssessmentInvitations.Count(i => i.Status == "Pending" && i.ExpiresAt >= nowUtc);
+            var acceptedLinks = _db.AssessmentInvitations.Count(i => i.Status == "Accepted" && i.ExpiresAt >= nowUtc);
+            var usedLinks = _db.AssessmentInvitations.Count(i => i.Status == "Used");
+            ViewBag.PendingLinkCount = pendingLinks;
+            ViewBag.AcceptedLinkCount = acceptedLinks;
+            ViewBag.UsedLinkCount = usedLinks;
+            ViewBag.OtherLinkCount = _db.AssessmentInvitations.Count() - pendingLinks - acceptedLinks - usedLinks;
+            // "Today" is the IST calendar day; queried directly so the count and the
+            // "next interview" don't depend on the 12 earliest Scheduled rows above.
+            var todayStartUtc = SchedulingHelper.BusinessDayStartUtc(SchedulingHelper.BusinessToday);
+            ViewBag.TodaysInterviews = _db.InterviewRecords
+                .AsNoTracking()
+                .Include(i => i.User)
+                .Where(i => i.Status == "Scheduled" && i.ScheduledAt >= todayStartUtc && i.ScheduledAt < todayStartUtc.AddDays(1))
+                .OrderBy(i => i.ScheduledAt)
                 .ToList();
             ViewBag.Reports = _db.AssessmentReports
                 .AsNoTracking()
@@ -256,5 +304,9 @@ namespace ExamPortal.Controllers
             }
             return RedirectToAction("Index");
         }
+
+        private static bool TryParseFilterDate(string? value, out DateTime date) =>
+            DateTime.TryParseExact(value?.Trim(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out date);
     }
 }
