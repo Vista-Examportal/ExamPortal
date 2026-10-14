@@ -74,6 +74,13 @@ namespace ExamPortal.Controllers
             // exam wasn't scheduled in server-local/UTC time.
             var startUtc = model.StartDateTime.HasValue ? SchedulingHelper.ConvertWallClockToUtc(model.StartDateTime.Value, model.TimeZone) : (DateTime?)null;
             var endUtc   = model.EndDateTime.HasValue   ? SchedulingHelper.ConvertWallClockToUtc(model.EndDateTime.Value, model.TimeZone)   : (DateTime?)null;
+            if (SchedulingHelper.IsStartInPast(startUtc, DateTime.UtcNow))
+            {
+                // The picker greys out past times (UX only); this is the authoritative check, so
+                // a direct POST or a stale/edited form can't schedule an assessment in the past.
+                ModelState.AddModelError("", "Start date/time can't be in the past.");
+                return View(model);
+            }
             if (startUtc.HasValue && endUtc.HasValue && endUtc.Value <= startUtc.Value)
             {
                 // Without this check, an inverted window doesn't error anywhere obvious — it
@@ -214,7 +221,21 @@ namespace ExamPortal.Controllers
                     ? SchedulingHelper.ConvertUtcToWallClock(exam.EndDateTime.Value, "Asia/Kolkata")
                     : null,
             };
+            PopulateStoredSchedule(exam);
             return View(model);
+        }
+
+        // Exam stores only UTC instants, not the zone they were entered in. These values let the
+        // Edit Schedule page state the stored window unambiguously (business zone + UTC) and let
+        // its script keep the same instant when the zone dropdown is changed.
+        private void PopulateStoredSchedule(Exam exam)
+        {
+            static string? Iso(DateTime? utc) => utc.HasValue
+                ? DateTime.SpecifyKind(utc.Value, DateTimeKind.Utc).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                : null;
+            ViewBag.StoredStartUtcIso = Iso(exam.StartDateTime);
+            ViewBag.StoredEndUtcIso = Iso(exam.EndDateTime);
+            ViewBag.StoredWindowText = SchedulingHelper.FormatScheduleWindow(exam.StartDateTime, exam.EndDateTime);
         }
 
 
@@ -228,6 +249,7 @@ namespace ExamPortal.Controllers
             if (!ModelState.IsValid)
             {
                 model.Title = exam.Title; // never trust the hidden field alone over the real record
+                PopulateStoredSchedule(exam);
                 return View(model);
             }
 
@@ -243,12 +265,23 @@ namespace ExamPortal.Controllers
             var endUtc = model.EndDateTime.HasValue
                 ? SchedulingHelper.ConvertWallClockToUtc(model.EndDateTime.Value, model.TimeZone)
                 : (DateTime?)null;
+            if (!SchedulingHelper.IsStartChangeAllowed(startUtc, exam.StartDateTime, DateTime.UtcNow))
+            {
+                // Same rule as CreateExam, except that re-saving the start the assessment already
+                // has is allowed — a running assessment's start is in the past by definition, and
+                // its End/Status must stay editable.
+                model.Title = exam.Title;
+                PopulateStoredSchedule(exam);
+                ModelState.AddModelError("", "Start date/time can't be in the past.");
+                return View(model);
+            }
             if (!SchedulingHelper.IsValidWindow(startUtc, endUtc))
             {
                 // Same reasoning as CreateExam's identical check: an inverted window doesn't
                 // error anywhere else, it just silently makes the assessment permanently
                 // unreachable via IsAssessmentOpen().
                 model.Title = exam.Title;
+                PopulateStoredSchedule(exam);
                 ModelState.AddModelError("", "End date/time must be after the start date/time.");
                 return View(model);
             }

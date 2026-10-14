@@ -34,17 +34,23 @@
                     This doesn't touch existing attempts, results, or questions.
                 </p>
 
+                <p class="mb-4 text-sm text-slate-700 dark:text-slate-200">
+                    <strong>Currently scheduled:</strong> @ViewBag.StoredWindowText
+                </p>
+
                 <div class="grid grid-cols-12 gap-3">
-                    <div class="col-span-6"><label for="StartDateTime" class="ui-label">Start</label><input asp-for="StartDateTime" class="ui-field" /></div>
-                    <div class="col-span-6"><label for="EndDateTime" class="ui-label">End</label><input asp-for="EndDateTime" class="ui-field" /></div>
+                    <div class="col-span-6"><label for="StartDateTime" class="ui-label">Start</label><input asp-for="StartDateTime" class="ui-field" data-schedule-start data-utc="@ViewBag.StoredStartUtcIso" /></div>
+                    <div class="col-span-6"><label for="EndDateTime" class="ui-label">End</label><input asp-for="EndDateTime" class="ui-field" data-schedule-end data-utc="@ViewBag.StoredEndUtcIso" /></div>
                     <div class="col-span-12">
                         <label for="TimeZone" class="ui-label">Time Zone for Start/End</label>
                         <select asp-for="TimeZone" class="ui-field">
                             @await Html.PartialAsync("_TimeZoneOptions")
                         </select>
                         <div class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                            The assessment doesn't remember which zone it was originally scheduled in —
-                            double-check Start/End above are showing the time you expect before saving.
+                            Start and End are entered in the zone selected here. The assessment doesn't remember
+                            which zone it was originally scheduled in, so it is shown in IST by default; changing
+                            the zone converts the times above and does not change the scheduled moment. Past start
+                            times can't be chosen.
                         </div>
                     </div>
                     <div class="col-span-12">
@@ -73,3 +79,7 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+@await Html.PartialAsync("_ScheduleStartScript")
+}

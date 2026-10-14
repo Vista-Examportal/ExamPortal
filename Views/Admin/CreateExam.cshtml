@@ -33,8 +33,8 @@
                     <div class="grid grid-cols-12 gap-2">
                         <div class="col-span-6"><label for="DurationMinutes" class="ui-label">Duration (minutes)<span class="ui-required" aria-hidden="true">*</span></label><input asp-for="DurationMinutes" class="ui-field" type="number" min="5" max="300" required aria-required="true" aria-describedby="err-DurationMinutes" /><span asp-validation-for="DurationMinutes" id="err-DurationMinutes" class="ui-field-error"></span></div>
                         <div class="col-span-6"><label for="PassingMarks" class="ui-label">Passing Score<span class="ui-required" aria-hidden="true">*</span></label><input asp-for="PassingMarks" class="ui-field" type="number" min="1" required aria-required="true" aria-describedby="err-PassingMarks" /><span asp-validation-for="PassingMarks" id="err-PassingMarks" class="ui-field-error"></span></div>
-                        <div class="col-span-6"><label for="StartDateTime" class="ui-label">Start</label><input asp-for="StartDateTime" class="ui-field" /></div>
-                        <div class="col-span-6"><label for="EndDateTime" class="ui-label">End</label><input asp-for="EndDateTime" class="ui-field" /></div>
+                        <div class="col-span-6"><label for="StartDateTime" class="ui-label">Start</label><input asp-for="StartDateTime" class="ui-field" data-schedule-start /></div>
+                        <div class="col-span-6"><label for="EndDateTime" class="ui-label">End</label><input asp-for="EndDateTime" class="ui-field" data-schedule-end /></div>
                         <div class="col-span-12"><label for="TimeZone" class="ui-label">Time Zone for Start/End</label><select asp-for="TimeZone" class="ui-field">
                             @await Html.PartialAsync("_TimeZoneOptions")
                         </select></div>
@@ -123,6 +123,7 @@
 </form>
 
 @section Scripts {
+@await Html.PartialAsync("_ScheduleStartScript")
 <script>
 let qIdx = @Model.Questions.Count;
 function addQuestion() {

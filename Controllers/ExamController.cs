@@ -170,8 +170,20 @@ namespace ExamPortal.Controllers
                 return RedirectToAction("Details", new { id });
             }
 
-            var existing = await _db.ExamAttempts.FirstOrDefaultAsync(a => a.UserId == UserId && a.ExamId == id && a.SubmittedAt == null);
-            if (existing != null && exam.AllowResumeAssessment) return RedirectToAction("Take", new { attemptId = existing.Id });
+            var existing = await _db.ExamAttempts.Include(a => a.Answers).FirstOrDefaultAsync(a => a.UserId == UserId && a.ExamId == id && a.SubmittedAt == null);
+            switch (AssessmentAttemptRules.DecideStart(existing != null, exam.AllowResumeAssessment))
+            {
+                case StartAttemptDecision.ResumeExisting:
+                    return RedirectToAction("Take", new { attemptId = existing!.Id });
+                case StartAttemptDecision.SubmitAbandoned:
+                    // Resume is off, so the unfinished attempt can't be continued — but it must not be
+                    // left open beside a brand-new one either (two active attempts, and a restarted
+                    // timer). Close it with the answers already auto-saved, exactly like a timeout, and
+                    // apply the usual rule that a retake needs a fresh invitation.
+                    await AutoSubmit(existing!, exam);
+                    TempData["Error"] = "Your earlier attempt was still open and has been submitted with the answers you had saved. A new invitation from the recruitment team is required to retake this assessment.";
+                    return RedirectToAction("Result", new { attemptId = existing!.Id });
+            }
 
             var selectedQuestions = SelectAttemptQuestions(exam);
             var attempt = new ExamAttempt
@@ -456,21 +468,19 @@ namespace ExamPortal.Controllers
             var attempt = await _db.ExamAttempts.FirstOrDefaultAsync(a => a.Id == attemptId && a.UserId == UserId && a.SubmittedAt == null);
             if (attempt == null) return NotFound();
 
-            language = Clamp(language, 50);
-            sourceCode = Clamp(sourceCode, 50_000);
+            // Same deadline rule as AutoSave/Submit: nothing is accepted after the time limit.
+            var exam = await _db.Exams.AsNoTracking().FirstOrDefaultAsync(e => e.Id == attempt.ExamId);
+            if (exam == null) return NotFound();
+            ApplyInvitationSettings(exam, await GetAttemptInvitation(attempt));
+            if (IsAttemptExpired(attempt.StartedAt, exam.DurationMinutes, DateTime.UtcNow))
+                return StatusCode(409, new { output = "Time expired." });
 
-            var output = string.IsNullOrWhiteSpace(sourceCode)
-                ? "No source code provided."
-                : $"Queued {language} code for prototype execution. Sample tests simulated successfully.";
-            _db.CodingSubmissions.Add(new CodingSubmission
-            {
-                AttemptId = attemptId,
-                QuestionId = questionId,
-                Language = language,
-                SourceCode = sourceCode,
-            });
-            await _db.SaveChangesAsync();
-            return Ok(new { output });
+            // There is no code-execution service in this application, and untrusted candidate code
+            // must never be run inside the web process. This endpoint therefore does NOT compile or
+            // run anything and must not report test results — it previously answered "Sample tests
+            // simulated successfully" for any non-empty input, which was untrue. The candidate's code
+            // is already persisted by AutoSave/Submit and is graded manually (GradeAttempt).
+            return Ok(new { output = "Running sample tests isn't available in this assessment. Your code is saved automatically and will be reviewed by the recruitment team after you submit." });
         }
 
         private async Task AutoSubmit(ExamAttempt attempt, Exam exam)

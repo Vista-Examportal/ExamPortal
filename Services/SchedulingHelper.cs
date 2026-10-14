@@ -266,5 +266,41 @@ namespace ExamPortal.Services
         /// </summary>
         public static bool IsValidWindow(DateTime? startUtc, DateTime? endUtc) =>
             !startUtc.HasValue || !endUtc.HasValue || endUtc.Value > startUtc.Value;
+
+        /// <summary>How far in the past a Start may be and still count as "now". The picker has
+        /// minute precision (it cannot express seconds), so a candidate start picked for the
+        /// current minute is already up to 59 seconds old by the time it is posted.</summary>
+        public const int StartTimeGraceMinutes = 1;
+
+        /// <summary>True when a (UTC) start time is earlier than now, allowing
+        /// <see cref="StartTimeGraceMinutes"/> of slack. An unset start is never "in the past".</summary>
+        public static bool IsStartInPast(DateTime? startUtc, DateTime utcNow) =>
+            startUtc.HasValue && startUtc.Value < utcNow.AddMinutes(-StartTimeGraceMinutes);
+
+        /// <summary>
+        /// Rule for a Start submitted when RESCHEDULING an existing assessment. A past start is
+        /// refused, except when it is the start the assessment already has (compared to the
+        /// minute): an assessment that is already running legitimately has a past start, and its
+        /// End/Status must still be editable without touching that value.
+        /// </summary>
+        public static bool IsStartChangeAllowed(DateTime? newStartUtc, DateTime? existingStartUtc, DateTime utcNow)
+        {
+            if (!IsStartInPast(newStartUtc, utcNow)) return true;
+            return existingStartUtc.HasValue
+                && TruncateToMinute(newStartUtc!.Value) == TruncateToMinute(existingStartUtc.Value);
+        }
+
+        private static DateTime TruncateToMinute(DateTime value) =>
+            new DateTime(value.Ticks - (value.Ticks % TimeSpan.TicksPerMinute));
+
+        /// <summary>Unambiguous one-line description of a stored assessment window: each bound in
+        /// the business time zone (labelled) with the same instant in UTC.</summary>
+        public static string FormatScheduleWindow(DateTime? startUtc, DateTime? endUtc)
+        {
+            static string One(DateTime? utc) => utc.HasValue
+                ? $"{FormatBusinessTime(utc, "dd MMM yyyy HH:mm")} ({utc.Value:dd MMM yyyy HH:mm} UTC)"
+                : "not set";
+            return $"{One(startUtc)} to {One(endUtc)}";
+        }
     }
 }

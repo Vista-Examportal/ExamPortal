@@ -136,10 +136,7 @@
                                 <div><strong class="text-[var(--vw-text)]">Sample Tests:</strong> @(q.CodingQuestion?.SampleTestCases)</div>
                                 <div><strong class="text-[var(--vw-text)]">Runtime:</strong> @(q.CodingQuestion?.RuntimeLimitSeconds ?? 2)s, <strong class="text-[var(--vw-text)]">Memory:</strong> @(q.CodingQuestion?.MemoryLimitMb ?? 128) MB</div>
                             </div>
-                            <button type="button" class="ui-btn-outline !px-3 !py-1.5 text-xs mt-2" onclick="runCode(@q.Id)">
-                                <i data-lucide="play" class="h-3.5 w-3.5"></i>Run Sample Tests
-                            </button>
-                            <pre class="rounded-lg border border-[var(--vw-border)] bg-[var(--vw-surface-muted)] p-2.5 mt-2 text-xs overflow-x-auto" id="codeOutput_@q.Id">Output will appear here.</pre>
+                            <p class="mt-2 text-xs text-[var(--vw-text-secondary)]" id="codeOutput_@q.Id">Code is not compiled or run in this assessment. The sample tests above are for reference only; your code is saved automatically and reviewed manually after you submit.</p>
                         </div>
                     }
                     <label class="ui-check-row mt-3 items-center">
@@ -345,14 +342,6 @@
             document.querySelectorAll('.auto-save-text').forEach(t => {
                 autoSave(t.dataset.qid, '', t.value, false);
             });
-        }
-
-        function runCode(questionId) {
-            const code = document.querySelector(`[name="code_${questionId}"]`).value;
-            const language = document.querySelector(`[name="language_${questionId}"]`).value;
-            const body = new URLSearchParams({ attemptId, questionId, language, sourceCode: code, __RequestVerificationToken: csrfToken });
-            fetch('/Exam/RunCode', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body })
-                .then(r => r.json()).then(d => document.getElementById(`codeOutput_${questionId}`).textContent = d.output);
         }
 
         function enterFullScreen() {

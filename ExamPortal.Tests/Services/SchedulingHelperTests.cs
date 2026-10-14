@@ -535,5 +535,91 @@ namespace ExamPortal.Tests.Services
             Assert.Contains("Tuesday, 01 September 2026 at 10:00 (Asia/Kolkata)", body);
             Assert.DoesNotContain(" UTC,", body);
         }
+
+        // ── Start-time-in-the-past rule (CreateExam / EditSchedule) ───────────────
+
+        private static readonly DateTime Now = new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc);
+
+        [Fact]
+        public void IsStartInPast_UnsetStart_IsNeverInThePast() =>
+            Assert.False(SchedulingHelper.IsStartInPast(null, Now));
+
+        [Fact]
+        public void IsStartInPast_EarlierToday_IsInThePast() =>
+            Assert.True(SchedulingHelper.IsStartInPast(Now.AddHours(-2), Now));
+
+        [Fact]
+        public void IsStartInPast_LaterToday_IsAllowed() =>
+            Assert.False(SchedulingHelper.IsStartInPast(Now.AddHours(2), Now));
+
+        [Fact]
+        public void IsStartInPast_CurrentMinute_IsAllowedWithinGrace()
+        {
+            // The picker has minute precision, so "now" truncated to the minute is up to 59s old.
+            Assert.False(SchedulingHelper.IsStartInPast(Now.AddSeconds(-59), Now));
+            Assert.True(SchedulingHelper.IsStartInPast(Now.AddMinutes(-2), Now));
+        }
+
+        [Fact]
+        public void IsStartInPast_UsesTheSelectedTimeZone_NotTheServerClock()
+        {
+            // 12:00 UTC is 17:30 IST. The wall-clock "15:00" is in the past when read as IST
+            // (09:30 UTC) but in the future when (mis)read as UTC — the check must use the zone.
+            var wall = new DateTime(2026, 10, 14, 15, 0, 0);
+            Assert.True(SchedulingHelper.IsStartInPast(SchedulingHelper.ConvertWallClockToUtc(wall, "Asia/Kolkata"), Now));
+            Assert.False(SchedulingHelper.IsStartInPast(SchedulingHelper.ConvertWallClockToUtc(wall, "UTC"), Now));
+            // ...and a later time today in IST (19:00 IST = 13:30 UTC) is allowed.
+            var later = new DateTime(2026, 10, 14, 19, 0, 0);
+            Assert.False(SchedulingHelper.IsStartInPast(SchedulingHelper.ConvertWallClockToUtc(later, "Asia/Kolkata"), Now));
+        }
+
+        [Fact]
+        public void IsStartChangeAllowed_NewPastStart_IsRejected() =>
+            Assert.False(SchedulingHelper.IsStartChangeAllowed(Now.AddDays(-1), Now.AddDays(-3), Now));
+
+        [Fact]
+        public void IsStartChangeAllowed_NewFutureStart_IsAllowed() =>
+            Assert.True(SchedulingHelper.IsStartChangeAllowed(Now.AddDays(1), Now.AddDays(-3), Now));
+
+        [Fact]
+        public void IsStartChangeAllowed_UnchangedPastStart_IsAllowed_SoRunningAssessmentsStayEditable()
+        {
+            var existing = DateTime.SpecifyKind(Now.AddDays(-1).AddSeconds(30), DateTimeKind.Unspecified); // as EF returns it
+            var resubmitted = Now.AddDays(-1); // picker value: minute precision, Kind=Utc
+            Assert.True(SchedulingHelper.IsStartChangeAllowed(resubmitted, existing, Now));
+        }
+
+        [Fact]
+        public void IsStartChangeAllowed_PastStartWhenNoneStored_IsRejected() =>
+            Assert.False(SchedulingHelper.IsStartChangeAllowed(Now.AddDays(-1), null, Now));
+
+        [Fact]
+        public void IsStartChangeAllowed_ClearingStart_IsAllowed() =>
+            Assert.True(SchedulingHelper.IsStartChangeAllowed(null, Now.AddDays(-1), Now));
+
+        [Fact]
+        public void IsStartChangeAllowed_EndAfterStartRuleStillApplies()
+        {
+            Assert.False(SchedulingHelper.IsValidWindow(Now.AddHours(2), Now.AddHours(1)));
+            Assert.False(SchedulingHelper.IsValidWindow(Now.AddHours(2), Now.AddHours(2)));
+            Assert.True(SchedulingHelper.IsValidWindow(Now.AddHours(2), Now.AddHours(3)));
+        }
+
+        // ── Unambiguous display of a stored window ────────────────────────────────
+
+        [Fact]
+        public void FormatScheduleWindow_ShowsBusinessZoneAndUtcForBothBounds()
+        {
+            var start = new DateTime(2026, 10, 23, 21, 0, 0, DateTimeKind.Unspecified); // 24 Oct 02:30 IST
+            var end = new DateTime(2026, 10, 29, 11, 10, 0, DateTimeKind.Unspecified);  // 29 Oct 16:40 IST
+
+            var text = SchedulingHelper.FormatScheduleWindow(start, end);
+
+            Assert.Equal("24 Oct 2026 02:30 IST (23 Oct 2026 21:00 UTC) to 29 Oct 2026 16:40 IST (29 Oct 2026 11:10 UTC)", text);
+        }
+
+        [Fact]
+        public void FormatScheduleWindow_UnsetBounds_SayNotSet() =>
+            Assert.Equal("not set to not set", SchedulingHelper.FormatScheduleWindow(null, null));
     }
 }
